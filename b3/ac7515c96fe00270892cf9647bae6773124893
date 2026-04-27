@@ -1,0 +1,54 @@
+apps/server/src/main.py
+  825e9ea16186ef37 61,86
+apps/server/tests/test_flat_src_layout.py
+  15391c6bd9255141 1-3,5-6,8-9,11,17,19-22,24,27,32
+  825e9ea16186ef37 4,7,10,12-16,18,23,25-26,28-31,33-43
+apps/server/tests/test_controller_modules.py
+  825e9ea16186ef37 102-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b3ac7515c96fe00270892cf9647bae6773124893",
+  "prompts": {
+    "15391c6bd9255141": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcdbf-fe21-7c73-a07c-99fcc155cb3c",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 1850,
+      "total_deletions": 0,
+      "accepted_lines": 1964,
+      "overriden_lines": 0
+    },
+    "2c004a45453e4481": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba2f9dbe-b91e-4199-b230-7047646ad661",
+        "model": "<synthetic>"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 4,
+      "accepted_lines": 596,
+      "overriden_lines": 0
+    },
+    "825e9ea16186ef37": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcdd5-56c9-7982-9dbb-893d330b0b61",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 51,
+      "total_deletions": 8,
+      "accepted_lines": 51,
+      "overriden_lines": 0
+    }
+  }
+}
