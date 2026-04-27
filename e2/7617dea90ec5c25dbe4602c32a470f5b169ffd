@@ -1,0 +1,38 @@
+apps/server/tests/test_shop_installations.py
+  0606fc2f66b9aae3 4,7,23-24,29,31-32,37,39-51
+apps/server/tests/test_hmac_webhook.py
+  0606fc2f66b9aae3 1-182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "e27617dea90ec5c25dbe4602c32a470f5b169ffd",
+  "prompts": {
+    "0606fc2f66b9aae3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcda1-514a-7510-abb5-cd8b514903dd",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 203,
+      "total_deletions": 7,
+      "accepted_lines": 203,
+      "overriden_lines": 0
+    },
+    "2c004a45453e4481": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba2f9dbe-b91e-4199-b230-7047646ad661",
+        "model": "<synthetic>"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 820,
+      "total_deletions": 104,
+      "accepted_lines": 394,
+      "overriden_lines": 0
+    }
+  }
+}
