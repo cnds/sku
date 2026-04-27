@@ -1,0 +1,78 @@
+apps/server/tests/test_controller_modules.py
+  dd67b498be0f7085 10,63-76
+apps/server/src/controllers/router.py
+  dd67b498be0f7085 6,10
+apps/server/src/services/diagnosis.py
+  dd67b498be0f7085 5,7-8,13-15,25-29,32,47,64-70
+  bf39326ba416a3e8 31,33-39,42-46,48,71
+  76e8b515380826fd 1-4,6,9-12,16-24,30,40-41,49-63
+apps/server/src/repositories/diagnosis.py
+  dd67b498be0f7085 1-74
+apps/server/tests/test_request_context.py
+  dd67b498be0f7085 1-199
+apps/server/src/main.py
+  dd67b498be0f7085 9,12,24-25,32-36,77,91,158,161,191,194
+apps/server/src/controllers/diagnosis.py
+  dd67b498be0f7085 1-56
+apps/server/src/services/job_dispatch.py
+  dd67b498be0f7085 1-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "df61c771ed413bbc1a5dee9e7e956c8778691fbd",
+  "prompts": {
+    "76e8b515380826fd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019db7e5-945f-7a00-a835-f2a52cb66b18",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1296,
+      "overriden_lines": 0
+    },
+    "b181992ca5ff3ddb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcd70-d15a-7e60-b390-94b5157e2d4b",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "bf39326ba416a3e8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcc82-9306-7ab2-8a70-2062f9fd3a2e",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 149,
+      "overriden_lines": 0
+    },
+    "dd67b498be0f7085": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcd88-4e92-76d3-aaeb-6b7a8bff6e1b",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 453,
+      "total_deletions": 188,
+      "accepted_lines": 453,
+      "overriden_lines": 0
+    }
+  }
+}
