@@ -1,0 +1,23 @@
+apps/server/tests/test_flat_src_layout.py
+  825e9ea16186ef37 10-12,14,27-29,31
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "18a90e76eca7a83a04a7235d3b52019025bde9db",
+  "prompts": {
+    "825e9ea16186ef37": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcdd5-56c9-7982-9dbb-893d330b0b61",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 1841,
+      "total_deletions": 0,
+      "accepted_lines": 2035,
+      "overriden_lines": 0
+    }
+  }
+}
