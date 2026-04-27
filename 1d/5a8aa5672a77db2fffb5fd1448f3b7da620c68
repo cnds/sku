@@ -1,0 +1,36 @@
+apps/server/tests/test_ingestion_and_rollups.py
+  15391c6bd9255141 1-237
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "1d5a8aa5672a77db2fffb5fd1448f3b7da620c68",
+  "prompts": {
+    "15391c6bd9255141": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcdbf-fe21-7c73-a07c-99fcc155cb3c",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 2088,
+      "total_deletions": 5,
+      "accepted_lines": 2201,
+      "overriden_lines": 0
+    },
+    "2c004a45453e4481": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba2f9dbe-b91e-4199-b230-7047646ad661",
+        "model": "<synthetic>"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 596,
+      "total_deletions": 48,
+      "accepted_lines": 594,
+      "overriden_lines": 0
+    }
+  }
+}
