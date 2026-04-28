@@ -1,0 +1,12 @@
+{
+  "name": "@sku-lens/extension",
+  "description": "Theme App Extension for SKU Lens storefront engagement tracking.",
+  "private": true,
+  "scripts": {
+    "build": "echo 'Theme App Extension scaffold only'",
+    "dev": "echo 'Use Shopify CLI to serve the extension'",
+    "lint": "echo 'No extension lint configured yet'",
+    "test": "echo 'No extension tests configured yet'",
+    "typecheck": "echo 'No extension typecheck configured yet'"
+  }
+}

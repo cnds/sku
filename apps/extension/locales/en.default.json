@@ -1,0 +1,11 @@
+{
+  "name": "SKU Lens",
+  "settings": {
+    "ingest_endpoint": {
+      "label": "Ingest endpoint"
+    },
+    "public_token": {
+      "label": "Store public token"
+    }
+  }
+}

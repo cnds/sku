@@ -1,0 +1,131 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: sku-lens-mysql
+    environment:
+      MYSQL_DATABASE: sku_lens
+      MYSQL_USER: sku
+      MYSQL_PASSWORD: sku
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+
+  redis:
+    image: redis:7.4-alpine
+    container_name: sku-lens-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile.dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+aiomysql://sku:sku@mysql:3306/sku_lens
+      REDIS_URL: redis://redis:6379/0
+      SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:?set SHOPIFY_API_KEY in .env}
+      SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:?set SHOPIFY_API_SECRET in .env}
+      SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:?set SHOPIFY_SCOPES in .env}
+      SHOPIFY_APP_URL: ${SHOPIFY_APP_URL:?set SHOPIFY_APP_URL in .env}
+      SHOPIFY_WEBHOOK_BASE_URL: ${SHOPIFY_WEBHOOK_BASE_URL:?set SHOPIFY_WEBHOOK_BASE_URL in .env}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?set GEMINI_API_KEY in .env}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
+      INGEST_TOKEN_TTL_SECONDS: ${INGEST_TOKEN_TTL_SECONDS:-300}
+    command: ["sh", "/workspace/scripts/dev-server.sh"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/openapi.json').read()\"",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    init: true
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/workspace
+      - server-venv:/workspace/apps/server/.venv
+      - uv-cache:/root/.cache/uv
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile.dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+aiomysql://sku:sku@mysql:3306/sku_lens
+      REDIS_URL: redis://redis:6379/0
+      SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:?set SHOPIFY_API_KEY in .env}
+      SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:?set SHOPIFY_API_SECRET in .env}
+      SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:?set SHOPIFY_SCOPES in .env}
+      SHOPIFY_APP_URL: ${SHOPIFY_APP_URL:?set SHOPIFY_APP_URL in .env}
+      SHOPIFY_WEBHOOK_BASE_URL: ${SHOPIFY_WEBHOOK_BASE_URL:?set SHOPIFY_WEBHOOK_BASE_URL in .env}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:?set GEMINI_API_KEY in .env}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
+      INGEST_TOKEN_TTL_SECONDS: ${INGEST_TOKEN_TTL_SECONDS:-300}
+    command: ["sh", "/workspace/scripts/dev-worker.sh"]
+    init: true
+    volumes:
+      - .:/workspace
+      - worker-venv:/workspace/apps/server/.venv
+      - uv-cache:/root/.cache/uv
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile.dev
+    depends_on:
+      server:
+        condition: service_healthy
+    environment:
+      CHOKIDAR_USEPOLLING: "true"
+      SERVER_API_URL: http://server:8000
+      SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:?set SHOPIFY_API_KEY in .env}
+    command: ["sh", "/workspace/scripts/dev-web.sh"]
+    init: true
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/workspace
+      - node-modules:/workspace/node_modules
+      - web-node-modules:/workspace/apps/web/node_modules
+      - pnpm-store:/pnpm/store
+
+volumes:
+  mysql-data:
+  redis-data:
+  node-modules:
+  pnpm-store:
+  server-venv:
+  uv-cache:
+  web-node-modules:
+  worker-venv:

@@ -1,0 +1,28 @@
+<div hidden data-sku-lens-root></div>
+<script
+  src="{{ 'sku-lens-tracker.js' | asset_url }}"
+  defer
+  data-endpoint="{{ block.settings.ingest_endpoint }}"
+  data-public-token="{{ block.settings.public_token }}"
+  data-shop-domain="{{ shop.permanent_domain }}"
+></script>
+
+{% schema %}
+{
+  "name": "t:name",
+  "target": "body",
+  "settings": [
+    {
+      "type": "text",
+      "id": "ingest_endpoint",
+      "label": "t:settings.ingest_endpoint.label",
+      "default": "http://localhost:8000/ingest/events"
+    },
+    {
+      "type": "text",
+      "id": "public_token",
+      "label": "t:settings.public_token.label"
+    }
+  ]
+}
+{% endschema %}

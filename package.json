@@ -1,0 +1,19 @@
+{
+  "name": "sku-lens",
+  "description": "SKU Lens monorepo for AI Winner & Loser Analysis.",
+  "private": true,
+  "packageManager": "pnpm@10.10.0",
+  "scripts": {
+    "build": "npm --prefix apps/web run build",
+    "dev": "npm --prefix apps/web run dev",
+    "lint": "npm run typecheck",
+    "perf:storefront": "node scripts/check-storefront-lighthouse.mjs",
+    "test": "npm run typecheck",
+    "typecheck": "npm run typecheck:web",
+    "typecheck:web": "npm --prefix apps/web run typecheck"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "typescript": "^5.6.3"
+  }
+}

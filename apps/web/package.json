@@ -1,0 +1,33 @@
+{
+  "name": "@sku-lens/web",
+  "description": "Embedded Shopify admin app for SKU Lens.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite dev",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remix-run/node": "latest",
+    "@remix-run/react": "latest",
+    "@shopify/app-bridge-react": "latest",
+    "@shopify/polaris": "latest",
+    "@shopify/polaris-icons": "latest",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@remix-run/dev": "^2.17.4",
+    "@remix-run/testing": "^2.17.4",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.21",
+    "vite-tsconfig-paths": "^4.3.2",
+    "vitest": "^1.6.1"
+  }
+}
