@@ -1,0 +1,298 @@
+apps/server/src/services/__init__.py
+  825e9ea16186ef37 1-2
+apps/server/tests/conftest.py
+  825e9ea16186ef37 1-41
+scripts/dev-web.sh
+  7bf7f192e08e1048 1-8
+apps/server/src/db.py
+  825e9ea16186ef37 1-52
+README.md
+  825e9ea16186ef37 1,3,5,8,10-11,14,16-17,19-21,25,27,34,36,38-42,44,47,49-52,56,58,60-64,68,73-77,81,83,85-90
+  400c298ef821b1f3 18
+  7bf7f192e08e1048 6,12,22-23,28-32,46,48,54,59,66,70-72,79
+apps/server/src/config.py
+  825e9ea16186ef37 1-32
+apps/web/app/routes/_index.tsx
+  2c004a45453e4481 1,3,5,7-9,12,19-20,31,36,38-61,64-65,67-71,74-107,109-124,126-166,168,170-175,177
+  0606fc2f66b9aae3 2,4,6,10-11,13-18,21-30,32-35,37,62-63,66,72-73,108,125,167,169,176,178-179
+apps/web/app/lib/messages.ts
+  2c004a45453e4481 1-88
+apps/server/src/schemas.py
+  825e9ea16186ef37 1-37,39-50,65-69,72-78,81-101,110-124
+  231a2b0662c4f0ac 38,70-71,79-80,102-109
+  255801cabc5552a0 51-64
+apps/server/Dockerfile.dev
+  825e9ea16186ef37 1-10
+apps/server/tests/test_flat_src_layout.py
+  7bf7f192e08e1048 18,39-41
+apps/web/app/lib/diagnosis.ts
+  7bf7f192e08e1048 1-33
+apps/server/src/security/__init__.py
+  76e8b515380826fd 1-2
+apps/extension/blocks/sku-lens-tracker.liquid
+  2c004a45453e4481 12-24
+apps/web/tsconfig.json
+  7bf7f192e08e1048 1-10
+apps/server/README.md
+  825e9ea16186ef37 1-4
+apps/server/src/services/gemini.py
+  825e9ea16186ef37 1-70,76-83,87-88,95-150
+  231a2b0662c4f0ac 71-75,84-86,89-94
+apps/extension/assets/sku-lens-tracker.js
+  2c004a45453e4481 55-57,59,65,67-69,75,120,128
+  825e9ea16186ef37 1,54,60-61,66,78,99,105-107,110-111,135,138,145-147,152,154-156,159-173,176,367,380,391,396,398,401,453-454,495,497,499
+  231a2b0662c4f0ac 2-53,58,62-64,70-74,76-77,79-98,100-104,108-109,112-119,121-127,129-134,136-137,139-144,148-151,153,157-158,174-175,177-366,368-379,381-390,392-395,397,399-400,402-452,455-494,496,498
+apps/server/src/repositories/__init__.py
+  825e9ea16186ef37 1-2
+.env.example
+  825e9ea16186ef37 1-11
+.gitignore
+  825e9ea16186ef37 1-23
+  7bf7f192e08e1048 24
+apps/web/tests/routes.resources.products.$productId.diagnosis.test.ts
+  7bf7f192e08e1048 1-100
+package.json
+  825e9ea16186ef37 1-19
+apps/extension/locales/en.default.json
+  2c004a45453e4481 1-11
+apps/server/pyproject.toml
+  825e9ea16186ef37 1-67
+apps/web/app/lib/url.ts
+  2c004a45453e4481 1-14
+apps/web/app/lib/contracts.ts
+  7bf7f192e08e1048 1-52
+apps/server/tests/test_ingestion_and_rollups.py
+  231a2b0662c4f0ac 293-498
+apps/server/tests/test_product_analysis.py
+  825e9ea16186ef37 1-8,10-97
+  255801cabc5552a0 9,98-195
+apps/server/tests/test_controller_modules.py
+  7bf7f192e08e1048 9-10,15,23-24,152-156,170-171,183,258-361
+apps/web/app/components/AnalysisPanel.tsx
+  2c004a45453e4481 2-15,20,29-121,189-190,192-195,197,200,202-211,216-219,223
+  0606fc2f66b9aae3 1,16-19,21-28,122-188,191,196,198-199,201,212-215,220-222,224-235
+scripts/check-storefront-lighthouse.mjs
+  7bf7f192e08e1048 1-146
+apps/server/tests/test_models.py
+  825e9ea16186ef37 1-20
+apps/web/app/lib/api.server.ts
+  825e9ea16186ef37 1-21,31-36,38-46,48-56,62,64-68,74-82,84-93,95-116
+  2c004a45453e4481 22-30,37,47,57-61,63,69-73,83,94
+apps/web/app/routes/resources.products.$productId.diagnosis.ts
+  2c004a45453e4481 13-14,31-32
+  0606fc2f66b9aae3 1-12,15-30,33
+apps/web/app/components/LeaderboardTable.tsx
+  2c004a45453e4481 1-132
+apps/web/app/routes/products.$productId.tsx
+  2c004a45453e4481 2-3,8-9,11-35,43,45,49,54,59-68,72-80
+  0606fc2f66b9aae3 1,4-7,10,36-42,44,46-48,50-53,55-58,69-71,81-85
+apps/server/src/repositories/analytics.py
+  825e9ea16186ef37 1-55,58-71,74-98,100-103,110,121-123,129-139,142-150
+  231a2b0662c4f0ac 56-57,72-73,99,104-109,111-120,124-128,140-141
+apps/server/src/models.py
+  825e9ea16186ef37 1-15,21-38,40-63,76-107
+  231a2b0662c4f0ac 16-20,39,64-75
+pnpm-workspace.yaml
+  825e9ea16186ef37 1-2
+docker-compose.yml
+  825e9ea16186ef37 1-131
+apps/web/app/entry.server.tsx
+  7bf7f192e08e1048 1-49
+.dockerignore
+  825e9ea16186ef37 1-23
+apps/web/app/types.d.ts
+  7bf7f192e08e1048 1-4
+apps/server/tests/test_diagnosis.py
+  255801cabc5552a0 6,11,60-238
+  825e9ea16186ef37 1-5,7-10,12-59
+apps/web/app/root.tsx
+  0606fc2f66b9aae3 1-9,11,14,17-64,67-80,82-85,128-132
+  2c004a45453e4481 10,12-13,15-16,65-66,81,86-127
+apps/web/app/entry.client.tsx
+  7bf7f192e08e1048 1-13
+apps/server/src/security/shopify.py
+  76e8b515380826fd 1-6,8-25,43-75
+  255801cabc5552a0 7,26-42
+scripts/dev-server.sh
+  7bf7f192e08e1048 1-15
+tsconfig.base.json
+  825e9ea16186ef37 1-13
+apps/server/tests/test_leaderboard.py
+  825e9ea16186ef37 1-71
+AGENTS.md
+  7bf7f192e08e1048 5,7-8,16-17,20,24,26,31,64
+  825e9ea16186ef37 1-4,6,9-13,15,18-19,21-23,25,27-30,34-63
+  400c298ef821b1f3 14,32-33
+apps/web/tests/root.test.tsx
+  15391c6bd9255141 1-16,18-33,35-46
+  2c004a45453e4481 17,34
+apps/web/tests/routes.products.$productId.test.ts
+  2c004a45453e4481 47
+  15391c6bd9255141 1-46,48-72
+apps/server/src/services/ingestion.py
+  825e9ea16186ef37 1-2,5-7,10-40
+  255801cabc5552a0 3-4,8-9,41-91
+apps/server/src/services/shopify.py
+  825e9ea16186ef37 1-2,10-11,110-146
+  255801cabc5552a0 3-9,12-109
+apps/server/tests/test_worker_module.py
+  255801cabc5552a0 3-4,9-22,25-26,38-47,50-65,67-74,76-78,83-245
+  825e9ea16186ef37 1-2,5-8,23-24,27-37,48-49,66,75,79-82
+scripts/dev-worker.sh
+  7bf7f192e08e1048 1-7
+apps/web/Dockerfile.dev
+  7bf7f192e08e1048 1-9
+apps/server/tests/test_branding_metadata.py
+  825e9ea16186ef37 1-27
+apps/server/src/worker.py
+  255801cabc5552a0 5,11-18,25,27,31-34,36-70,73-74,78,81-82,88,99,117-118,122,138-142,146-160,165-169,173-187,190-200
+  825e9ea16186ef37 1-4,6-10,19-24,26,28-30,35,71-72,75-77,79-80,83-87,89-98,100-116,119-121,123-137,143-145,161-164,170-172,188-189
+apps/server/src/services/rollups.py
+  825e9ea16186ef37 1-5,7-11,22-27,35-43,56,70-71,75,77,80-82,84-85,88-90,96-98,112-128,142-145
+  231a2b0662c4f0ac 6,12-21,28-34,44-55,57-69,72-74,76,78-79,83,86-87,91-95,99-111,129-141
+apps/web/app/lib/analytics.ts
+  2c004a45453e4481 2-10
+apps/server/tests/test_request_context.py
+  255801cabc5552a0 4,17-25,156-319,374-411,413-429,468
+  231a2b0662c4f0ac 362-370,430-436
+apps/server/src/services/analysis.py
+  255801cabc5552a0 9-10,93-105,117-120,124-133
+  231a2b0662c4f0ac 81-82,88-89
+  825e9ea16186ef37 1-8,11-80,83-87,90-92,106-116,121-123,134-143
+apps/extension/shopify.extension.toml
+  2c004a45453e4481 1-2
+  825e9ea16186ef37 3-4
+apps/server/src/job_queue.py
+  255801cabc5552a0 36-66
+  825e9ea16186ef37 1-35
+apps/server/tests/test_ingest_auth_service.py
+  7bf7f192e08e1048 8-13,53,60,76,83,109,116
+apps/web/package.json
+  7bf7f192e08e1048 1-33
+apps/web/vite.config.ts
+  7bf7f192e08e1048 1-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "c2c8a8a3f64529f028fcfb46b65d4fbfd5635364",
+  "prompts": {
+    "0606fc2f66b9aae3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcda1-514a-7510-abb5-cd8b514903dd",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 286,
+      "overriden_lines": 0
+    },
+    "15391c6bd9255141": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcdbf-fe21-7c73-a07c-99fcc155cb3c",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 115,
+      "overriden_lines": 0
+    },
+    "231a2b0662c4f0ac": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2c4cc67a-5f31-4744-88c6-0496b2e3b176",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 1054,
+      "total_deletions": 145,
+      "accepted_lines": 822,
+      "overriden_lines": 0
+    },
+    "255801cabc5552a0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dce4b-0c2c-7222-9252-d75498f23a97",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 1118,
+      "total_deletions": 89,
+      "accepted_lines": 1095,
+      "overriden_lines": 0
+    },
+    "2c004a45453e4481": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ba2f9dbe-b91e-4199-b230-7047646ad661",
+        "model": "<synthetic>"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 166,
+      "total_deletions": 67,
+      "accepted_lines": 671,
+      "overriden_lines": 0
+    },
+    "400c298ef821b1f3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcecf-9182-7651-a9bf-396de30bcb7e",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "76e8b515380826fd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019db7e5-945f-7a00-a835-f2a52cb66b18",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 231,
+      "overriden_lines": 0
+    },
+    "7bf7f192e08e1048": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dd1db-5d32-7311-ac01-b0511d537488",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 666,
+      "total_deletions": 191,
+      "accepted_lines": 666,
+      "overriden_lines": 0
+    },
+    "825e9ea16186ef37": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dcdd5-56c9-7982-9dbb-893d330b0b61",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 1833,
+      "total_deletions": 0,
+      "accepted_lines": 1810,
+      "overriden_lines": 0
+    }
+  }
+}
