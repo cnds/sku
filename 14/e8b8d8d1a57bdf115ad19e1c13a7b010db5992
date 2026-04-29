@@ -1,0 +1,23 @@
+.gitignore
+  dcfeb952780dc5c7 25
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "14e8b8d8d1a57bdf115ad19e1c13a7b010db5992",
+  "prompts": {
+    "dcfeb952780dc5c7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dd813-29d2-7240-b43e-29fd9cb35810",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
