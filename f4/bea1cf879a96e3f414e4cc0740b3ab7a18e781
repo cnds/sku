@@ -1,0 +1,195 @@
+apps/server/src/services/gemini.py
+  a093465e9c2f3059 79,81-89,118-120,123-125,127-129,131-133,142-146,148-149,153-154
+apps/server/src/services/ingest_auth.py
+  dcfeb952780dc5c7 9,50,67
+apps/web/app/lib/logging.ts
+  dcfeb952780dc5c7 1-139
+apps/server/src/config.py
+  dcfeb952780dc5c7 11
+apps/extension/assets/sku-lens-tracker.js
+  dcfeb952780dc5c7 5-72,76-79,209-216,231-237,243,253-264,267-273
+apps/server/tests/test_demo_seed.py
+  dcfeb952780dc5c7 1-145
+apps/web/tests/api.server.test.ts
+  dcfeb952780dc5c7 1-105
+apps/server/src/services/rollups.py
+  dcfeb952780dc5c7 3,10,24-34
+apps/server/src/models.py
+  dcfeb952780dc5c7 7,91
+README.md
+  dcfeb952780dc5c7 3,5-6,11,22,24-27,29-33,74-75,77-79
+apps/server/tests/test_ingestion_and_rollups.py
+  dcfeb952780dc5c7 17,140-145,163,200-202,220,256-261,286,293-345
+apps/server/src/repositories/installations.py
+  dcfeb952780dc5c7 3-5,27,35,42,44-58
+scripts/dev-server.sh
+  dcfeb952780dc5c7 11
+apps/web/app/root.tsx
+  a73e48108146997a 74
+apps/server/src/main.py
+  dbe0dcf80b3752b4 21,32-33,111-125,132-136,144-149,155-159
+  8de05ff023eaf4e8 3,6-7,38,106-107,110,126,130,137,140-141,150,160,167
+apps/server/src/seed_demo.py
+  dcfeb952780dc5c7 1-408
+apps/web/app/routes/_index.tsx
+  a093465e9c2f3059 86,88,90-92,96,98-100,103
+apps/server/src/controllers/ingestion.py
+  dbe0dcf80b3752b4 13,29-35,56-62
+  8de05ff023eaf4e8 3,10,23,28,36-38,45-51,53
+AGENTS.md
+  dcfeb952780dc5c7 7,16,18-25,29,42,65-77,86
+apps/server/src/controllers/diagnosis.py
+  a093465e9c2f3059 24,33,41-54,62
+apps/server/src/controllers/analytics.py
+  a093465e9c2f3059 20,34
+apps/server/src/services/job_dispatch.py
+  dcfeb952780dc5c7 3,7,12-14,30-66,73-77,89-115,117,119
+apps/web/app/components/RadarChart.tsx
+  a093465e9c2f3059 1-189
+apps/server/src/logging_utils.py
+  dbe0dcf80b3752b4 12
+  8de05ff023eaf4e8 1-11,13-21
+apps/web/app/routes/products.$productId.tsx
+  a093465e9c2f3059 3,8,39,43,57-58,66,74
+apps/server/tests/test_db.py
+  dcfeb952780dc5c7 1-77
+apps/web/app/components/AnalysisPanel.tsx
+  a093465e9c2f3059 19,28-31,33-52,55,94-119,121-122,124,127-155,167-169,172,185-188,217-226,246-250,253
+apps/server/tests/test_worker_module.py
+  dbe0dcf80b3752b4 203,213-214,236-240,242,247-248,251-252
+  9c16b303f804a5aa 11,19,292-378
+  8de05ff023eaf4e8 3,157,159,212,215-235,241,243-246,249-250,253
+apps/server/src/db.py
+  dcfeb952780dc5c7 8-9,55-125
+apps/server/tests/conftest.py
+  dcfeb952780dc5c7 11,43-50
+apps/server/tests/test_shopify_service.py
+  dcfeb952780dc5c7 32,45,51,63,70-80,88,90,95,121,125
+apps/web/app/lib/contracts.ts
+  a093465e9c2f3059 17-18
+apps/server/src/job_queue.py
+  8de05ff023eaf4e8 9,32,36,44
+  dbe0dcf80b3752b4 4,8,37-43
+apps/server/src/services/shop_time.py
+  dcfeb952780dc5c7 1-42
+apps/server/src/controllers/shopify.py
+  8de05ff023eaf4e8 3-4,10,48,52,64,73
+  dbe0dcf80b3752b4 17,33-35,68-72
+apps/server/pyproject.toml
+  dcfeb952780dc5c7 22,37,45,50
+apps/server/src/services/shop_installations.py
+  9c16b303f804a5aa 3-5,8-12,16-21,23,31,33-39,43,45-61
+apps/web/app/lib/api.server.ts
+  a093465e9c2f3059 139,142
+apps/web/tests/routes.resources.products.$productId.diagnosis.test.ts
+  dcfeb952780dc5c7 46,85
+apps/server/src/services/ingestion.py
+  dcfeb952780dc5c7 13-25,63-65,76,78-84,95-97,107-108,111,114-117
+.env.example
+  dcfeb952780dc5c7 8
+apps/web/vite.config.ts
+  a73e48108146997a 17
+apps/server/tests/test_logging_utils.py
+  dcfeb952780dc5c7 1-23
+apps/server/tests/test_controller_modules.py
+  a093465e9c2f3059 186,256,362
+apps/server/tests/test_request_context.py
+  a093465e9c2f3059 404
+  8de05ff023eaf4e8 136-138,140-142,147,157-159,165-166,209,215,223,398,467
+  dbe0dcf80b3752b4 139,143-146,148-156,160-164
+apps/server/tests/test_hmac_webhook.py
+  dcfeb952780dc5c7 193-198
+apps/web/tests/routes.products.$productId.test.ts
+  dcfeb952780dc5c7 56
+apps/web/app/components/LeaderboardTable.tsx
+  a093465e9c2f3059 18,27,61-65,84,100-101
+apps/web/app/lib/messages.ts
+  a093465e9c2f3059 18,21,23-26,30,34,52,60-67
+apps/server/src/services/shopify.py
+  dcfeb952780dc5c7 16,47,67-70,104,110-113,119,158-177
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "f4bea1cf879a96e3f414e4cc0740b3ab7a18e781",
+  "prompts": {
+    "8de05ff023eaf4e8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dd36d-5d6c-79b2-aa35-162dea15c76f",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 836,
+      "total_deletions": 587,
+      "accepted_lines": 128,
+      "overriden_lines": 0
+    },
+    "9c16b303f804a5aa": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dd21f-516e-7213-8f28-e83b15c9f8f5",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 130,
+      "total_deletions": 3,
+      "accepted_lines": 130,
+      "overriden_lines": 0
+    },
+    "a093465e9c2f3059": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f99fefac-9db4-4a71-bf49-c88ec2ace64d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 5416,
+      "total_deletions": 248,
+      "accepted_lines": 631,
+      "overriden_lines": 0
+    },
+    "a73e48108146997a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0ef1ea81-429a-48d3-bec2-1a6f1ff0cb02",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 3,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "dbe0dcf80b3752b4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dd74a-ffb1-7960-b19a-0825fade3029",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 119,
+      "total_deletions": 305,
+      "accepted_lines": 105,
+      "overriden_lines": 0
+    },
+    "dcfeb952780dc5c7": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019dd813-29d2-7240-b43e-29fd9cb35810",
+        "model": "gpt-5.4"
+      },
+      "human_author": "丁松",
+      "messages": [],
+      "total_additions": 1467,
+      "total_deletions": 88,
+      "accepted_lines": 1467,
+      "overriden_lines": 0
+    }
+  }
+}
