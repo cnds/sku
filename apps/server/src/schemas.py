@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from enum import StrEnum
 from typing import Any
 
@@ -23,7 +23,12 @@ class TimeWindow(StrEnum):
         return timedelta(days=30)
 
     def start_date(self, *, now: datetime | None = None) -> datetime.date:
-        reference = now or datetime.now(UTC)
+        return self.start_date_from_reference_date(
+            reference_date=(now or datetime.now(UTC)).date()
+        )
+
+    def start_date_from_reference_date(self, *, reference_date: date) -> date:
+        reference = datetime.combine(reference_date, time.min, tzinfo=UTC)
         return (reference - self.delta).date()
 
 

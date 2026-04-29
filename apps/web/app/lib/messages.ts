@@ -15,27 +15,23 @@ export const messages = {
   },
 
   dashboard: {
-    subtitle: "AI-powered winner & loser analysis",
+    subtitle: "AI-powered product performance ranking",
     viewTopProduct: "View top product",
     bannerText: (count: number, window: string) =>
-      `Tracking ${count} products for ${window}. SKU Lens audits product pages by measuring component-level engagement and quantifying order gaps against benchmarks.`,
+      `Tracking ${count} products for ${window}. SKU Lens ranks products into Red Board (hidden gems) and Black Board (underperformers).`,
     errorMessage: "Failed to load the dashboard. The analytics server may be unavailable.",
-    statUnderperformers: "Underperformers",
-    statUnderperformersDesc: "Products with high views but low conversion",
-    statHiddenGems: "Hidden Gems",
-    statHiddenGemsDesc: "Products with high conversion but low traffic",
-    blackboardTitle: "Blackboard — Underperformers",
-    redboardTitle: "Redboard — Hidden Gems",
+    blackboardTitle: "Black Board",
+    blackboardSubtitle: "High views, low conversion",
+    redboardTitle: "Red Board",
+    redboardSubtitle: "High conversion, low traffic",
   },
 
   product: {
-    backAction: "Leaderboard",
+    backAction: "Board",
     errorTitle: "Product Analysis",
     errorMessage: "Failed to load product analysis. The product may not exist or the server is unavailable.",
     notFound: "This product was not found.",
-    gapDescription: (gap: string, sign: string) =>
-      `This product has an order gap of ${sign}${gap} compared to its benchmark. Review the funnel comparison and component engagement below to identify improvement opportunities.`,
-    subtitle: (benchmark: string) => `Deep-dive analysis comparing against ${benchmark}`,
+    subtitle: (benchmark: string) => `Scoring & AI diagnosis · benchmark: ${benchmark}`,
   },
 
   leaderboard: {
@@ -53,12 +49,7 @@ export const messages = {
   },
 
   analysis: {
-    funnelHeading: "Funnel Comparison",
-    benchmarkLabel: (id: string) => `Benchmark: ${id}`,
-    metricViews: "Views",
-    metricAddToCart: "Add to Cart",
-    metricOrders: "Orders",
-    metricVs: (value: string) => `vs ${value}`,
+    scoringHeading: "Scoring Dimensions",
     diagnosisHeading: "AI Diagnosis",
     diagnosisGenerating: "Generating",
     diagnosisFailed: "Failed",
@@ -66,12 +57,14 @@ export const messages = {
     diagnosisPendingBanner: "The AI is analyzing this product. This usually takes 10–30 seconds.",
     diagnosisFailedFallback: "Diagnosis failed unexpectedly.",
     diagnosisNoReport: "No report available.",
-    componentHeading: "Component Engagement",
-    componentDescription: "Click-through rates compared against the benchmark product.",
-    componentColumnName: "Component",
-    componentColumnTargetCtr: "Target CTR",
-    componentColumnBenchmarkCtr: "Benchmark CTR",
-    componentColumnDelta: "Delta",
+    cardProblem: "Problem Diagnosis",
+    cardCause: "Root Cause",
+    cardRecommendations: "Recommendations",
+    dimensionViews: "Views",
+    dimensionAddToCart: "Add to Cart",
+    dimensionOrders: "Orders",
+    dimensionCtr: "CTR",
+    dimensionConversion: "Conversion",
   },
 
   timeWindows: {

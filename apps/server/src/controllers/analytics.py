@@ -17,7 +17,7 @@ WINDOW_QUERY = Query()
 async def get_leaderboard(
     shop_id: str,
     board: Annotated[LeaderboardType, BOARD_QUERY] = LeaderboardType.BLACK,
-    window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.DAYS_7,
+    window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.HOURS_24,
 ) -> list[LeaderboardEntry]:
     return await ProductAnalysisService().get_leaderboard(
         board=board,
@@ -31,7 +31,7 @@ async def get_product_analysis(
     product_id: str,
     request: Request,
     shop_id: str,
-    window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.DAYS_7,
+    window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.HOURS_24,
 ) -> ProductAnalysisResult:
     return await ProductAnalysisService(
         settings=request.app.state.settings,

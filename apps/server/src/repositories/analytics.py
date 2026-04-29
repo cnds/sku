@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import desc, func, literal, select
 from sqlalchemy.sql.selectable import Subquery
@@ -18,8 +18,13 @@ class AnalyticsRepository:
         board: LeaderboardType,
         shop_id: str,
         window: TimeWindow,
+        reference_date: date | None = None,
     ) -> list[LeaderboardEntry]:
-        aggregated = self._aggregated_stats_subquery(shop_id=shop_id, window=window)
+        aggregated = self._aggregated_stats_subquery(
+            shop_id=shop_id,
+            window=window,
+            reference_date=reference_date,
+        )
         store_avg_cr = (
             select(
                 func.coalesce(func.sum(aggregated.c.orders), 0) * 1.0
@@ -81,12 +86,16 @@ class AnalyticsRepository:
         *,
         shop_id: str,
         window: TimeWindow,
+        reference_date: date | None = None,
     ) -> dict[str, ProductSnapshot]:
         statement = (
             sqlmodel_select(DailyProductStat)
             .where(
                 DailyProductStat.shop_id == shop_id,
-                DailyProductStat.stat_date >= window.start_date(now=datetime.now(UTC)),
+                DailyProductStat.stat_date >= self._window_start_date(
+                    window=window,
+                    reference_date=reference_date,
+                ),
             )
         )
 
@@ -130,7 +139,13 @@ class AnalyticsRepository:
 
         return aggregated
 
-    def _aggregated_stats_subquery(self, *, shop_id: str, window: TimeWindow) -> Subquery:
+    def _aggregated_stats_subquery(
+        self,
+        *,
+        shop_id: str,
+        window: TimeWindow,
+        reference_date: date | None = None,
+    ) -> Subquery:
         return (
             select(
                 DailyProductStat.product_id.label("product_id"),
@@ -142,9 +157,17 @@ class AnalyticsRepository:
             )
             .where(
                 DailyProductStat.shop_id == shop_id,
-                DailyProductStat.stat_date
-                >= window.start_date(now=datetime.now(UTC)),
+                DailyProductStat.stat_date >= self._window_start_date(
+                    window=window,
+                    reference_date=reference_date,
+                ),
             )
             .group_by(DailyProductStat.product_id)
             .subquery()
         )
+
+    @staticmethod
+    def _window_start_date(*, window: TimeWindow, reference_date: date | None) -> date:
+        if reference_date is not None:
+            return window.start_date_from_reference_date(reference_date=reference_date)
+        return window.start_date(now=datetime.now(UTC))

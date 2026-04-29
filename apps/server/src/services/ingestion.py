@@ -10,6 +10,19 @@ from services.rollups import DailyRollupService
 
 
 class EventIngestionService:
+    @staticmethod
+    def _resolve_stat_dates(
+        *,
+        stat_date: date | None = None,
+        stat_dates: set[date] | None = None,
+    ) -> list[date]:
+        resolved = set(stat_dates or set())
+        if stat_date is not None:
+            resolved.add(stat_date)
+        if not resolved:
+            raise ValueError("At least one stat date is required.")
+        return sorted(resolved)
+
     async def persist_batch(
         self,
         *,
@@ -47,7 +60,9 @@ class EventIngestionService:
         session_id: str,
         shop_domain: str,
         shop_id: str,
-        stat_date: date,
+        stat_date: date | None = None,
+        stat_dates: set[date] | None = None,
+        timezone_name: str | None = None,
         visitor_id: str,
     ) -> None:
         await self.persist_batch(
@@ -58,10 +73,15 @@ class EventIngestionService:
             shop_id=shop_id,
             visitor_id=visitor_id,
         )
-        await DailyRollupService().rollup_day(
-            shop_id=shop_id,
+        for resolved_stat_date in self._resolve_stat_dates(
             stat_date=stat_date,
-        )
+            stat_dates=stat_dates,
+        ):
+            await DailyRollupService().rollup_day(
+                shop_id=shop_id,
+                stat_date=resolved_stat_date,
+                timezone_name=timezone_name,
+            )
 
     async def persist_batch_rollup_and_enqueue(
         self,
@@ -72,7 +92,9 @@ class EventIngestionService:
         session_id: str,
         shop_domain: str,
         shop_id: str,
-        stat_date: date,
+        stat_date: date | None = None,
+        stat_dates: set[date] | None = None,
+        timezone_name: str | None = None,
         visitor_id: str,
     ) -> None:
         await self.persist_batch_and_rollup(
@@ -82,10 +104,15 @@ class EventIngestionService:
             shop_domain=shop_domain,
             shop_id=shop_id,
             stat_date=stat_date,
+            stat_dates=stat_dates,
+            timezone_name=timezone_name,
             visitor_id=visitor_id,
         )
-        JobDispatchService().enqueue_rollup(
+        JobDispatchService().enqueue_rollups(
             after_commit_callbacks=after_commit_callbacks,
             shop_id=shop_id,
-            stat_date=stat_date,
+            stat_dates=self._resolve_stat_dates(
+                stat_date=stat_date,
+                stat_dates=stat_dates,
+            ),
         )

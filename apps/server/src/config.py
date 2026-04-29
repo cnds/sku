@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str
     redis_url: str
+    sku_lens_log_level: str = "INFO"
     shopify_api_key: str
     shopify_api_secret: str
     shopify_app_url: str
@@ -29,4 +30,3 @@ class Settings(BaseSettings):
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]
-

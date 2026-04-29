@@ -183,7 +183,7 @@ async def test_leaderboard_endpoint_smoke(
         "settings": None,
         "board": LeaderboardType.BLACK,
         "shop_id": "shop-123",
-        "window": TimeWindow.DAYS_7,
+        "window": TimeWindow.HOURS_24,
     }
 
 
@@ -253,7 +253,7 @@ async def test_product_analysis_endpoint_smoke(
         "settings": settings,
         "product_id": "prod-1",
         "shop_id": "shop-123",
-        "window": TimeWindow.DAYS_7,
+        "window": TimeWindow.HOURS_24,
     }
 
 
@@ -359,5 +359,5 @@ async def test_diagnosis_endpoint_maps_domain_not_found_to_http(
     assert seen == {
         "product_id": "missing-product",
         "shop_id": "shop-1",
-        "window": TimeWindow.DAYS_7,
+        "window": TimeWindow.HOURS_24,
     }

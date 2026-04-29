@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime
 from enum import StrEnum
 from typing import Any
 
-from sqlalchemy import JSON, UniqueConstraint
+from sqlalchemy import JSON, Text, UniqueConstraint
 from sqlmodel import Column, Field, SQLModel
 
 
@@ -88,7 +88,7 @@ class ProductDiagnosis(SQLModel, table=True):
     window: str = Field(index=True)
     snapshot_hash: str = Field(index=True)
     status: DiagnosisStatus = Field(index=True)
-    report_markdown: str | None = Field(default=None)
+    report_markdown: str | None = Field(default=None, sa_column=Column(Text, nullable=True))
     summary_json: dict[str, Any] = Field(
         default_factory=dict,
         sa_column=Column(JSON, nullable=False),
@@ -104,4 +104,7 @@ class ShopInstallation(SQLModel, table=True):
     shop_domain: str = Field(index=True)
     access_token: str | None = Field(default=None)
     public_token: str = Field(index=True)
+    timezone_name: str = Field(default="UTC")
     installed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    last_completed_local_date: date | None = Field(default=None, index=True)
+    next_rollup_at_utc: datetime | None = Field(default=None, index=True)

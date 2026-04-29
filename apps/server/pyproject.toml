@@ -19,6 +19,7 @@ dependencies = [
   "redis>=6.0.0",
   "sqlalchemy>=2.0.38",
   "sqlmodel>=0.0.24",
+  "tzdata>=2025.2",
   "uvicorn>=0.34.0"
 ]
 
@@ -33,6 +34,7 @@ dev = [
 
 [project.scripts]
 sku-lens-server = "main:run"
+sku-lens-seed-demo = "seed_demo:main"
 sku-lens-worker = "worker:main"
 
 [tool.hatch.build.targets.wheel]
@@ -40,10 +42,12 @@ only-include = [
   "src/config.py",
   "src/db.py",
   "src/job_queue.py",
+  "src/logging_utils.py",
   "src/main.py",
   "src/models.py",
   "src/repositories",
   "src/schemas.py",
+  "src/seed_demo.py",
   "src/security",
   "src/services",
   "src/worker.py"

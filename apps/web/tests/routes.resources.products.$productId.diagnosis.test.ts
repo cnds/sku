@@ -43,6 +43,7 @@ describe("diagnosis resource route", () => {
 
     expect(fetchDiagnosisMock).toHaveBeenCalledWith({
       productId: "product-1",
+      requestId: expect.any(String),
       shopId: "test-shop.myshopify.com",
       window: "7d",
     });
@@ -81,6 +82,7 @@ describe("diagnosis resource route", () => {
 
     expect(createDiagnosisMock).toHaveBeenCalledWith({
       productId: "product-1",
+      requestId: expect.any(String),
       shopId: "test-shop.myshopify.com",
       snapshot: {
         add_to_carts: 2,

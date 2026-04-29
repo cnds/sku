@@ -133,6 +133,38 @@ async def test_db_session_middleware_rolls_back_failed_requests(
 
 
 @pytest.mark.asyncio
+async def test_db_session_middleware_propagates_request_id_and_logs_completed_requests(
+    sqlite_database_url: str,
+    redis_url: str,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    app = create_app(_settings(sqlite_database_url, redis_url))
+    await init_db(app.state.session_factory.engine)
+
+    @app.get("/test/context/request-log")
+    async def _request_log_route() -> dict[str, bool]:
+        return {"ok": True}
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get(
+            "/test/context/request-log",
+            headers={"X-SKU-Lens-Request-Id": "req-123"},
+        )
+    captured = capsys.readouterr().err
+
+    assert response.status_code == 200
+    assert response.headers["X-SKU-Lens-Request-Id"] == "req-123"
+    assert "request completed" in captured
+    assert "request_id=req-123" in captured
+    assert "method=GET" in captured
+    assert "path=/test/context/request-log" in captured
+    assert "status=200" in captured
+
+
+@pytest.mark.asyncio
 async def test_enqueue_json_uses_initialized_redis_client(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -174,12 +206,13 @@ async def test_job_dispatch_service_uses_plain_after_commit_callbacks(
         raising=False,
     )
 
-    JobDispatchService().enqueue_rollup(
+    job_ids = JobDispatchService().enqueue_rollup(
         after_commit_callbacks=callbacks,
         shop_id="shop-1",
         stat_date=date(2026, 4, 27),
     )
 
+    assert len(job_ids) == 1
     assert enqueued == []
 
     await callbacks.run()
@@ -187,7 +220,7 @@ async def test_job_dispatch_service_uses_plain_after_commit_callbacks(
     assert enqueued == [
         (
             "sku-lens:rollups",
-            {"shop_id": "shop-1", "stat_date": "2026-04-27"},
+            {"job_id": job_ids[0], "shop_id": "shop-1", "stat_date": "2026-04-27"},
         )
     ]
 
@@ -362,12 +395,13 @@ async def test_diagnosis_jobs_enqueue_after_commit_via_dispatch_service(
     assert len(enqueued) == 1
     queue_name, payload = enqueued[0]
     assert queue_name == "sku-lens:diagnoses"
+    assert isinstance(payload["job_id"], str)
     assert payload["product_id"] == "product-1"
     assert payload["shop_id"] == "shop-1"
     assert payload["snapshot"]["views"] == snapshot["views"]
     assert payload["snapshot"]["orders"] == snapshot["orders"]
     assert payload["snapshot_hash"] == response.json()["snapshot_hash"]
-    assert payload["window"] == "7d"
+    assert payload["window"] == "24h"
 
 
 @pytest.mark.asyncio
@@ -430,6 +464,7 @@ async def test_diagnosis_endpoint_persists_pending_report_and_avoids_duplicate_e
     assert len(enqueued) == 1
     queue_name, payload = enqueued[0]
     assert queue_name == "sku-lens:diagnoses"
+    assert isinstance(payload["job_id"], str)
     assert payload["product_id"] == "product-1"
     assert payload["snapshot"]["views"] == snapshot["views"]
     assert payload["snapshot"]["orders"] == snapshot["orders"]

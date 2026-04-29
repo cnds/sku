@@ -2,10 +2,81 @@
   var script = document.currentScript;
   if (!(script instanceof HTMLScriptElement)) return;
 
+  var DEBUG_STORAGE_KEY = "sku-lens:debug";
+  var REQUEST_ID_HEADER = "X-SKU-Lens-Request-Id";
+
+  function generateId() {
+    return crypto.randomUUID
+      ? crypto.randomUUID()
+      : Date.now() + "-" + Math.random().toString(36).slice(2);
+  }
+
+  function debugEnabled() {
+    try {
+      return localStorage.getItem(DEBUG_STORAGE_KEY) === "1";
+    } catch (_error) {
+      return false;
+    }
+  }
+
+  function log(level, event, fields) {
+    if (!debugEnabled()) return;
+
+    var timestamp = new Date().toISOString();
+    var keys = [
+      "request_id",
+      "status",
+      "path",
+      "event_count",
+      "shop_domain",
+      "error",
+    ];
+    var entries = [];
+    var seen = {};
+
+    for (var i = 0; i < keys.length; i++) {
+      var orderedKey = keys[i];
+      if (fields[orderedKey] === undefined || fields[orderedKey] === null || fields[orderedKey] === "") continue;
+      seen[orderedKey] = true;
+      entries.push(orderedKey + "=" + formatLogValue(fields[orderedKey]));
+    }
+
+    var extraKeys = Object.keys(fields).sort();
+    for (var j = 0; j < extraKeys.length; j++) {
+      var key = extraKeys[j];
+      if (seen[key]) continue;
+      if (fields[key] === undefined || fields[key] === null || fields[key] === "") continue;
+      entries.push(key + "=" + formatLogValue(fields[key]));
+    }
+
+    var line = timestamp + " " + level.toUpperCase() + " [extension][tracker][" + event + "]";
+    if (entries.length) {
+      line += " " + entries.join(" ");
+    }
+
+    if (level === "debug") console.debug(line);
+    else if (level === "info") console.info(line);
+    else if (level === "warn") console.warn(line);
+    else console.error(line);
+  }
+
+  function formatLogValue(value) {
+    if (typeof value === "boolean" || typeof value === "number") return String(value);
+    if (typeof value === "object") return JSON.stringify(value);
+
+    var text = String(value);
+    if (!text) return "\"\"";
+    if (/\s|["'=]/.test(text)) return JSON.stringify(text);
+    return text;
+  }
+
   var endpoint = script.dataset.endpoint;
   var publicToken = script.dataset.publicToken;
   var shopDomain = script.dataset.shopDomain;
-  if (!endpoint || !publicToken || !shopDomain) return;
+  if (!endpoint || !publicToken || !shopDomain) {
+    log("info", "tracker.boot_skipped", { error: "missing tracker config" });
+    return;
+  }
 
   // ---------------------------------------------------------------------------
   // Constants
@@ -51,12 +122,6 @@
   // ---------------------------------------------------------------------------
   // Identity & session
   // ---------------------------------------------------------------------------
-
-  function generateId() {
-    return crypto.randomUUID
-      ? crypto.randomUUID()
-      : Date.now() + "-" + Math.random().toString(36).slice(2);
-  }
 
   function ensureId(key) {
     var v = localStorage.getItem(key);
@@ -141,7 +206,14 @@
   // ---------------------------------------------------------------------------
 
   function track(eventType, options) {
-    if (queue.length >= MAX_QUEUE_SIZE) queue.shift();
+    if (queue.length >= MAX_QUEUE_SIZE) {
+      var dropped = queue.shift();
+      log("warn", "tracker.queue_dropped", {
+        event_count: 1,
+        event_type: dropped ? dropped.event_type : null,
+        shop_domain: shopDomain,
+      });
+    }
     queue.push({
       event_type: eventType,
       occurred_at: new Date().toISOString(),
@@ -156,11 +228,19 @@
   function flush() {
     if (!queue.length) return;
     var events = queue.splice(0, queue.length);
+    var requestId = generateId();
+    log("debug", "tracker.flush_started", {
+      event_count: events.length,
+      path: endpoint,
+      request_id: requestId,
+      shop_domain: shopDomain,
+    });
     fetch(endpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "X-SKU-Lens-Public-Token": publicToken,
+        "X-SKU-Lens-Request-Id": requestId,
         "X-SKU-Lens-Timestamp": String(Math.floor(Date.now() / 1000)),
       },
       body: JSON.stringify({
@@ -170,9 +250,27 @@
         visitor_id: visitorId,
       }),
       keepalive: true,
-    }).catch(function () {
+    }).then(function (response) {
+      if (!response.ok) {
+        throw new Error("Tracker flush failed with status " + response.status + ".");
+      }
+
+      log("debug", "tracker.flush_completed", {
+        event_count: events.length,
+        request_id: requestId,
+        shop_domain: shopDomain,
+        status: response.status,
+      });
+    }).catch(function (error) {
       var remaining = MAX_QUEUE_SIZE - queue.length;
       if (remaining > 0) queue.unshift.apply(queue, events.slice(0, remaining));
+      log("error", "tracker.flush_failed", {
+        error: error && error.message ? error.message : String(error),
+        event_count: events.length,
+        path: endpoint,
+        request_id: requestId,
+        shop_domain: shopDomain,
+      });
     });
   }
 

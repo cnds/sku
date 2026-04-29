@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
+from datetime import UTC, date, datetime
+
 from config import Settings
 from repositories.analytics import AnalyticsRepository
+from repositories.installations import InstallationRepository
 from schemas import (
     ComponentComparison,
     FunnelComparison,
@@ -12,6 +16,7 @@ from schemas import (
     ProductSnapshot,
     TimeWindow,
 )
+from services.shop_time import ensure_utc_datetime, local_date_for_shop
 
 
 class ProductAnalysisService:
@@ -19,8 +24,12 @@ class ProductAnalysisService:
         self,
         *,
         settings: Settings | None = None,
+        installation_repository: InstallationRepository | None = None,
+        time_provider: Callable[[], datetime] | None = None,
     ) -> None:
         self._repository = AnalyticsRepository()
+        self._installation_repository = installation_repository or InstallationRepository()
+        self._time_provider = time_provider or (lambda: datetime.now(UTC))
         self._benchmark_min_views = (settings or Settings.model_construct()).benchmark_min_views
 
     async def get_product_analysis(
@@ -30,10 +39,16 @@ class ProductAnalysisService:
         shop_id: str,
         window: TimeWindow,
     ) -> ProductAnalysisResult:
-        snapshots = await self._repository.fetch_product_snapshots(shop_id=shop_id, window=window)
+        reference_date = await self._shop_reference_date(shop_id=shop_id)
+        snapshots = await self._repository.fetch_product_snapshots(
+            shop_id=shop_id,
+            window=window,
+            reference_date=reference_date,
+        )
         benchmark_snapshots = await self._repository.fetch_product_snapshots(
             shop_id=shop_id,
             window=TimeWindow.DAYS_30,
+            reference_date=reference_date,
         )
 
         target = snapshots[product_id]
@@ -99,10 +114,20 @@ class ProductAnalysisService:
         shop_id: str,
         window: TimeWindow,
     ) -> list[LeaderboardEntry]:
+        reference_date = await self._shop_reference_date(shop_id=shop_id)
         return await self._repository.fetch_leaderboard(
             board=board,
             shop_id=shop_id,
             window=window,
+            reference_date=reference_date,
+        )
+
+    async def _shop_reference_date(self, *, shop_id: str) -> date:
+        installation = await self._installation_repository.get_by_shop_domain(shop_id)
+        now_utc = ensure_utc_datetime(self._time_provider())
+        return local_date_for_shop(
+            instant=now_utc,
+            timezone_name=installation.timezone_name if installation is not None else None,
         )
 
     def _select_benchmark(

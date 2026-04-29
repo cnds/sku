@@ -71,9 +71,9 @@ export default function App() {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <meta name="shopify-api-key" content={shopifyApiKey} />
+        <script src={APP_BRIDGE_SRC} />
         <Meta />
         <Links />
-        <script defer src={APP_BRIDGE_SRC} />
       </head>
       <body>
         <AppProvider i18n={polarisTranslations} linkComponent={RemixPolarisLink}>

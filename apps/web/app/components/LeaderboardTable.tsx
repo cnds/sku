@@ -6,7 +6,6 @@ import {
   IndexTable,
   InlineStack,
   Text,
-  useBreakpoints,
 } from "@shopify/polaris";
 import type { LeaderboardEntry, TimeWindow } from "@/lib/contracts";
 import { messages } from "@/lib/messages";
@@ -16,26 +15,19 @@ interface LeaderboardTableProps {
   rows: LeaderboardEntry[];
   shopId: string;
   title: string;
+  subtitle: string;
   tone: "critical" | "success";
   window: TimeWindow;
-}
-
-function scoreTone(score: number, boardTone: "critical" | "success"): "attention" | "critical" | "success" | "info" {
-  if (boardTone === "critical") {
-    return score >= 50 ? "critical" : "attention";
-  }
-  return score >= 50 ? "success" : "info";
 }
 
 export function LeaderboardTable({
   rows,
   shopId,
   title,
+  subtitle,
   tone,
   window,
 }: LeaderboardTableProps) {
-  const { smUp } = useBreakpoints();
-
   if (rows.length === 0) {
     return (
       <Card>
@@ -66,6 +58,11 @@ export function LeaderboardTable({
             </Badge>
           </InlineStack>
         </InlineStack>
+        <Box paddingBlockStart="100">
+          <Text as="p" variant="bodySm" tone="subdued">
+            {subtitle}
+          </Text>
+        </Box>
       </Box>
       <IndexTable
         resourceName={resourceName}
@@ -73,13 +70,9 @@ export function LeaderboardTable({
         headings={[
           { title: messages.leaderboard.columnRank },
           { title: messages.leaderboard.columnProduct },
-          { title: messages.leaderboard.columnViews, alignment: "end" },
-          { title: messages.leaderboard.columnAddToCart, alignment: "end" },
-          { title: messages.leaderboard.columnOrders, alignment: "end" },
           { title: messages.leaderboard.columnScore, alignment: "end" },
         ]}
         selectable={false}
-        condensed={!smUp}
       >
         {rows.map((row, index) => (
           <IndexTable.Row
@@ -88,7 +81,7 @@ export function LeaderboardTable({
             position={index}
           >
             <IndexTable.Cell>
-              <Text as="span" variant="bodyMd" tone="subdued">
+              <Text as="span" variant="bodyMd" fontWeight="bold" tone={tone === "critical" ? "critical" : "success"}>
                 {index + 1}
               </Text>
             </IndexTable.Cell>
@@ -103,24 +96,9 @@ export function LeaderboardTable({
               </Text>
             </IndexTable.Cell>
             <IndexTable.Cell>
-              <Text as="span" variant="bodyMd" alignment="end">
-                {row.views.toLocaleString()}
-              </Text>
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-              <Text as="span" variant="bodyMd" alignment="end">
-                {row.add_to_carts.toLocaleString()}
-              </Text>
-            </IndexTable.Cell>
-            <IndexTable.Cell>
-              <Text as="span" variant="bodyMd" alignment="end">
-                {row.orders.toLocaleString()}
-              </Text>
-            </IndexTable.Cell>
-            <IndexTable.Cell>
               <InlineStack align="end">
-                <Badge tone={scoreTone(row.score, tone)}>
-                  {row.score.toFixed(2)}
+                <Badge tone={tone}>
+                  {row.score.toFixed(1)}
                 </Badge>
               </InlineStack>
             </IndexTable.Cell>

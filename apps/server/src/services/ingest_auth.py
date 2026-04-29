@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 
 from config import Settings
+from models import ShopInstallation
 from repositories.installations import InstallationRepository
 
 
@@ -46,7 +47,7 @@ class IngestAuthService:
         shop_domain: str,
         public_token: str,
         timestamp: int,
-    ) -> None:
+    ) -> ShopInstallation:
         current_time = int(self._time_provider())
         if abs(current_time - timestamp) > self._settings.ingest_token_ttl_seconds:
             raise IngestRequestExpiredError()
@@ -63,3 +64,4 @@ class IngestAuthService:
         ).hexdigest()
         if not secrets.compare_digest(expected, current):
             raise InvalidIngestTokenError()
+        return installation

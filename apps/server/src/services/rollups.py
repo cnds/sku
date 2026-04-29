@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import date
 
 from sqlalchemy import case, delete, func, select
 from sqlmodel import select as sqlmodel_select
 
 from db import get_db_session
 from models import DailyProductStat, EventType, RawEvent
+from services.shop_time import utc_bounds_for_shop_date
 
 
 def _build_component_index(rows: list) -> dict[str, dict[str, int]]:
@@ -20,9 +21,17 @@ def _build_component_index(rows: list) -> dict[str, dict[str, int]]:
 
 
 class DailyRollupService:
-    async def rollup_day(self, *, shop_id: str, stat_date: date) -> None:
-        day_start = datetime.combine(stat_date, time.min, tzinfo=UTC)
-        day_end = day_start + timedelta(days=1)
+    async def rollup_day(
+        self,
+        *,
+        shop_id: str,
+        stat_date: date,
+        timezone_name: str | None = None,
+    ) -> None:
+        day_start, day_end = utc_bounds_for_shop_date(
+            local_date=stat_date,
+            timezone_name=timezone_name,
+        )
         session = get_db_session()
 
         day_filter = [

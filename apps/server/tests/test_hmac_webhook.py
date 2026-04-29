@@ -190,12 +190,9 @@ async def test_shopify_webhook_persists_order_rollup_and_enqueue_after_commit(
     assert daily_stats[0].orders == 1
     assert daily_stats[0].views == 0
     assert daily_stats[0].add_to_carts == 0
-    assert enqueued == [
-        (
-            "sku-lens:rollups",
-            {
-                "shop_id": "demo.myshopify.com",
-                "stat_date": daily_stats[0].stat_date.isoformat(),
-            },
-        )
-    ]
+    assert len(enqueued) == 1
+    queue_name, enqueued_payload = enqueued[0]
+    assert queue_name == "sku-lens:rollups"
+    assert enqueued_payload["shop_id"] == "demo.myshopify.com"
+    assert enqueued_payload["stat_date"] == daily_stats[0].stat_date.isoformat()
+    assert isinstance(enqueued_payload["job_id"], str)

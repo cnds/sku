@@ -14,6 +14,8 @@ export interface FunnelSnapshot {
   views: number;
   add_to_carts: number;
   orders: number;
+  impressions: number;
+  clicks: number;
 }
 
 export interface ComponentComparison {

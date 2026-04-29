@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+import logging
 
 from redis.asyncio import Redis, from_url
+
+LOGGER = logging.getLogger(__name__)
 
 _redis_client: Redis | None = None
 
@@ -27,11 +29,19 @@ async def close_redis_client() -> None:
     _redis_client = None
 
 
-async def enqueue_json(*, payload: dict[str, Any], queue_name: str) -> bool:
+async def enqueue_json(*, payload: dict[str, object], queue_name: str) -> bool:
     try:
         await get_redis_client().lpush(queue_name, json.dumps(payload))
         return True
-    except Exception:
+    except Exception as exc:
+        LOGGER.exception(
+            "queue enqueue failed queue_name=%s job_id=%s product_id=%s shop_id=%s error=%s",
+            queue_name,
+            payload.get("job_id"),
+            payload.get("product_id"),
+            payload.get("shop_id"),
+            exc,
+        )
         return False
 
 

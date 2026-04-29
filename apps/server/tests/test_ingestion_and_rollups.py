@@ -14,6 +14,7 @@ from models import DailyProductStat, EventType, RawEvent, ShopInstallation
 from schemas import IngestEvent
 from services.ingestion import EventIngestionService
 from services.job_dispatch import AfterCommitCallbacks
+from services.rollups import DailyRollupService
 
 
 def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
@@ -136,12 +137,12 @@ async def test_ingestion_service_persists_rollup_and_registers_enqueue_callback(
 
     await callbacks.run()
 
-    assert enqueued == [
-        (
-            "sku-lens:rollups",
-            {"shop_id": "shop-1", "stat_date": "2026-04-23"},
-        )
-    ]
+    assert len(enqueued) == 1
+    queue_name, enqueued_payload = enqueued[0]
+    assert queue_name == "sku-lens:rollups"
+    assert enqueued_payload["shop_id"] == "shop-1"
+    assert enqueued_payload["stat_date"] == "2026-04-23"
+    assert isinstance(enqueued_payload["job_id"], str)
 
 
 @pytest.mark.asyncio
@@ -159,6 +160,7 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
             ShopInstallation(
                 shop_domain="demo.myshopify.com",
                 public_token="public-1",
+                timezone_name="Asia/Tokyo",
             )
         )
         await session.commit()
@@ -195,10 +197,9 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
         assert len(daily_stats) == 1
         assert daily_stats[0].views == 1
         assert daily_stats[0].component_clicks_distribution == {"size_chart": 1}
-        assert payload == {
-            "shop_id": "demo.myshopify.com",
-            "stat_date": daily_stats[0].stat_date.isoformat(),
-        }
+        assert payload["shop_id"] == "demo.myshopify.com"
+        assert payload["stat_date"] == daily_stats[0].stat_date.isoformat()
+        assert isinstance(payload["job_id"], str)
 
         enqueue_visibility_checks.append(
             (
@@ -216,7 +217,7 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
         raising=False,
     )
 
-    occurred_at = datetime.now(UTC).replace(microsecond=0)
+    occurred_at = datetime(2026, 4, 28, 15, 5, tzinfo=UTC)
     payload = {
         "shop_domain": "demo.myshopify.com",
         "visitor_id": "visitor-1",
@@ -252,15 +253,12 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
     assert response.status_code == 202
     assert response.json() == {"accepted": 2}
     assert enqueue_visibility_checks == [(2, 1, {"size_chart": 1})]
-    assert enqueued == [
-        (
-            "sku-lens:rollups",
-            {
-                "shop_id": "demo.myshopify.com",
-                "stat_date": occurred_at.date().isoformat(),
-            },
-        )
-    ]
+    assert len(enqueued) == 1
+    queue_name, enqueued_payload = enqueued[0]
+    assert queue_name == "sku-lens:rollups"
+    assert enqueued_payload["shop_id"] == "demo.myshopify.com"
+    assert enqueued_payload["stat_date"] == "2026-04-29"
+    assert isinstance(enqueued_payload["job_id"], str)
 
     async with app.state.session_factory() as session:
         raw_events = (
@@ -285,11 +283,66 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
     assert raw_events[1].component_id == "size_chart"
     assert len(daily_stats) == 1
     assert daily_stats[0].product_id == "product-1"
-    assert daily_stats[0].stat_date == occurred_at.date()
+    assert daily_stats[0].stat_date.isoformat() == "2026-04-29"
     assert daily_stats[0].views == 1
     assert daily_stats[0].add_to_carts == 0
     assert daily_stats[0].orders == 0
     assert daily_stats[0].component_clicks_distribution == {"size_chart": 1}
+
+
+@pytest.mark.asyncio
+async def test_daily_rollup_service_uses_shop_timezone_day_boundaries(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+
+    async with db_session_context(session_factory) as session:
+        session.add_all(
+            [
+                RawEvent(
+                    channel="sdk",
+                    event_type=EventType.VIEW,
+                    occurred_at=datetime(2026, 4, 28, 14, 59, tzinfo=UTC),
+                    product_id="product-1",
+                    session_id="session-1",
+                    shop_domain="demo.myshopify.com",
+                    shop_id="shop-1",
+                    visitor_id="visitor-1",
+                ),
+                RawEvent(
+                    channel="sdk",
+                    event_type=EventType.VIEW,
+                    occurred_at=datetime(2026, 4, 28, 15, 1, tzinfo=UTC),
+                    product_id="product-1",
+                    session_id="session-1",
+                    shop_domain="demo.myshopify.com",
+                    shop_id="shop-1",
+                    visitor_id="visitor-1",
+                ),
+            ]
+        )
+
+        await DailyRollupService().rollup_day(
+            shop_id="shop-1",
+            stat_date=date(2026, 4, 29),
+            timezone_name="Asia/Tokyo",
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        daily_stats = (
+            await session.exec(
+                select(DailyProductStat).where(
+                    DailyProductStat.shop_id == "shop-1",
+                    DailyProductStat.product_id == "product-1",
+                )
+            )
+        ).all()
+
+    assert len(daily_stats) == 1
+    assert daily_stats[0].stat_date.isoformat() == "2026-04-29"
+    assert daily_stats[0].views == 1
 
 
 @pytest.mark.asyncio

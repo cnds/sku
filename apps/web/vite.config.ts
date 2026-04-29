@@ -1,4 +1,3 @@
-import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
@@ -15,7 +14,7 @@ export default defineConfig(async () => {
   } as const;
 
   return {
-    plugins: [react(), remix({ future }), tsconfigPaths()],
+    plugins: [remix({ future }), tsconfigPaths()],
     server: {
       port: 3000,
     },

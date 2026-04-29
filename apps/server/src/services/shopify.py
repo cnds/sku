@@ -13,6 +13,7 @@ from models import EventType, ShopInstallation
 from schemas import IngestEvent
 from security.shopify import verify_shopify_oauth_hmac
 from services.shop_installations import ShopInstallationService
+from services.shop_time import local_date_for_shop, normalize_shop_timezone
 
 
 @dataclass(slots=True)
@@ -43,6 +44,7 @@ class ShopifyOrderWebhookService:
         *,
         payload: dict[str, Any],
         shop_domain: str,
+        timezone_name: str | None = None,
     ) -> ShopifyOrderIngestionBatch:
         order_id = str(payload.get("id", "unknown"))
         occurred_at = self._time_provider()
@@ -62,7 +64,10 @@ class ShopifyOrderWebhookService:
             session_id=f"order-{order_id}",
             shop_domain=shop_domain,
             shop_id=shop_domain,
-            stat_date=occurred_at.date(),
+            stat_date=local_date_for_shop(
+                instant=occurred_at,
+                timezone_name=timezone_name,
+            ),
             visitor_id=f"shopify-order-{order_id}",
         )
 
@@ -96,9 +101,14 @@ class ShopifyInstallationCallbackService:
 
         public_token = self._token_provider()
         access_token = None
+        timezone_name = normalize_shop_timezone(None)
         if code:
             access_token = await self._oauth_service.exchange_access_token(
                 code=code,
+                shop_domain=shop_domain,
+            )
+            timezone_name = await self._oauth_service.fetch_shop_timezone(
+                access_token=access_token,
                 shop_domain=shop_domain,
             )
 
@@ -106,6 +116,7 @@ class ShopifyInstallationCallbackService:
             shop_domain=shop_domain,
             public_token=public_token,
             access_token=access_token,
+            timezone_name=timezone_name,
         )
 
 
@@ -141,6 +152,29 @@ class ShopifyOAuthService:
                     response=response,
                 )
             return access_token
+        finally:
+            if should_close:
+                await client.aclose()
+
+    async def fetch_shop_timezone(
+        self,
+        *,
+        access_token: str,
+        shop_domain: str,
+    ) -> str:
+        client = self._http_client or httpx.AsyncClient(timeout=20.0)
+        should_close = self._http_client is None
+        try:
+            response = await client.get(
+                f"https://{shop_domain}/admin/api/latest/shop.json",
+                headers={"X-Shopify-Access-Token": access_token},
+            )
+            response.raise_for_status()
+            payload = response.json()
+            shop_payload = payload.get("shop", {})
+            return normalize_shop_timezone(str(shop_payload.get("iana_timezone") or "UTC"))
+        except httpx.HTTPError:
+            return normalize_shop_timezone(None)
         finally:
             if should_close:
                 await client.aclose()

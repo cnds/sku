@@ -76,11 +76,17 @@ class GeminiDiagnosisService:
         return "\n".join(
             [
                 "You are diagnosing a Shopify product detail page.",
-                "Use the following aggregated metrics to produce a concise markdown report with:",
-                "1. Anomaly identification",
-                "2. Likely buyer hesitation",
-                "3. Concrete page fixes",
+                "Use the following aggregated metrics to produce a concise markdown report.",
                 "",
+                "Structure the report with EXACTLY these three sections using ## headings:",
+                "## Problem",
+                "(Identify the key anomaly or performance issue)",
+                "## Root Cause",
+                "(Explain likely reasons for buyer hesitation or the performance gap)",
+                "## Recommendations",
+                "(List 2-4 concrete, actionable page fixes)",
+                "",
+                "Metrics:",
                 f"Impressions (collection pages): {snapshot.impressions}",
                 f"Clicks (collection to PDP): {snapshot.clicks}",
                 f"Page views (all sources): {snapshot.views}",
@@ -109,42 +115,42 @@ class GeminiDiagnosisService:
         conversion_rate = 0.0 if snapshot.views == 0 else snapshot.orders / snapshot.views
         size_chart_clicks = snapshot.component_clicks_distribution.get("size_chart", 0)
 
-        primary_issue = "Traffic is healthy but conversion is under index."
-        recommended_action = "Lift trust and fit clarity above the fold."
+        problem = "Traffic is healthy but conversion is under index."
+        root_cause = "Buyers may lack confidence due to insufficient product detail or social proof."
+        recommendations = "Lift trust and fit clarity above the fold."
 
         if snapshot.views < 50:
-            primary_issue = "Traffic is too thin to confirm demand with confidence."
-            recommended_action = "Invest in traffic acquisition before large page redesigns."
+            problem = "Traffic is too thin to confirm demand with confidence."
+            root_cause = "The product has low visibility in collections and search results."
+            recommendations = "Invest in traffic acquisition before large page redesigns."
         elif size_chart_clicks == 0:
-            primary_issue = "Fit intent is present, but the size-chart interaction is missing."
-            recommended_action = "Expose size guidance earlier and repeat it near the CTA."
+            problem = "Fit intent is present, but the size-chart interaction is missing."
+            root_cause = "Size guidance is not prominent enough to attract clicks."
+            recommendations = "Expose size guidance earlier and repeat it near the CTA."
         elif conversion_rate >= 0.08:
-            primary_issue = "The product converts well once viewed."
-            recommended_action = "Scale traffic and protect merchandising consistency."
+            problem = "The product converts well once viewed."
+            root_cause = "Strong product-market fit, but limited traffic caps total revenue."
+            recommendations = "Scale traffic and protect merchandising consistency."
 
         report_markdown = "\n".join(
             [
-                "# SKU Lens",
-                "",
-                "AI Winner & Loser Analysis",
-                "",
-                "Use AI to audit product pages by tracking component-level engagement and "
-                "quantifying Order Gaps.",
-                "",
                 f"- Views: {snapshot.views}",
                 f"- Add to carts: {snapshot.add_to_carts}",
                 f"- Orders: {snapshot.orders}",
                 f"- Conversion rate: {conversion_rate:.2%}",
                 "",
-                "## Diagnosis",
-                primary_issue,
+                "## Problem",
+                problem,
                 "",
-                "## Recommendation",
-                recommended_action,
+                "## Root Cause",
+                root_cause,
+                "",
+                "## Recommendations",
+                recommendations,
             ]
         )
         return report_markdown, {
-            "primary_issue": primary_issue,
-            "recommended_action": recommended_action,
+            "primary_issue": problem,
+            "recommended_action": recommendations,
             "source": "fallback",
         }

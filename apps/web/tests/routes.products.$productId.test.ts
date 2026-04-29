@@ -53,6 +53,7 @@ describe("product analysis route loader", () => {
 
     expect(fetchProductAnalysisMock).toHaveBeenCalledWith({
       productId: "product-1",
+      requestId: expect.any(String),
       shopId: "test-shop.myshopify.com",
       window: "7d",
     });

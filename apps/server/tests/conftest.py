@@ -8,6 +8,7 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 import db
+import job_queue
 
 
 @pytest.fixture
@@ -39,3 +40,11 @@ async def dispose_test_engines(
     finally:
         for engine in created_engines:
             await engine.dispose()
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def close_test_redis_clients() -> AsyncIterator[None]:
+    try:
+        yield
+    finally:
+        await job_queue.close_redis_client()

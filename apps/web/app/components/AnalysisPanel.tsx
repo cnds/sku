@@ -5,8 +5,6 @@ import {
   BlockStack,
   Box,
   Card,
-  DataTable,
-  Divider,
   InlineGrid,
   InlineStack,
   SkeletonBodyText,
@@ -15,9 +13,10 @@ import {
 } from "@shopify/polaris";
 import type { DiagnosisResult, ProductAnalysisResult } from "@/lib/contracts";
 
-import { COMPONENT_LABELS } from "@/lib/analytics";
 import { createFailedDiagnosis, createPendingDiagnosis, snapshotFromAnalysis } from "@/lib/diagnosis";
+import { REQUEST_ID_HEADER, generateRequestId, logBrowserEvent } from "@/lib/logging";
 import { messages } from "@/lib/messages";
+import { RadarChart } from "@/components/RadarChart";
 
 interface AnalysisPanelProps {
   analysis: ProductAnalysisResult;
@@ -26,39 +25,34 @@ interface AnalysisPanelProps {
 
 const DIAGNOSIS_POLL_INTERVAL_MS = 3_000;
 
-function MetricCard({ label, target, benchmark }: { label: string; target: number; benchmark: number }) {
-  const diff = target - benchmark;
-  const isPositive = diff >= 0;
+function parseDiagnosisSections(markdown: string | null): { problem: string; cause: string; recommendations: string } {
+  if (!markdown) {
+    return { problem: messages.analysis.diagnosisNoReport, cause: "", recommendations: "" };
+  }
 
-  return (
-    <Box
-      background="bg-surface"
-      borderRadius="300"
-      borderWidth="025"
-      borderColor="border"
-      padding="400"
-    >
-      <BlockStack gap="200">
-        <Text as="p" variant="bodySm" tone="subdued">
-          {label}
-        </Text>
-        <InlineStack gap="200" blockAlign="baseline">
-          <Text as="p" variant="headingXl">
-            {target.toLocaleString()}
-          </Text>
-          <Text as="p" variant="bodySm" tone="subdued">
-            {messages.analysis.metricVs(benchmark.toLocaleString())}
-          </Text>
-        </InlineStack>
-        <Badge tone={isPositive ? "success" : "critical"}>
-          {`${isPositive ? "+" : ""}${diff.toLocaleString()}`}
-        </Badge>
-      </BlockStack>
-    </Box>
-  );
+  const sections = markdown.split(/^##\s+/m).filter(Boolean);
+
+  if (sections.length >= 3) {
+    return {
+      problem: sections[0].replace(/^[^\n]*\n/, "").trim(),
+      cause: sections[1].replace(/^[^\n]*\n/, "").trim(),
+      recommendations: sections[2].replace(/^[^\n]*\n/, "").trim(),
+    };
+  }
+
+  const paragraphs = markdown.split(/\n\n+/).filter((p) => p.trim());
+  if (paragraphs.length >= 3) {
+    return {
+      problem: paragraphs[0].trim(),
+      cause: paragraphs[1].trim(),
+      recommendations: paragraphs.slice(2).join("\n\n").trim(),
+    };
+  }
+
+  return { problem: markdown.trim(), cause: "", recommendations: "" };
 }
 
-function DiagnosisPanel({ diagnosis }: { diagnosis: DiagnosisResult }) {
+function DiagnosisCards({ diagnosis }: { diagnosis: DiagnosisResult }) {
   if (diagnosis.status === "pending") {
     return (
       <Card>
@@ -97,25 +91,68 @@ function DiagnosisPanel({ diagnosis }: { diagnosis: DiagnosisResult }) {
     );
   }
 
+  const { problem, cause, recommendations } = parseDiagnosisSections(diagnosis.report_markdown);
+
+  const cards: Array<{ title: string; content: string; toneColor: string; bgColor: string; borderColor: string }> = [
+    {
+      title: messages.analysis.cardProblem,
+      content: problem,
+      toneColor: "#d48806",
+      bgColor: "#fffbe6",
+      borderColor: "#ffe58f",
+    },
+    {
+      title: messages.analysis.cardCause,
+      content: cause,
+      toneColor: "#333333",
+      bgColor: "#fafafa",
+      borderColor: "#d9d9d9",
+    },
+    {
+      title: messages.analysis.cardRecommendations,
+      content: recommendations,
+      toneColor: "#389e0d",
+      bgColor: "#f6ffed",
+      borderColor: "#b7eb8f",
+    },
+  ];
+
   return (
-    <Card>
-      <BlockStack gap="300">
+    <Box>
+      <Box paddingBlockEnd="300">
         <InlineStack gap="200" blockAlign="center">
-          <Text as="h2" variant="headingMd">
-            {messages.analysis.diagnosisHeading}
-          </Text>
+          <Text as="h2" variant="headingMd">{messages.analysis.diagnosisHeading}</Text>
           <Badge tone="success">{messages.analysis.diagnosisReady}</Badge>
         </InlineStack>
-        <Divider />
-        <Box>
-          <Text as="span" variant="bodyMd">
-            <span style={{ whiteSpace: "pre-wrap" }}>
-              {diagnosis.report_markdown ?? messages.analysis.diagnosisNoReport}
-            </span>
-          </Text>
-        </Box>
-      </BlockStack>
-    </Card>
+      </Box>
+      <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
+        {cards.map((card) => (
+          <div
+            key={card.title}
+            style={{
+              border: `1px solid ${card.borderColor}`,
+              borderRadius: 8,
+              overflow: "hidden",
+            }}
+          >
+            <div
+              style={{
+                background: card.bgColor,
+                padding: "10px 14px",
+                fontWeight: "bold",
+                color: card.toneColor,
+                fontSize: 13,
+              }}
+            >
+              {card.title}
+            </div>
+            <div style={{ padding: 14, fontSize: 13, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+              {card.content || "—"}
+            </div>
+          </div>
+        ))}
+      </InlineGrid>
+    </Box>
   );
 }
 
@@ -127,8 +164,12 @@ export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
     let pollTimer: number | undefined;
 
     async function fetchDiagnosis(init?: RequestInit): Promise<DiagnosisResult> {
+      const requestId = generateRequestId();
+      const headers = new Headers(init?.headers);
+      headers.set(REQUEST_ID_HEADER, requestId);
       const response = await fetch(diagnosisPath, {
         ...init,
+        headers,
         signal: abortController.signal,
       });
 
@@ -141,7 +182,10 @@ export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
       }
 
       if (!response.ok) {
-        throw new Error(`Diagnosis request failed with status ${response.status}.`);
+        const error = new Error(`Diagnosis request failed with status ${response.status}.`);
+        (error as Error & { requestId: string; status: number }).requestId = requestId;
+        (error as Error & { requestId: string; status: number }).status = response.status;
+        throw error;
       }
 
       return (await response.json()) as DiagnosisResult;
@@ -170,6 +214,16 @@ export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
 
         const message =
           error instanceof Error ? error.message : "Diagnosis request failed unexpectedly.";
+        logBrowserEvent("error", "diagnosis.sync_failed", {
+          error: message,
+          path: diagnosisPath,
+          request_id:
+            error instanceof Error && "requestId" in error ? String(error.requestId) : undefined,
+          status:
+            error instanceof Error && "status" in error && typeof error.status === "number"
+              ? error.status
+              : undefined,
+        });
         startTransition(() => {
           setDiagnosis(createFailedDiagnosis(message));
         });
@@ -186,50 +240,17 @@ export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
     };
   }, [analysis, diagnosisPath]);
 
-  const { target, benchmark } = analysis.funnel;
-
   return (
     <BlockStack gap="500">
       <Card>
-        <BlockStack gap="400">
-          <InlineStack align="space-between" blockAlign="center">
-            <Text as="h2" variant="headingMd">
-              {messages.analysis.funnelHeading}
-            </Text>
-            <Text as="p" variant="bodySm" tone="subdued">
-              {messages.analysis.benchmarkLabel(analysis.benchmark_product_id)}
-            </Text>
-          </InlineStack>
-          <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
-            <MetricCard label={messages.analysis.metricViews} target={target.views} benchmark={benchmark.views} />
-            <MetricCard label={messages.analysis.metricAddToCart} target={target.add_to_carts} benchmark={benchmark.add_to_carts} />
-            <MetricCard label={messages.analysis.metricOrders} target={target.orders} benchmark={benchmark.orders} />
-          </InlineGrid>
-        </BlockStack>
+        <RadarChart
+          target={analysis.funnel.target}
+          benchmark={analysis.funnel.benchmark}
+          componentComparisons={analysis.component_comparisons}
+        />
       </Card>
 
-      <DiagnosisPanel diagnosis={diagnosis} />
-
-      <Card>
-        <BlockStack gap="300">
-          <Text as="h2" variant="headingMd">
-            {messages.analysis.componentHeading}
-          </Text>
-          <Text as="p" variant="bodySm" tone="subdued">
-            {messages.analysis.componentDescription}
-          </Text>
-          <DataTable
-            columnContentTypes={["text", "numeric", "numeric", "numeric"]}
-            headings={[messages.analysis.componentColumnName, messages.analysis.componentColumnTargetCtr, messages.analysis.componentColumnBenchmarkCtr, messages.analysis.componentColumnDelta]}
-            rows={analysis.component_comparisons.map((component) => [
-              COMPONENT_LABELS[component.component_id] ?? component.component_id,
-              `${(component.target_ctr * 100).toFixed(1)}%`,
-              `${(component.benchmark_ctr * 100).toFixed(1)}%`,
-              `${(component.delta * 100).toFixed(1)}%`,
-            ])}
-          />
-        </BlockStack>
-      </Card>
+      <DiagnosisCards diagnosis={diagnosis} />
     </BlockStack>
   );
 }

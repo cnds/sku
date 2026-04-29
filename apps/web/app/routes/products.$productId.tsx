@@ -1,10 +1,11 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { isRouteErrorResponse, useLoaderData, useRouteError } from "@remix-run/react";
-import { Badge, Banner, BlockStack, InlineStack, Layout, Page, Text } from "@shopify/polaris";
+import { Badge, Banner, InlineStack, Layout, Page, Text } from "@shopify/polaris";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { formatTimeWindowLabel } from "@/lib/analytics";
 import { fetchProductAnalysis, parseTimeWindow } from "@/lib/api.server";
+import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
 import { dashboardPath, diagnosisResourcePath } from "@/lib/url";
 
@@ -35,10 +36,11 @@ export function ErrorBoundary() {
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
+  const requestId = requestIdFromHeaders(request.headers);
   const shopId = url.searchParams.get("shop") ?? "demo.myshopify.com";
   const window = parseTimeWindow(url.searchParams.get("window"));
   const productId = params.productId ?? "";
-  const analysis = await fetchProductAnalysis({ productId, shopId, window });
+  const analysis = await fetchProductAnalysis({ productId, requestId, shopId, window });
 
   return {
     analysis,
@@ -52,6 +54,8 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 export default function ProductAnalysisRoute() {
   const data = useLoaderData<typeof loader>();
   const gapValue = data.analysis.gap;
+  const boardType = gapValue > 0 ? "Black Board" : "Red Board";
+  const boardTone = gapValue > 0 ? "critical" : "success";
 
   return (
     <Page
@@ -59,9 +63,7 @@ export default function ProductAnalysisRoute() {
       backAction={{ content: messages.product.backAction, url: dashboardPath(data.shopId, data.window) }}
       titleMetadata={
         <InlineStack gap="200">
-          <Badge tone={gapValue > 0 ? "critical" : "success"}>
-            {`Gap: ${gapValue > 0 ? "+" : ""}${gapValue.toFixed(1)}`}
-          </Badge>
+          <Badge tone={boardTone}>{boardType}</Badge>
           <Badge>{formatTimeWindowLabel(data.window)}</Badge>
         </InlineStack>
       }
@@ -69,15 +71,7 @@ export default function ProductAnalysisRoute() {
     >
       <Layout>
         <Layout.Section>
-          <BlockStack gap="400">
-            <Text as="p" variant="bodyMd" tone="subdued">
-              {messages.product.gapDescription(
-                gapValue.toFixed(1),
-                gapValue > 0 ? "+" : "",
-              )}
-            </Text>
-            <AnalysisPanel analysis={data.analysis} diagnosisPath={data.diagnosisPath} />
-          </BlockStack>
+          <AnalysisPanel analysis={data.analysis} diagnosisPath={data.diagnosisPath} />
         </Layout.Section>
       </Layout>
     </Page>

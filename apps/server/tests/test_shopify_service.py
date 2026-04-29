@@ -29,7 +29,7 @@ def _settings() -> Settings:
 
 
 def test_shopify_order_webhook_service_builds_ingestion_batch() -> None:
-    occurred_at = datetime(2026, 4, 27, 12, 0, tzinfo=UTC)
+    occurred_at = datetime(2026, 4, 28, 15, 5, tzinfo=UTC)
     service = ShopifyOrderWebhookService(time_provider=lambda: occurred_at)
 
     batch = service.build_order_ingestion_batch(
@@ -42,12 +42,13 @@ def test_shopify_order_webhook_service_builds_ingestion_batch() -> None:
             ],
         },
         shop_domain="demo.myshopify.com",
+        timezone_name="Asia/Tokyo",
     )
 
     assert batch.shop_id == "demo.myshopify.com"
     assert batch.shop_domain == "demo.myshopify.com"
     assert batch.session_id == "order-42"
-    assert batch.stat_date == occurred_at.date()
+    assert batch.stat_date.isoformat() == "2026-04-29"
     assert batch.visitor_id == "shopify-order-42"
     assert len(batch.events) == 1
     assert batch.events[0].event_type.value == "order"
@@ -59,12 +60,23 @@ def test_shopify_order_webhook_service_builds_ingestion_batch() -> None:
 @pytest.mark.asyncio
 async def test_shopify_installation_callback_service_exchanges_token_and_upserts_installation() -> None:
     exchanged: list[tuple[str, str]] = []
-    upserted: list[tuple[str, str, str | None]] = []
+    upserted: list[tuple[str, str, str | None, str]] = []
 
     class StubOAuthService:
         async def exchange_access_token(self, *, code: str, shop_domain: str) -> str:
             exchanged.append((code, shop_domain))
             return "access-1"
+
+        async def fetch_shop_timezone(
+            self,
+            *,
+            access_token: str,
+            shop_domain: str,
+        ) -> str:
+            assert access_token.startswith("access-")
+            assert access_token.endswith("1")
+            assert shop_domain == "demo.myshopify.com"
+            return "Asia/Tokyo"
 
     class StubInstallationService:
         async def upsert_installation(
@@ -73,12 +85,14 @@ async def test_shopify_installation_callback_service_exchanges_token_and_upserts
             shop_domain: str,
             public_token: str,
             access_token: str | None,
+            timezone_name: str,
         ) -> ShopInstallation:
-            upserted.append((shop_domain, public_token, access_token))
+            upserted.append((shop_domain, public_token, access_token, timezone_name))
             return ShopInstallation(
                 shop_domain=shop_domain,
                 public_token=public_token,
                 access_token=access_token,
+                timezone_name=timezone_name,
             )
 
     service = ShopifyInstallationCallbackService(
@@ -104,10 +118,11 @@ async def test_shopify_installation_callback_service_exchanges_token_and_upserts
     )
 
     assert exchanged == [("oauth-code", "demo.myshopify.com")]
-    assert upserted == [("demo.myshopify.com", "public-1", "access-1")]
+    assert upserted == [("demo.myshopify.com", "public-1", "access-1", "Asia/Tokyo")]
     assert installation.shop_domain == "demo.myshopify.com"
     assert installation.public_token == upserted[0][1]
     assert installation.access_token == upserted[0][2]
+    assert installation.timezone_name == "Asia/Tokyo"
 
 
 @pytest.mark.asyncio
