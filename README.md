@@ -2,7 +2,7 @@
 
 AI Product Performance Ranking
 
-Use AI to rank Shopify PDPs into Red Board and Black Board, compare `24h` / `7d` / `30d`
+Use AI to rank Shopify PDPs into Winners and Leakers, compare `24h` / `7d` / `30d`
 windows, and generate diagnosis cards from funnel plus component engagement signals.
 
 ## Apps

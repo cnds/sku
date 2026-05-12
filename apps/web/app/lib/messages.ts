@@ -18,12 +18,12 @@ export const messages = {
     subtitle: "AI-powered product performance ranking",
     viewTopProduct: "View top product",
     bannerText: (count: number, window: string) =>
-      `Tracking ${count} products for ${window}. SKU Lens ranks products into Red Board (hidden gems) and Black Board (underperformers).`,
+      `Tracking ${count} products for ${window}. SKU Lens ranks products into Winners and Leakers.`,
     errorMessage: "Failed to load the dashboard. The analytics server may be unavailable.",
-    blackboardTitle: "Black Board",
-    blackboardSubtitle: "High views, low conversion",
-    redboardTitle: "Red Board",
-    redboardSubtitle: "High conversion, low traffic",
+    blackboardTitle: "Leakers",
+    blackboardSubtitle: "Products losing shoppers before they buy",
+    redboardTitle: "Winners",
+    redboardSubtitle: "Products converting better than their traffic suggests",
   },
 
   product: {

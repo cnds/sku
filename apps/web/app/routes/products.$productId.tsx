@@ -9,6 +9,12 @@ import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
 import { dashboardPath, diagnosisResourcePath } from "@/lib/url";
 
+export function boardLabelForGap(gapValue: number): { label: string; tone: "critical" | "success" } {
+  return gapValue > 0
+    ? { label: messages.dashboard.blackboardTitle, tone: "critical" }
+    : { label: messages.dashboard.redboardTitle, tone: "success" };
+}
+
 export function ErrorBoundary() {
   const error = useRouteError();
 
@@ -53,9 +59,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
 export default function ProductAnalysisRoute() {
   const data = useLoaderData<typeof loader>();
-  const gapValue = data.analysis.gap;
-  const boardType = gapValue > 0 ? "Black Board" : "Red Board";
-  const boardTone = gapValue > 0 ? "critical" : "success";
+  const board = boardLabelForGap(data.analysis.gap);
 
   return (
     <Page
@@ -63,7 +67,7 @@ export default function ProductAnalysisRoute() {
       backAction={{ content: messages.product.backAction, url: dashboardPath(data.shopId, data.window) }}
       titleMetadata={
         <InlineStack gap="200">
-          <Badge tone={boardTone}>{boardType}</Badge>
+          <Badge tone={board.tone}>{board.label}</Badge>
           <Badge>{formatTimeWindowLabel(data.window)}</Badge>
         </InlineStack>
       }
