@@ -4,7 +4,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 
-from schemas import LeaderboardEntry, LeaderboardType, ProductAnalysisResult, TimeWindow
+from schemas import LeaderboardEntry, LeaderboardType, PriorityCard, ProductAnalysisResult, TimeWindow
 from services.analysis import ProductAnalysisService
 
 router = APIRouter()
@@ -21,6 +21,17 @@ async def get_leaderboard(
 ) -> list[LeaderboardEntry]:
     return await ProductAnalysisService().get_leaderboard(
         board=board,
+        shop_id=shop_id,
+        window=window,
+    )
+
+
+@router.get("/api/priorities")
+async def get_priorities(
+    shop_id: str,
+    window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.HOURS_24,
+) -> list[PriorityCard]:
+    return await ProductAnalysisService().get_product_priorities(
         shop_id=shop_id,
         window=window,
     )

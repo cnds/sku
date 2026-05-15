@@ -2,6 +2,7 @@ import type {
   DiagnosisResult,
   LeaderboardEntry,
   LeaderboardType,
+  PriorityCard,
   ProductAnalysisResult,
   ProductSnapshot,
   TimeWindow,
@@ -41,6 +42,20 @@ export async function fetchLeaderboard(args: {
     {
       requestId: args.requestId,
       route: "leaderboard",
+    },
+  );
+}
+
+export async function fetchPriorities(args: {
+  requestId: string;
+  shopId: string;
+  window: TimeWindow;
+}): Promise<PriorityCard[]> {
+  return fetchJson<PriorityCard[]>(
+    apiPath("/api/priorities", shopParams(args.shopId, args.window)),
+    {
+      requestId: args.requestId,
+      route: "priorities",
     },
   );
 }

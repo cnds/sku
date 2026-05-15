@@ -17,6 +17,9 @@ from schemas import (
     FunnelSnapshot,
     LeaderboardEntry,
     LeaderboardType,
+    PriorityBoardType,
+    PriorityCard,
+    PrioritySignalState,
     ProductAnalysisResult,
     TimeWindow,
 )
@@ -56,6 +59,9 @@ def test_analytics_routes_are_owned_by_expected_modules(
     app = create_app(_settings(sqlite_database_url, redis_url))
 
     assert _route_entries(app, "/api/leaderboard") == [
+        (("GET",), "controllers.analytics"),
+    ]
+    assert _route_entries(app, "/api/priorities") == [
         (("GET",), "controllers.analytics"),
     ]
     assert _route_entries(app, "/api/products/{product_id}/analysis") == [
@@ -111,6 +117,7 @@ def test_all_business_routes_are_owned_by_controller_modules(
     app = create_app(_settings(sqlite_database_url, redis_url))
     expected = {
         ("/api/leaderboard", ("GET",), "controllers.analytics"),
+        ("/api/priorities", ("GET",), "controllers.analytics"),
         ("/api/products/{product_id}/analysis", ("GET",), "controllers.analytics"),
         ("/api/products/{product_id}/diagnosis", ("GET",), "controllers.diagnosis"),
         ("/api/products/{product_id}/diagnosis", ("POST",), "controllers.diagnosis"),
@@ -182,6 +189,68 @@ async def test_leaderboard_endpoint_smoke(
     assert seen == {
         "settings": None,
         "board": LeaderboardType.BLACK,
+        "shop_id": "shop-123",
+        "window": TimeWindow.HOURS_24,
+    }
+
+
+@pytest.mark.asyncio
+async def test_priorities_endpoint_smoke(
+    sqlite_database_url: str,
+    redis_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app = create_app(_settings(sqlite_database_url, redis_url))
+    seen: dict[str, object] = {}
+    expected = [
+        PriorityCard(
+            product_id="prod-1",
+            board=PriorityBoardType.LEAKER,
+            signal_state=PrioritySignalState.READY,
+            flag_reason="Orders lag similar traffic",
+            primary_step="pdp_add_to_cart",
+            evidence=["120 PDP views", "8 add-to-carts", "1 order"],
+            suspected_friction="Size guidance is being missed.",
+            first_fix="Move the size chart closer to the buy box.",
+            views=120,
+            add_to_carts=8,
+            orders=1,
+            impressions=240,
+            clicks=44,
+            score=4.2,
+        )
+    ]
+
+    class FakeProductAnalysisService:
+        def __init__(self, *, settings: Settings | None = None) -> None:
+            seen["settings"] = settings
+
+        async def get_product_priorities(
+            self,
+            *,
+            shop_id: str,
+            window: TimeWindow,
+        ) -> list[PriorityCard]:
+            seen["shop_id"] = shop_id
+            seen["window"] = window
+            return expected
+
+    monkeypatch.setattr(
+        analytics_controller,
+        "ProductAnalysisService",
+        FakeProductAnalysisService,
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get("/api/priorities", params={"shop_id": "shop-123"})
+
+    assert response.status_code == 200
+    assert response.json() == [entry.model_dump(mode="json") for entry in expected]
+    assert seen == {
+        "settings": None,
         "shop_id": "shop-123",
         "window": TimeWindow.HOURS_24,
     }

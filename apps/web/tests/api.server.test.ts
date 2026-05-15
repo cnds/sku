@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, fetchDiagnosis, fetchProductAnalysis } from "../app/lib/api.server";
+import { ApiError, fetchDiagnosis, fetchPriorities, fetchProductAnalysis } from "../app/lib/api.server";
 
 describe("api.server logging", () => {
   const originalFetch = global.fetch;
@@ -101,5 +101,26 @@ describe("api.server logging", () => {
     );
 
     expect(errorSpy).not.toHaveBeenCalled();
+  });
+
+  it("fetches today's priority cards from the backend priority endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { "Content-Type": "application/json" },
+        status: 200,
+      }),
+    ) as typeof fetch;
+
+    await fetchPriorities({
+      requestId: "req-priority",
+      shopId: "shop-1",
+      window: "24h",
+    });
+
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] ?? [];
+    const headers = new Headers(init?.headers);
+
+    expect(String(url)).toBe("http://localhost:8000/api/priorities?shop_id=shop-1&window=24h");
+    expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-priority");
   });
 });

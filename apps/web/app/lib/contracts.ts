@@ -1,5 +1,7 @@
 export type TimeWindow = "24h" | "7d" | "30d";
 export type LeaderboardType = "black" | "red";
+export type PriorityBoardType = "leaker" | "hidden_winner";
+export type PrioritySignalState = "Ready" | "Weak signal" | "Insufficient data" | "Tracking issue";
 export type DiagnosisStatus = "pending" | "ready" | "failed";
 
 export interface LeaderboardEntry {
@@ -7,6 +9,8 @@ export interface LeaderboardEntry {
   views: number;
   add_to_carts: number;
   orders: number;
+  impressions?: number;
+  clicks?: number;
   score: number;
 }
 
@@ -16,6 +20,13 @@ export interface FunnelSnapshot {
   orders: number;
   impressions: number;
   clicks: number;
+  media_interactions?: number;
+  variant_changes?: number;
+  total_dwell_ms?: number;
+  engage_count?: number;
+  avg_scroll_pct?: number;
+  component_clicks_distribution?: Record<string, number>;
+  component_impressions_distribution?: Record<string, number>;
 }
 
 export interface ComponentComparison {
@@ -43,6 +54,31 @@ export interface ProductSnapshot {
   add_to_carts: number;
   orders: number;
   component_clicks_distribution: Record<string, number>;
+  impressions?: number;
+  clicks?: number;
+  media_interactions?: number;
+  variant_changes?: number;
+  total_dwell_ms?: number;
+  engage_count?: number;
+  avg_scroll_pct?: number;
+  component_impressions_distribution?: Record<string, number>;
+}
+
+export interface PriorityCard {
+  product_id: string;
+  board: PriorityBoardType;
+  signal_state: PrioritySignalState;
+  flag_reason: string;
+  primary_step: string;
+  evidence: string[];
+  suspected_friction: string;
+  first_fix: string;
+  views: number;
+  add_to_carts: number;
+  orders: number;
+  impressions: number;
+  clicks: number;
+  score: number;
 }
 
 export interface DiagnosisResult {
@@ -51,4 +87,3 @@ export interface DiagnosisResult {
   report_markdown: string | null;
   summary_json: Record<string, string>;
 }
-

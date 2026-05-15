@@ -6,7 +6,7 @@ import pytest
 
 from db import create_session_factory, db_session_context, init_db
 from models import DailyProductStat, ShopInstallation
-from schemas import LeaderboardType, TimeWindow
+from schemas import LeaderboardType, PriorityBoardType, PrioritySignalState, ProductSnapshot, TimeWindow
 from services.analysis import ProductAnalysisService
 
 
@@ -150,6 +150,155 @@ async def test_product_analysis_service_fetches_leaderboard_entries(
 
     assert leaderboard[0].product_id == "product-underperformer"
     assert round(leaderboard[0].score, 2) == 3.76
+
+
+@pytest.mark.asyncio
+async def test_product_priorities_returns_two_leakers_and_one_hidden_winner(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="leaker-size-confidence",
+                    stat_date=date(2026, 4, 23),
+                    views=120,
+                    add_to_carts=8,
+                    orders=1,
+                    impressions=240,
+                    clicks=44,
+                    media_interactions=12,
+                    variant_changes=9,
+                    component_clicks_distribution={"size_chart": 1, "review_tab": 3},
+                    component_impressions_distribution={"size_chart": 70, "review_tab": 52},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="leaker-media-trust",
+                    stat_date=date(2026, 4, 23),
+                    views=100,
+                    add_to_carts=10,
+                    orders=2,
+                    impressions=210,
+                    clicks=39,
+                    media_interactions=1,
+                    variant_changes=5,
+                    component_clicks_distribution={"product_media": 1, "review_tab": 1},
+                    component_impressions_distribution={"product_media": 85, "review_tab": 64},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="benchmark-hero",
+                    stat_date=date(2026, 4, 23),
+                    views=120,
+                    add_to_carts=24,
+                    orders=16,
+                    impressions=260,
+                    clicks=58,
+                    media_interactions=18,
+                    variant_changes=12,
+                    component_clicks_distribution={"size_chart": 10, "review_tab": 12},
+                    component_impressions_distribution={"size_chart": 72, "review_tab": 66},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="hidden-winner",
+                    stat_date=date(2026, 4, 23),
+                    views=38,
+                    add_to_carts=14,
+                    orders=7,
+                    impressions=62,
+                    clicks=30,
+                    media_interactions=8,
+                    variant_changes=6,
+                    component_clicks_distribution={"review_tab": 7, "size_chart": 5},
+                    component_impressions_distribution={"review_tab": 30, "size_chart": 26},
+                ),
+            ],
+        )
+        await session.commit()
+
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
+    async with db_session_context(session_factory):
+        priorities = await analysis_service.get_product_priorities(
+            shop_id="shop-1",
+            window=TimeWindow.DAYS_7,
+        )
+
+    assert [priority.product_id for priority in priorities] == [
+        "leaker-size-confidence",
+        "leaker-media-trust",
+        "hidden-winner",
+    ]
+    assert [priority.board for priority in priorities] == [
+        PriorityBoardType.LEAKER,
+        PriorityBoardType.LEAKER,
+        PriorityBoardType.HIDDEN_WINNER,
+    ]
+    assert all(priority.signal_state is PrioritySignalState.READY for priority in priorities)
+    assert priorities[0].primary_step == "pdp_add_to_cart"
+    assert "size_chart" in priorities[0].suspected_friction
+    assert priorities[2].flag_reason == "Strong buying intent with limited traffic"
+
+
+@pytest.mark.asyncio
+async def test_product_priorities_gracefully_returns_fewer_than_three_cards(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+
+    async with session_factory() as session:
+        session.add(
+            DailyProductStat(
+                shop_id="shop-1",
+                product_id="only-leaker",
+                stat_date=date(2026, 4, 23),
+                views=100,
+                add_to_carts=5,
+                orders=1,
+                impressions=160,
+                clicks=35,
+                component_clicks_distribution={"size_chart": 1},
+                component_impressions_distribution={"size_chart": 60},
+            )
+        )
+        await session.commit()
+
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
+    async with db_session_context(session_factory):
+        priorities = await analysis_service.get_product_priorities(
+            shop_id="shop-1",
+            window=TimeWindow.DAYS_7,
+        )
+
+    assert [priority.product_id for priority in priorities] == ["only-leaker"]
+    assert priorities[0].board is PriorityBoardType.LEAKER
+
+
+def test_priority_signal_state_derives_tracking_and_volume_quality() -> None:
+    service = ProductAnalysisService()
+
+    assert service.derive_priority_signal_state(
+        ProductSnapshot(views=80, add_to_carts=5, orders=1),
+    ) is PrioritySignalState.TRACKING_ISSUE
+    assert service.derive_priority_signal_state(
+        ProductSnapshot(views=6, add_to_carts=1, orders=0, impressions=20, clicks=4),
+    ) is PrioritySignalState.INSUFFICIENT_DATA
+    assert service.derive_priority_signal_state(
+        ProductSnapshot(views=22, add_to_carts=2, orders=0, impressions=50, clicks=8),
+    ) is PrioritySignalState.WEAK_SIGNAL
+    assert service.derive_priority_signal_state(
+        ProductSnapshot(views=80, add_to_carts=10, orders=3, impressions=120, clicks=30),
+    ) is PrioritySignalState.READY
 
 
 @pytest.mark.asyncio

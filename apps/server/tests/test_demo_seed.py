@@ -61,26 +61,37 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
                 "window": "24h",
             },
         )
+        priorities = await client.get(
+            "/api/priorities",
+            params={"shop_id": "demo.myshopify.com", "window": "24h"},
+        )
         analysis = await client.get(
-            "/api/products/demo-underperformer/analysis",
+            "/api/products/demo-size-confidence-leaker/analysis",
             params={"shop_id": "demo.myshopify.com", "window": "24h"},
         )
         diagnosis = await client.get(
-            "/api/products/demo-underperformer/diagnosis",
+            "/api/products/demo-size-confidence-leaker/diagnosis",
             params={"shop_id": "demo.myshopify.com", "window": "24h"},
         )
 
     assert blackboard.status_code == 200
     assert redboard.status_code == 200
+    assert priorities.status_code == 200
     assert analysis.status_code == 200
     assert diagnosis.status_code == 200
 
-    assert blackboard.json()[0]["product_id"] == "demo-underperformer"
-    assert redboard.json()[0]["product_id"] == "demo-hidden-gem"
+    assert blackboard.json()[0]["product_id"] == "demo-size-confidence-leaker"
+    assert redboard.json()[0]["product_id"] == "demo-hidden-winner"
+    assert [card["product_id"] for card in priorities.json()] == [
+        "demo-size-confidence-leaker",
+        "demo-media-trust-leaker",
+        "demo-hidden-winner",
+    ]
     assert analysis.json()["benchmark_product_id"] == "demo-benchmark"
     assert analysis.json()["component_comparisons"]
     assert diagnosis.json()["status"] == "ready"
-    assert diagnosis.json()["report_markdown"]
+    assert "## Observed" in diagnosis.json()["report_markdown"]
+    assert "## Suspected friction" in diagnosis.json()["report_markdown"]
 
 
 @pytest.mark.asyncio
@@ -139,8 +150,8 @@ async def test_seed_demo_data_is_idempotent_for_demo_products(
         ).all()
 
     assert len(first_raw_events) > 0
-    assert len(first_daily_stats) == 3
-    assert len(first_diagnoses) == 9
+    assert len(first_daily_stats) == 4
+    assert len(first_diagnoses) == 12
     assert len(second_raw_events) == len(first_raw_events)
     assert len(second_daily_stats) == len(first_daily_stats)
     assert len(second_diagnoses) == len(first_diagnoses)

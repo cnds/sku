@@ -72,13 +72,15 @@ class AIDiagnosisService:
             [
                 "Use the following aggregated metrics to produce a concise markdown report.",
                 "",
-                "Structure the report with EXACTLY these three sections using ## headings:",
-                "## Problem",
-                "(Identify the key anomaly or performance issue)",
-                "## Root Cause",
-                "(Explain likely reasons for buyer hesitation or the performance gap)",
-                "## Recommendations",
-                "(List 2-4 concrete, actionable page fixes)",
+                "Structure the report with EXACTLY these four sections using ## headings:",
+                "## Observed",
+                "(State the visible shopper-journey pattern without over-claiming)",
+                "## Evidence",
+                "(List the specific metrics that support the observation)",
+                "## Suspected friction",
+                "(Explain the likely buying hesitation or discovery constraint)",
+                "## First fix to try",
+                "(Give one concrete page or merchandising change to test first)",
                 "",
                 "Metrics:",
                 f"Impressions (collection pages): {snapshot.impressions}",
@@ -117,42 +119,43 @@ class AIDiagnosisService:
         conversion_rate = 0.0 if snapshot.views == 0 else snapshot.orders / snapshot.views
         size_chart_clicks = snapshot.component_clicks_distribution.get("size_chart", 0)
 
-        problem = "Traffic is healthy but conversion is under index."
-        root_cause = "Buyers may lack confidence due to insufficient product detail or social proof."
-        recommendations = "Lift trust and fit clarity above the fold."
+        observed = "Traffic is healthy but conversion is under index."
+        friction = "Buyers may lack confidence due to insufficient product detail or social proof."
+        first_fix = "Lift trust and fit clarity above the fold."
 
         if snapshot.views < 50:
-            problem = "Traffic is too thin to confirm demand with confidence."
-            root_cause = "The product has low visibility in collections and search results."
-            recommendations = "Invest in traffic acquisition before large page redesigns."
+            observed = "Traffic is too thin to confirm demand with confidence."
+            friction = "The product has low visibility in collections and search results."
+            first_fix = "Invest in a small traffic test before large page redesigns."
         elif size_chart_clicks == 0:
-            problem = "Fit intent is present, but the size-chart interaction is missing."
-            root_cause = "Size guidance is not prominent enough to attract clicks."
-            recommendations = "Expose size guidance earlier and repeat it near the CTA."
+            observed = "Fit intent is present, but the size-chart interaction is missing."
+            friction = "Size guidance is not prominent enough to attract clicks."
+            first_fix = "Expose size guidance earlier and repeat it near the CTA."
         elif conversion_rate >= 0.08:
-            problem = "The product converts well once viewed."
-            root_cause = "Strong product-market fit, but limited traffic caps total revenue."
-            recommendations = "Scale traffic and protect merchandising consistency."
+            observed = "The product converts well once viewed."
+            friction = "Strong product-market fit is visible, but limited traffic caps total revenue."
+            first_fix = "Scale traffic and protect merchandising consistency."
 
         report_markdown = "\n".join(
             [
+                "## Observed",
+                observed,
+                "",
+                "## Evidence",
                 f"- Views: {snapshot.views}",
                 f"- Add to carts: {snapshot.add_to_carts}",
                 f"- Orders: {snapshot.orders}",
                 f"- Conversion rate: {conversion_rate:.2%}",
                 "",
-                "## Problem",
-                problem,
+                "## Suspected friction",
+                friction,
                 "",
-                "## Root Cause",
-                root_cause,
-                "",
-                "## Recommendations",
-                recommendations,
+                "## First fix to try",
+                first_fix,
             ]
         )
         return report_markdown, {
-            "primary_issue": problem,
-            "recommended_action": recommendations,
+            "primary_issue": observed,
+            "recommended_action": first_fix,
             "source": "fallback",
         }

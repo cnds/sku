@@ -119,6 +119,28 @@
     '[name="id"]',
   ].join(",");
 
+  var ADD_TO_CART_SELECTORS = [
+    'form[action*="/cart/add"] button[type="submit"]',
+    'form[action*="/cart/add"] input[type="submit"]',
+    'button[name="add"]',
+    "[data-add-to-cart]",
+  ].join(",");
+
+  var PDP_COMPONENT_SELECTORS = [
+    "[data-sku-lens-component]",
+    'form[action*="/cart/add"]',
+    ".product__media",
+    ".product__media-list",
+    ".product__media-wrapper",
+    ".product-media",
+    ".product__description",
+    ".product__accordion",
+    "[data-media-id]",
+    "[id*='shopify-product-reviews']",
+    "[class*='review']",
+    "[class*='size']",
+  ].join(",");
+
   // ---------------------------------------------------------------------------
   // Identity & session
   // ---------------------------------------------------------------------------
@@ -145,6 +167,7 @@
   var queue = [];
   var visitorId = ensureId("sku-lens:visitor-id");
   var sessionId = getSessionId();
+  var lastAddToCartAt = 0;
 
   // ---------------------------------------------------------------------------
   // Product ID resolution
@@ -199,6 +222,36 @@
       return m ? m[1] : id;
     }
     return null;
+  }
+
+  function resolvePdpComponentId(element) {
+    if (!element || !element.closest) return "pdp_component";
+
+    var explicit = element.closest("[data-sku-lens-component]");
+    if (explicit) {
+      var component = explicit.getAttribute("data-sku-lens-component");
+      if (component) return component;
+    }
+
+    if (element.closest('form[action*="/cart/add"]')) return "buy_box";
+    if (
+      element.closest(".product__media") ||
+      element.closest(".product__media-list") ||
+      element.closest(".product__media-wrapper") ||
+      element.closest(".product-media") ||
+      element.closest("[data-media-id]")
+    ) return "product_media";
+
+    var text = [
+      element.id || "",
+      element.className || "",
+      element.getAttribute("aria-label") || "",
+      element.textContent || "",
+    ].join(" ").toLowerCase();
+    if (text.indexOf("review") >= 0) return "review_tab";
+    if (text.indexOf("size") >= 0 || text.indexOf("fit") >= 0) return "size_chart";
+
+    return findSectionName(element) || "pdp_component";
   }
 
   // ---------------------------------------------------------------------------
@@ -372,6 +425,169 @@
   }
 
   // ---------------------------------------------------------------------------
+  // view — PDP page view
+  // ---------------------------------------------------------------------------
+
+  function initPdpViewTracking() {
+    if (resolvePageType() !== "pdp") return;
+    var productId = resolveProductId(null);
+    if (!productId) return;
+
+    track("view", {
+      productId: productId,
+      context: {
+        page_type: "pdp",
+        path: window.location.pathname,
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // component_click / impression — PDP component interactions and exposure
+  // ---------------------------------------------------------------------------
+
+  function initPdpComponentClickTracking() {
+    if (resolvePageType() !== "pdp") return;
+
+    document.addEventListener(
+      "click",
+      function (event) {
+        var target = event.target instanceof HTMLElement ? event.target : null;
+        if (!target || !target.closest) return;
+
+        var component = target.closest(PDP_COMPONENT_SELECTORS);
+        if (!component) return;
+
+        var productId = resolveProductId(null);
+        if (!productId) return;
+
+        track("component_click", {
+          productId: productId,
+          componentId: resolvePdpComponentId(component),
+          context: {
+            action: "click",
+            page_type: "pdp",
+          },
+        });
+      },
+      true
+    );
+  }
+
+  function initPdpComponentImpressionTracking() {
+    if (resolvePageType() !== "pdp") return null;
+    if (typeof IntersectionObserver === "undefined") return null;
+
+    var fired = new WeakSet();
+    var observer = new IntersectionObserver(
+      function (entries) {
+        for (var i = 0; i < entries.length; i++) {
+          var entry = entries[i];
+          if (!entry.isIntersecting || fired.has(entry.target)) continue;
+          fired.add(entry.target);
+
+          var productId = resolveProductId(null);
+          if (!productId) return;
+
+          track("impression", {
+            productId: productId,
+            componentId: resolvePdpComponentId(entry.target),
+            context: {
+              page_type: "pdp",
+            },
+          });
+        }
+      },
+      { threshold: 0.35 }
+    );
+
+    function observeComponents() {
+      var components = document.querySelectorAll(PDP_COMPONENT_SELECTORS);
+      for (var i = 0; i < components.length; i++) {
+        if (!fired.has(components[i])) observer.observe(components[i]);
+      }
+    }
+
+    observeComponents();
+    return { refresh: observeComponents };
+  }
+
+  // ---------------------------------------------------------------------------
+  // buy box and add_to_cart — PDP purchase intent
+  // ---------------------------------------------------------------------------
+
+  function initBuyBoxIntentTracking() {
+    if (resolvePageType() !== "pdp") return;
+
+    document.addEventListener(
+      "change",
+      function (event) {
+        var target = event.target instanceof HTMLElement ? event.target : null;
+        if (!target || !target.closest || !target.closest('form[action*="/cart/add"]')) return;
+
+        var productId = resolveProductId(null);
+        if (!productId) return;
+
+        track("component_click", {
+          productId: productId,
+          componentId: "buy_box",
+          variantId: resolveSelectedVariantId(),
+          context: {
+            action: "intent",
+            page_type: "pdp",
+          },
+        });
+      },
+      true
+    );
+  }
+
+  function initAddToCartTracking() {
+    if (resolvePageType() !== "pdp") return;
+
+    document.addEventListener(
+      "submit",
+      function (event) {
+        var target = event.target instanceof HTMLElement ? event.target : null;
+        if (!target || !target.matches('form[action*="/cart/add"]')) return;
+        trackAddToCart("submit");
+      },
+      true
+    );
+
+    document.addEventListener(
+      "click",
+      function (event) {
+        var target = event.target instanceof HTMLElement ? event.target : null;
+        if (!target || !target.closest) return;
+        if (!target.closest(ADD_TO_CART_SELECTORS)) return;
+        trackAddToCart("click");
+      },
+      true
+    );
+  }
+
+  function trackAddToCart(action) {
+    var now = Date.now();
+    if (now - lastAddToCartAt < 1000) return;
+    lastAddToCartAt = now;
+
+    var productId = resolveProductId(null);
+    if (!productId) return;
+
+    track("add_to_cart", {
+      productId: productId,
+      componentId: "buy_box",
+      variantId: resolveSelectedVariantId(),
+      context: {
+        action: action,
+        page_type: "pdp",
+        source: "product_form",
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // media — PDP gallery interactions
   // ---------------------------------------------------------------------------
 
@@ -393,6 +609,7 @@
 
         track("media", {
           productId: productId,
+          componentId: "product_media",
           context: {
             action: classifyMediaAction(trigger),
             media_index: resolveMediaIndex(trigger),
@@ -582,11 +799,17 @@
   // ---------------------------------------------------------------------------
 
   var impressionTracker = initImpressionTracking();
+  var pdpComponentImpressionTracker = initPdpComponentImpressionTracking();
   initClickTracking();
+  initPdpViewTracking();
+  initPdpComponentClickTracking();
+  initBuyBoxIntentTracking();
+  initAddToCartTracking();
   initMediaTracking();
   initVariantTracking();
   initEngageTracking();
   initMutationWatcher(impressionTracker);
+  initMutationWatcher(pdpComponentImpressionTracker);
 
   document.addEventListener("visibilitychange", function () {
     if (document.visibilityState === "hidden") flush();

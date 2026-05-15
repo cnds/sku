@@ -37,6 +37,18 @@ class LeaderboardType(StrEnum):
     RED = "red"
 
 
+class PriorityBoardType(StrEnum):
+    LEAKER = "leaker"
+    HIDDEN_WINNER = "hidden_winner"
+
+
+class PrioritySignalState(StrEnum):
+    READY = "Ready"
+    WEAK_SIGNAL = "Weak signal"
+    INSUFFICIENT_DATA = "Insufficient data"
+    TRACKING_ISSUE = "Tracking issue"
+
+
 class IngestEvent(BaseModel):
     event_type: EventType
     occurred_at: datetime
@@ -83,6 +95,13 @@ class FunnelSnapshot(BaseModel):
     orders: int
     impressions: int = 0
     clicks: int = 0
+    media_interactions: int = 0
+    variant_changes: int = 0
+    total_dwell_ms: int = 0
+    engage_count: int = 0
+    avg_scroll_pct: int = 0
+    component_clicks_distribution: dict[str, int] = Field(default_factory=dict)
+    component_impressions_distribution: dict[str, int] = Field(default_factory=dict)
 
 
 class FunnelComparison(BaseModel):
@@ -120,6 +139,23 @@ class ProductAnalysisResult(BaseModel):
     gap: float
     funnel: FunnelComparison
     component_comparisons: list[ComponentComparison]
+
+
+class PriorityCard(BaseModel):
+    product_id: str
+    board: PriorityBoardType
+    signal_state: PrioritySignalState
+    flag_reason: str
+    primary_step: str
+    evidence: list[str]
+    suspected_friction: str
+    first_fix: str
+    views: int
+    add_to_carts: int
+    orders: int
+    impressions: int
+    clicks: int
+    score: float
 
 
 class DiagnosisResult(BaseModel):

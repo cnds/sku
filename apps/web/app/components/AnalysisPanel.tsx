@@ -13,10 +13,14 @@ import {
 } from "@shopify/polaris";
 import type { DiagnosisResult, ProductAnalysisResult } from "@/lib/contracts";
 
-import { createFailedDiagnosis, createPendingDiagnosis, snapshotFromAnalysis } from "@/lib/diagnosis";
+import {
+  createFailedDiagnosis,
+  createPendingDiagnosis,
+  parseDiagnosisSections,
+  snapshotFromAnalysis,
+} from "@/lib/diagnosis";
 import { REQUEST_ID_HEADER, generateRequestId, logBrowserEvent } from "@/lib/logging";
 import { messages } from "@/lib/messages";
-import { RadarChart } from "@/components/RadarChart";
 
 interface AnalysisPanelProps {
   analysis: ProductAnalysisResult;
@@ -25,31 +29,197 @@ interface AnalysisPanelProps {
 
 const DIAGNOSIS_POLL_INTERVAL_MS = 3_000;
 
-function parseDiagnosisSections(markdown: string | null): { problem: string; cause: string; recommendations: string } {
-  if (!markdown) {
-    return { problem: messages.analysis.diagnosisNoReport, cause: "", recommendations: "" };
-  }
+interface ShopperJourneyStep {
+  id: string;
+  label: string;
+  value: string;
+  detail: string;
+}
 
-  const sections = markdown.split(/^##\s+/m).filter(Boolean);
+interface ShopperJourneyDropOff {
+  stepId: string;
+  label: string;
+  evidence: string;
+  suspectedFriction: string;
+  firstFix: string;
+}
 
-  if (sections.length >= 3) {
+interface ShopperJourney {
+  steps: ShopperJourneyStep[];
+  primaryDropOff: ShopperJourneyDropOff;
+}
+
+export function buildShopperJourney(analysis: ProductAnalysisResult): ShopperJourney {
+  const target = analysis.funnel.target;
+  const benchmark = analysis.funnel.benchmark;
+  const targetViewToCart = safeRate(target.add_to_carts, target.views);
+  const benchmarkViewToCart = safeRate(benchmark.add_to_carts, benchmark.views);
+  const targetCartToOrder = safeRate(target.orders, target.add_to_carts);
+  const benchmarkCartToOrder = safeRate(benchmark.orders, benchmark.add_to_carts);
+  const targetCollectionCtr = safeRate(target.clicks, target.impressions);
+  const benchmarkCollectionCtr = safeRate(benchmark.clicks, benchmark.impressions);
+  const engagementCount = safeNumber(target.media_interactions) + safeNumber(target.variant_changes)
+    + Object.values(target.component_clicks_distribution ?? {}).reduce((sum, value) => sum + value, 0);
+
+  return {
+    primaryDropOff: primaryDropOff({
+      benchmarkCartToOrder,
+      benchmarkCollectionCtr,
+      benchmarkViewToCart,
+      targetCartToOrder,
+      targetCollectionCtr,
+      targetViewToCart,
+    }),
+    steps: [
+      {
+        detail: `${formatCount(target.impressions)} tracked impressions`,
+        id: "exposure",
+        label: messages.analysis.dimensionExposure,
+        value: formatCount(target.impressions),
+      },
+      {
+        detail: `${formatPercent(targetCollectionCtr)} collection CTR`,
+        id: "click",
+        label: messages.analysis.dimensionClick,
+        value: formatCount(target.clicks),
+      },
+      {
+        detail: `${formatCount(target.views)} PDP sessions`,
+        id: "pdp_view",
+        label: messages.analysis.dimensionPdpView,
+        value: formatCount(target.views),
+      },
+      {
+        detail: `${formatCount(engagementCount)} media, variant, and component actions`,
+        id: "engagement",
+        label: messages.analysis.dimensionEngagement,
+        value: formatCount(engagementCount),
+      },
+      {
+        detail: `${formatPercent(targetViewToCart)} PDP view to add-to-cart`,
+        id: "add_to_cart",
+        label: messages.analysis.dimensionAddToCart,
+        value: formatCount(target.add_to_carts),
+      },
+      {
+        detail: `${formatPercent(targetCartToOrder)} cart-to-order`,
+        id: "order",
+        label: messages.analysis.dimensionOrders,
+        value: formatCount(target.orders),
+      },
+    ],
+  };
+}
+
+function primaryDropOff(args: {
+  benchmarkCartToOrder: number;
+  benchmarkCollectionCtr: number;
+  benchmarkViewToCart: number;
+  targetCartToOrder: number;
+  targetCollectionCtr: number;
+  targetViewToCart: number;
+}): ShopperJourneyDropOff {
+  if (args.benchmarkCollectionCtr - args.targetCollectionCtr > 0.05) {
     return {
-      problem: sections[0].replace(/^[^\n]*\n/, "").trim(),
-      cause: sections[1].replace(/^[^\n]*\n/, "").trim(),
-      recommendations: sections[2].replace(/^[^\n]*\n/, "").trim(),
+      evidence: `${formatPercent(args.targetCollectionCtr)} collection CTR`,
+      firstFix: "Clarify the collection card image, title, or price cue before the next traffic push.",
+      label: "Collection impression to click",
+      stepId: "collection_click",
+      suspectedFriction: "The product is being seen, but the listing is not earning enough PDP visits.",
     };
   }
 
-  const paragraphs = markdown.split(/\n\n+/).filter((p) => p.trim());
-  if (paragraphs.length >= 3) {
+  if (args.benchmarkViewToCart - args.targetViewToCart > 0.05) {
     return {
-      problem: paragraphs[0].trim(),
-      cause: paragraphs[1].trim(),
-      recommendations: paragraphs.slice(2).join("\n\n").trim(),
+      evidence: `${formatPercent(args.targetViewToCart)} PDP view to add-to-cart`,
+      firstFix: "Move the strongest trust, fit, or offer cue next to the buy box and test one change.",
+      label: "PDP view to add-to-cart",
+      stepId: "pdp_add_to_cart",
+      suspectedFriction: "Shoppers reach the page but do not get enough confidence to start checkout.",
     };
   }
 
-  return { problem: markdown.trim(), cause: "", recommendations: "" };
+  if (args.benchmarkCartToOrder - args.targetCartToOrder > 0.1) {
+    return {
+      evidence: `${formatPercent(args.targetCartToOrder)} cart-to-order`,
+      firstFix: "Clarify shipping, returns, or checkout confidence near the CTA.",
+      label: "Add-to-cart to order",
+      stepId: "cart_to_order",
+      suspectedFriction: "Buy-box intent is present, but shoppers hesitate before completing the order.",
+    };
+  }
+
+  return {
+    evidence: "No single journey step trails the benchmark sharply.",
+    firstFix: "Keep monitoring the next window before making a large page change.",
+    label: "No sharp drop-off",
+    stepId: "balanced",
+    suspectedFriction: "The journey does not show a dominant loss point yet.",
+  };
+}
+
+function safeNumber(value: number | undefined): number {
+  return value ?? 0;
+}
+
+function safeRate(numerator: number | undefined, denominator: number | undefined): number {
+  const safeDenominator = safeNumber(denominator);
+  return safeDenominator === 0 ? 0 : safeNumber(numerator) / safeDenominator;
+}
+
+function formatPercent(value: number): string {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function formatCount(value: number | undefined): string {
+  return safeNumber(value).toLocaleString("en-US");
+}
+
+function ShopperJourneyCard({ analysis }: { analysis: ProductAnalysisResult }) {
+  const journey = buildShopperJourney(analysis);
+
+  return (
+    <Card>
+      <BlockStack gap="400">
+        <InlineStack align="space-between" blockAlign="center">
+          <Text as="h2" variant="headingMd">{messages.analysis.journeyHeading}</Text>
+          <Badge tone="critical">{messages.analysis.primaryDropOff}</Badge>
+        </InlineStack>
+        <InlineGrid columns={{ xs: 2, md: 6 }} gap="300">
+          {journey.steps.map((step) => (
+            <Box
+              key={step.id}
+              background={step.id === journey.primaryDropOff.stepId ? "bg-fill-critical-secondary" : "bg-surface"}
+              borderColor={step.id === journey.primaryDropOff.stepId ? "border-critical" : "border"}
+              borderRadius="200"
+              borderWidth="025"
+              padding="300"
+            >
+              <BlockStack gap="100">
+                <Text as="p" variant="bodySm" tone="subdued">{step.label}</Text>
+                <Text as="p" variant="headingMd">{step.value}</Text>
+                <Text as="p" variant="bodySm" tone="subdued">{step.detail}</Text>
+              </BlockStack>
+            </Box>
+          ))}
+        </InlineGrid>
+        <Box
+          background="bg-fill-critical-secondary"
+          borderColor="border-critical"
+          borderRadius="200"
+          borderWidth="025"
+          padding="400"
+        >
+          <BlockStack gap="200">
+            <Text as="h3" variant="headingSm">{journey.primaryDropOff.label}</Text>
+            <Text as="p" variant="bodyMd">{journey.primaryDropOff.evidence}</Text>
+            <Text as="p" variant="bodyMd">{journey.primaryDropOff.suspectedFriction}</Text>
+            <Text as="p" variant="bodyMd" fontWeight="semibold">{journey.primaryDropOff.firstFix}</Text>
+          </BlockStack>
+        </Box>
+      </BlockStack>
+    </Card>
+  );
 }
 
 function DiagnosisCards({ diagnosis }: { diagnosis: DiagnosisResult }) {
@@ -91,26 +261,33 @@ function DiagnosisCards({ diagnosis }: { diagnosis: DiagnosisResult }) {
     );
   }
 
-  const { problem, cause, recommendations } = parseDiagnosisSections(diagnosis.report_markdown);
+  const { evidence, firstFix, observed, suspectedFriction } = parseDiagnosisSections(diagnosis.report_markdown);
 
   const cards: Array<{ title: string; content: string; toneColor: string; bgColor: string; borderColor: string }> = [
     {
-      title: messages.analysis.cardProblem,
-      content: problem,
+      title: messages.analysis.cardObserved,
+      content: observed,
       toneColor: "#d48806",
       bgColor: "#fffbe6",
       borderColor: "#ffe58f",
     },
     {
-      title: messages.analysis.cardCause,
-      content: cause,
+      title: messages.analysis.cardEvidence,
+      content: evidence,
       toneColor: "#333333",
       bgColor: "#fafafa",
       borderColor: "#d9d9d9",
     },
     {
-      title: messages.analysis.cardRecommendations,
-      content: recommendations,
+      title: messages.analysis.cardSuspectedFriction,
+      content: suspectedFriction,
+      toneColor: "#096dd9",
+      bgColor: "#e6f7ff",
+      borderColor: "#91d5ff",
+    },
+    {
+      title: messages.analysis.cardFirstFix,
+      content: firstFix,
       toneColor: "#389e0d",
       bgColor: "#f6ffed",
       borderColor: "#b7eb8f",
@@ -125,7 +302,7 @@ function DiagnosisCards({ diagnosis }: { diagnosis: DiagnosisResult }) {
           <Badge tone="success">{messages.analysis.diagnosisReady}</Badge>
         </InlineStack>
       </Box>
-      <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
+      <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
         {cards.map((card) => (
           <div
             key={card.title}
@@ -242,14 +419,7 @@ export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
 
   return (
     <BlockStack gap="500">
-      <Card>
-        <RadarChart
-          target={analysis.funnel.target}
-          benchmark={analysis.funnel.benchmark}
-          componentComparisons={analysis.component_comparisons}
-        />
-      </Card>
-
+      <ShopperJourneyCard analysis={analysis} />
       <DiagnosisCards diagnosis={diagnosis} />
     </BlockStack>
   );

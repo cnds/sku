@@ -76,8 +76,10 @@ async def test_ai_service_posts_chat_completions_request_and_parses_response() -
                     {
                         "message": {
                             "content": (
-                                "## Problem\nTraffic is engaged but not converting.\n\n"
-                                "## Recommendations\nClarify fit."
+                                "## Observed\nTraffic is engaged but not converting.\n\n"
+                                "## Evidence\n120 views and 2 orders.\n\n"
+                                "## Suspected friction\nFit confidence is weak.\n\n"
+                                "## First fix to try\nClarify fit."
                             )
                         }
                     }
@@ -98,10 +100,12 @@ async def test_ai_service_posts_chat_completions_request_and_parses_response() -
     assert payload["model"] == "sku-diagnosis-model"
     assert [message["role"] for message in payload["messages"]] == ["system", "user"]
     assert "Shopify product detail page" in payload["messages"][0]["content"]
+    assert "## Observed" in payload["messages"][1]["content"]
+    assert "## First fix to try" in payload["messages"][1]["content"]
     assert "Page views (all sources): 120" in payload["messages"][1]["content"]
-    assert report_markdown.startswith("## Problem")
+    assert report_markdown.startswith("## Observed")
     assert summary == {
-        "primary_issue": "Problem",
+        "primary_issue": "Observed",
         "recommended_action": "Review the markdown report and prioritize the first action item.",
         "source": "openai-compatible",
     }
@@ -118,7 +122,10 @@ async def test_ai_service_uses_fallback_when_api_key_is_placeholder() -> None:
             http_client=client,
         ).generate_report(snapshot=_snapshot())
 
-    assert "## Recommendations" in report_markdown
+    assert "## Observed" in report_markdown
+    assert "## Evidence" in report_markdown
+    assert "## Suspected friction" in report_markdown
+    assert "## First fix to try" in report_markdown
     assert summary["source"] == "fallback"
 
 
@@ -133,7 +140,7 @@ async def test_ai_service_uses_fallback_when_api_key_is_not_configured() -> None
             http_client=client,
         ).generate_report(snapshot=_snapshot())
 
-    assert "## Recommendations" in report_markdown
+    assert "## First fix to try" in report_markdown
     assert summary["source"] == "fallback"
 
 
@@ -148,7 +155,7 @@ async def test_ai_service_uses_fallback_when_chat_response_content_is_empty() ->
             http_client=client,
         ).generate_report(snapshot=_snapshot())
 
-    assert "## Recommendations" in report_markdown
+    assert "## First fix to try" in report_markdown
     assert summary["source"] == "fallback"
 
 
@@ -163,5 +170,5 @@ async def test_ai_service_uses_fallback_when_chat_request_fails() -> None:
             http_client=client,
         ).generate_report(snapshot=_snapshot())
 
-    assert "## Recommendations" in report_markdown
+    assert "## First fix to try" in report_markdown
     assert summary["source"] == "fallback"

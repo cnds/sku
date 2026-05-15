@@ -427,6 +427,64 @@ async def test_ingestion_service_persists_new_sdk_events_and_rolls_up(
 
 
 @pytest.mark.asyncio
+async def test_daily_rollup_counts_pdp_view_buy_box_intent_and_add_to_cart_events(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+
+    occurred_at = datetime(2026, 4, 23, 9, 0, tzinfo=UTC)
+
+    async with db_session_context(session_factory) as session:
+        await EventIngestionService().persist_batch_and_rollup(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="sdk",
+            session_id="session-1",
+            stat_date=date(2026, 4, 23),
+            visitor_id="visitor-1",
+            events=[
+                IngestEvent(
+                    event_type=EventType.VIEW,
+                    occurred_at=occurred_at,
+                    product_id="product-1",
+                    context={"page_type": "pdp"},
+                ),
+                IngestEvent(
+                    event_type=EventType.IMPRESSION,
+                    occurred_at=occurred_at,
+                    product_id="product-1",
+                    component_id="product_media",
+                    context={"page_type": "pdp"},
+                ),
+                IngestEvent(
+                    event_type=EventType.COMPONENT_CLICK,
+                    occurred_at=occurred_at,
+                    product_id="product-1",
+                    component_id="buy_box",
+                    context={"action": "intent"},
+                ),
+                IngestEvent(
+                    event_type=EventType.ADD_TO_CART,
+                    occurred_at=occurred_at,
+                    product_id="product-1",
+                    variant_id="variant-1",
+                    context={"source": "product_form"},
+                ),
+            ],
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        daily_stat = (await session.exec(select(DailyProductStat))).one()
+
+    assert daily_stat.views == 1
+    assert daily_stat.add_to_carts == 1
+    assert daily_stat.component_clicks_distribution == {"buy_box": 1}
+    assert daily_stat.component_impressions_distribution == {"product_media": 1}
+
+
+@pytest.mark.asyncio
 async def test_engage_event_without_product_id_persists_but_excluded_from_rollup(
     sqlite_database_url: str,
 ) -> None:

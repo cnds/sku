@@ -33,13 +33,18 @@ DEFAULT_WEB_BASE_URL = "http://localhost:3000"
 @dataclass(frozen=True, slots=True)
 class DemoProductPlan:
     product_id: str
+    impressions: int
+    clicks: int
     views: int
     add_to_carts: int
     orders: int
+    media_interactions: int
+    variant_changes: int
     component_clicks: dict[str, int]
-    problem: str
-    cause: str
-    recommendations: tuple[str, ...]
+    component_impressions: dict[str, int]
+    observed: str
+    suspected_friction: str
+    first_fix: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -55,62 +60,102 @@ class DemoSeedSummary:
 
 DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
     DemoProductPlan(
-        product_id="demo-underperformer",
-        views=60,
+        product_id="demo-size-confidence-leaker",
+        impressions=240,
+        clicks=44,
+        views=120,
         add_to_carts=8,
         orders=1,
+        media_interactions=12,
+        variant_changes=9,
         component_clicks={
-            "hero_cta": 5,
-            "review_tab": 2,
+            "product_media": 8,
+            "review_tab": 4,
             "size_chart": 1,
         },
-        problem="Traffic is landing on the PDP, but orders are lagging the store benchmark.",
-        cause=(
-            "The page gets enough views, but trust and sizing components are being "
-            "used less than the benchmark product."
-        ),
-        recommendations=(
-            "Move social proof higher on the page.",
-            "Expose the size chart closer to the buy box.",
-            "Tighten the CTA copy around shipping and returns.",
-        ),
+        component_impressions={
+            "product_media": 82,
+            "review_tab": 58,
+            "size_chart": 76,
+        },
+        observed="Shoppers reach the PDP, but very few continue from viewing to add-to-cart.",
+        suspected_friction="Size confidence is weak because the size chart is visible but rarely opened.",
+        first_fix="Move the size chart beside the variant selector and repeat fit guidance near the buy box.",
+    ),
+    DemoProductPlan(
+        product_id="demo-media-trust-leaker",
+        impressions=210,
+        clicks=39,
+        views=100,
+        add_to_carts=10,
+        orders=2,
+        media_interactions=1,
+        variant_changes=5,
+        component_clicks={
+            "product_media": 1,
+            "review_tab": 1,
+            "size_chart": 4,
+        },
+        component_impressions={
+            "product_media": 90,
+            "review_tab": 70,
+            "size_chart": 50,
+        },
+        observed="The PDP earns clicks, but shoppers do not inspect media or trust proof before dropping.",
+        suspected_friction="Media and reviews are not pulling enough attention to reduce hesitation.",
+        first_fix="Bring one strong product video and the review summary above the fold.",
+    ),
+    DemoProductPlan(
+        product_id="demo-hidden-winner",
+        impressions=65,
+        clicks=28,
+        views=30,
+        add_to_carts=14,
+        orders=7,
+        media_interactions=10,
+        variant_changes=8,
+        component_clicks={
+            "product_media": 6,
+            "review_tab": 7,
+            "size_chart": 5,
+        },
+        component_impressions={
+            "product_media": 20,
+            "review_tab": 30,
+            "size_chart": 25,
+        },
+        observed="The product converts strongly once discovered, but traffic is still low.",
+        suspected_friction="Discovery is the constraint rather than PDP persuasion.",
+        first_fix="Give this SKU a higher collection slot and one campaign placement for the next window.",
     ),
     DemoProductPlan(
         product_id="demo-benchmark",
-        views=70,
-        add_to_carts=20,
-        orders=12,
+        impressions=260,
+        clicks=58,
+        views=120,
+        add_to_carts=24,
+        orders=16,
+        media_interactions=18,
+        variant_changes=12,
         component_clicks={
-            "hero_cta": 14,
-            "review_tab": 10,
-            "size_chart": 8,
+            "product_media": 14,
+            "review_tab": 12,
+            "size_chart": 10,
         },
-        problem="This product is already acting as the conversion benchmark for the shop.",
-        cause="Customers reach supporting content early and continue through the funnel without a large drop-off.",
-        recommendations=(
-            "Reuse this page layout as the reference for lower-performing PDPs.",
-            "Keep the review module and sizing guidance above the fold.",
-            "Reuse this content structure for similar high-intent products.",
-        ),
-    ),
-    DemoProductPlan(
-        product_id="demo-hidden-gem",
-        views=18,
-        add_to_carts=7,
-        orders=3,
-        component_clicks={
-            "hero_cta": 4,
-            "review_tab": 2,
-            "size_chart": 2,
+        component_impressions={
+            "product_media": 86,
+            "review_tab": 68,
+            "size_chart": 72,
         },
-        problem="The PDP is converting well once shoppers discover it, but traffic is still limited.",
-        cause="Add-to-cart and order rates are strong, yet the total view volume is much lower than the shop average.",
-        recommendations=(
-            "Feature this SKU in collection pages and merchandising blocks.",
-            "Drive paid or email traffic toward this PDP.",
-            "Promote this SKU next to weaker products with stronger traffic.",
-        ),
+        observed="This product is acting as the conversion benchmark for the shop.",
+        suspected_friction="No primary friction is visible in the current window.",
+        first_fix="Reuse this page structure as the reference for weaker PDPs.",
     ),
+)
+
+LEGACY_DEMO_PRODUCT_IDS = (
+    "demo-underperformer",
+    "demo-hidden-gem",
 )
 
 
@@ -232,9 +277,30 @@ def _build_events(*, plan: DemoProductPlan, occurred_at: datetime) -> list[Inges
 
     events.extend(
         IngestEvent(
+            event_type=EventType.IMPRESSION,
+            occurred_at=occurred_at - timedelta(minutes=2),
+            product_id=plan.product_id,
+            component_id="collection_card",
+            context={"position": 0},
+        )
+        for _ in range(plan.impressions)
+    )
+    events.extend(
+        IngestEvent(
+            event_type=EventType.CLICK,
+            occurred_at=occurred_at - timedelta(minutes=1),
+            product_id=plan.product_id,
+            component_id="collection_card",
+            context={"target_url": f"/products/{plan.product_id}"},
+        )
+        for _ in range(plan.clicks)
+    )
+    events.extend(
+        IngestEvent(
             event_type=EventType.VIEW,
             occurred_at=occurred_at,
             product_id=plan.product_id,
+            context={"page_type": "pdp"},
         )
         for _ in range(plan.views)
     )
@@ -266,12 +332,51 @@ def _build_events(*, plan: DemoProductPlan, occurred_at: datetime) -> list[Inges
             for _ in range(count)
         )
 
+    for component_id, count in plan.component_impressions.items():
+        events.extend(
+            IngestEvent(
+                event_type=EventType.IMPRESSION,
+                occurred_at=occurred_at + timedelta(minutes=3),
+                product_id=plan.product_id,
+                component_id=component_id,
+                context={"page_type": "pdp"},
+            )
+            for _ in range(count)
+        )
+
+    events.extend(
+        IngestEvent(
+            event_type=EventType.MEDIA,
+            occurred_at=occurred_at + timedelta(minutes=4),
+            product_id=plan.product_id,
+            context={"action": "gallery"},
+        )
+        for _ in range(plan.media_interactions)
+    )
+    events.extend(
+        IngestEvent(
+            event_type=EventType.VARIANT,
+            occurred_at=occurred_at + timedelta(minutes=5),
+            product_id=plan.product_id,
+            context={"options": {"Size": "M"}},
+        )
+        for _ in range(plan.variant_changes)
+    )
+    events.append(
+        IngestEvent(
+            event_type=EventType.ENGAGE,
+            occurred_at=occurred_at + timedelta(minutes=6),
+            product_id=plan.product_id,
+            context={"dwell_ms": 18000, "max_scroll_pct": 65, "page_type": "pdp"},
+        )
+    )
+
     return events
 
 
 async def _clear_existing_demo_records(*, shop_domain: str) -> None:
     session = get_db_session()
-    product_ids = tuple(plan.product_id for plan in DEMO_PRODUCTS)
+    product_ids = tuple(plan.product_id for plan in DEMO_PRODUCTS) + LEGACY_DEMO_PRODUCT_IDS
 
     await session.exec(
         delete(ProductDiagnosis).where(
@@ -395,14 +500,15 @@ def _report_markdown(
     snapshot: ProductSnapshot,
     window: TimeWindow,
 ) -> str:
-    recommendations = "\n".join(f"- {item}" for item in plan.recommendations)
     return (
-        "## Problem\n"
-        f"{plan.problem}\n\n"
-        "## Cause\n"
-        f"{plan.cause}\n"
+        "## Observed\n"
+        f"{plan.observed}\n\n"
+        "## Evidence\n"
         f"Observed snapshot for {window.value}: {snapshot.views} views, "
-        f"{snapshot.add_to_carts} add-to-carts, {snapshot.orders} orders.\n\n"
-        "## Recommendations\n"
-        f"{recommendations}"
+        f"{snapshot.add_to_carts} add-to-carts, {snapshot.orders} orders, "
+        f"{snapshot.clicks} clicks from {snapshot.impressions} impressions.\n\n"
+        "## Suspected friction\n"
+        f"{plan.suspected_friction}\n\n"
+        "## First fix to try\n"
+        f"{plan.first_fix}"
     )

@@ -81,7 +81,7 @@ async def test_server_worker_processes_diagnosis_jobs_with_initialized_runtime(
 
     assert stored.status is DiagnosisStatus.READY
     assert stored.summary_json["source"] == "fallback"
-    assert "Recommendation" in (stored.report_markdown or "")
+    assert "## First fix to try" in (stored.report_markdown or "")
 
 
 @pytest.mark.asyncio
