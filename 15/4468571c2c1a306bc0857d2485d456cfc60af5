@@ -1,0 +1,41 @@
+apps/web/app/lib/analytics.ts
+  s_acf5a93d9ae027::t_58977e909ba159 1
+apps/web/tests/board-copy.test.ts
+  s_acf5a93d9ae027::t_5f9e84bb5b8d12 3,5,12-13,18-24,35-51
+apps/server/tests/test_branding_metadata.py
+  s_acf5a93d9ae027::t_7fd3c445dd635e 26-28
+apps/server/src/seed_demo.py
+  s_acf5a93d9ae027::t_a2ff68d8b1152e 240
+ROADMAP.md
+  s_acf5a93d9ae027::t_cf31c6ae7bb2ba 11,21,35,41,44,59,71-73,76,79-88,93-97,101-102,107-108,115,117-121,127-131,135,137-139,151-155
+apps/web/app/routes/_index.tsx
+  s_acf5a93d9ae027::t_60912ae11eb322 44-57,100-102
+apps/web/app/components/LeaderboardTable.tsx
+  s_acf5a93d9ae027::t_d6f507c28a348a 14-15,25-36,86,107-109
+apps/web/app/lib/messages.ts
+  s_acf5a93d9ae027::t_eca44164bb2e5f 18-19,21,26,28,30,38,47
+apps/server/src/main.py
+  s_acf5a93d9ae027::t_cc40171897aec4 57-59
+README.md
+  s_acf5a93d9ae027::t_ca387b309b4b81 3
+  s_acf5a93d9ae027::t_796118ecd1f584 5-8,14,81
+AGENTS.md
+  s_acf5a93d9ae027::t_9cffe01d53bf8a 42
+  s_acf5a93d9ae027::t_33695f5b46fd73 77
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "154468571c2c1a306bc0857d2485d456cfc60af5",
+  "prompts": {},
+  "sessions": {
+    "s_acf5a93d9ae027": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2a6c-8ac7-71f2-bdd7-a8fda95bafe5",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
