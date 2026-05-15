@@ -1,0 +1,67 @@
+apps/web/tests/routes._index.test.ts
+  s_05aacd0149d9d8::t_effce6584ef977 1-50
+apps/web/tests/storefront-tracker.test.ts
+  s_05aacd0149d9d8::t_fb4af067e9ec93 1-18
+apps/web/app/components/AnalysisPanel.tsx
+  s_05aacd0149d9d8::t_30c9b63400f3e3 16-21,32-45,47-112,114-122,124-128,132,134-138,142-222,264,268-269,275-276,282-290,305,422
+apps/server/tests/test_product_analysis.py
+  s_05aacd0149d9d8::t_945ce43b5f42ee 9,155-301
+apps/server/src/controllers/analytics.py
+  s_05aacd0149d9d8::t_cffefa164bf4bf 7,29-34
+apps/web/tests/api.server.test.ts
+  s_05aacd0149d9d8::t_b53c0123b034d1 3,105-124
+apps/server/tests/test_ingestion_and_rollups.py
+  s_05aacd0149d9d8::t_f41d59fce58437 430-486
+apps/web/app/routes/_index.tsx
+  s_05aacd0149d9d8::t_7b9d0a73ff2fc7 5,9,11,20-21,31-32,37-100,130,138-139,141,155-184
+apps/web/app/lib/contracts.ts
+  s_05aacd0149d9d8::t_e6d90823587b0c 3-4,12-13,23-29,57-81
+apps/extension/assets/sku-lens-tracker.js
+  s_05aacd0149d9d8::t_1bc9844441d0ed 122-143,227-256,427-570,575-587,802,804-807,812
+  s_05aacd0149d9d8::t_0ffdadba4ff869 170,571-574
+  s_05aacd0149d9d8::t_4f2c69bc6ba9a5 612
+apps/server/src/seed_demo.py
+  s_05aacd0149d9d8::t_b488cf86249132 36-37,41-42,44-47,63-66,69-70,72-73,76-83,86-93,95-97,99-106,109-116,118-120,122-129,131-158,278-297,303,335-373,379,504-506,508-513
+apps/web/tests/diagnosis-contract.test.ts
+  s_05aacd0149d9d8::t_c75548eac73b23 1-84
+apps/web/app/lib/api.server.ts
+  s_05aacd0149d9d8::t_c2fe42bafe2093 5,49-58
+apps/web/app/lib/messages.ts
+  s_05aacd0149d9d8::t_038905ac107fdc 75-76
+  s_05aacd0149d9d8::t_adafa51e7cbc7b 22-25,57-58,66-73
+apps/server/tests/test_ai_service.py
+  s_05aacd0149d9d8::t_52508bebdca73e 79-82,103-104,106,108,125-128,143,158,173
+apps/server/tests/test_demo_seed.py
+  s_05aacd0149d9d8::t_88d7c1c0fd7320 64-67,69,73,79,83-89,93-94,153-154
+apps/server/tests/test_controller_modules.py
+  s_05aacd0149d9d8::t_bb8dd13db7ce65 20-22,64-66,120,197-253
+apps/web/tests/product-journey.test.ts
+  s_05aacd0149d9d8::t_e3c558510e4cd1 1-64
+apps/server/tests/test_worker_module.py
+  s_05aacd0149d9d8::t_2b3d13b1e222f3 84
+apps/web/app/lib/diagnosis.ts
+  s_05aacd0149d9d8::t_fdd2be29a6b123 2,23,25-28,34-41,44-88
+apps/server/src/services/ai.py
+  s_05aacd0149d9d8::t_3e038cb97f76eb 75-83,122-124,127-129,131-133,135-137,141-144,150-151,153-154,158-159
+apps/server/src/services/analysis.py
+  s_05aacd0149d9d8::t_412f79982b2d24 15-17,95-96,116-160,165-177,186-383,415-421
+  s_05aacd0149d9d8::t_147ab3b2fe2bcd 161-164
+apps/server/src/schemas.py
+  s_05aacd0149d9d8::t_cf64405ef7d51e 40-51,98-104,144-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "8f524638a2463b5d8d2f5a4cff0a3da19535f44c",
+  "prompts": {},
+  "sessions": {
+    "s_05aacd0149d9d8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2a30-ff06-7260-80b4-ab6f6f2f8c89",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
