@@ -12,24 +12,40 @@
 
 ## Product Positioning
 
-SKU Lens is an AI-powered Winners / Leakers board for Shopify products.
+SKU Lens is a daily decision board for Shopify products.
 
-It tells merchants which products are winning or leaking shoppers, where the shopper journey breaks, what on the PDP may have caused that drop-off, and what to fix or promote next.
+It tells merchants which products to promote, which products to fix, why each product was flagged, and what first action to take next.
 
 The core product promise is:
 
-1. Show the merchant which products deserve attention.
-2. Explain why each product is a Winner or a Leaker.
-3. Identify the likely drop-off step in the shopper journey.
-4. Use AI to turn the evidence into a concrete PDP recommendation.
+1. Show the merchant today's highest-priority product decisions.
+2. Identify hidden Winners that deserve more exposure.
+3. Identify Leakers with strong evidence of shopper drop-off.
+4. Explain the observed signal, supporting evidence, suspected friction, and first fix to try.
 
 ## Product Boundaries
 
-- Winners / Leakers is the product center, not a secondary analytics view.
-- The product should prioritize "why this product is on the board" over broad store overview metrics.
-- AI should explain specific funnel and PDP behavior, not generate generic ecommerce advice.
+- The home page is not an analytics dashboard. It is a daily decision board.
+- Winners / Leakers is the product center, not a secondary analytics view or report filter.
+- A Winner means "high intent, underexposed", not "best seller".
+- A Leaker means "high attention, weak progression", not "worst seller".
+- The product should prioritize "which products need action today and why" over broad store overview metrics.
+- AI should explain specific funnel and PDP behavior with evidence, not generate generic ecommerce advice.
+- AI wording must avoid false certainty. Use suspected friction, likely cause, and first fix language unless the evidence is conclusive.
 - Workflow, agency reporting, multi-store portfolios, and full task management are future extensions. They should not pull the first product away from the board plus diagnosis loop.
 - Revenue impact can be introduced later, but only after funnel coverage and order attribution are strong enough to avoid false precision.
+
+## MVP Product Constraints
+
+- The first home experience should default to 3 priority cards: 2 Leakers and 1 Hidden Winner.
+- Secondary lists such as "View more products" can exist, but they should not become the primary experience.
+- Each priority card must have one main conclusion, one drop-off or opportunity, one suspected friction, and one first fix.
+- Do not show long metric tables, broad filter sets, or exploratory chart panels on the first screen.
+- Do not turn card recommendations into a generic AI audit checklist. Keep the card focused on the next decision.
+- Every diagnosis should follow the same evidence chain: `Observed`, `Evidence`, `Suspected friction`, and `First fix to try`.
+- Product cards need explicit signal states: `Ready`, `Weak signal`, `Insufficient data`, and `Tracking issue`.
+- Low-data products should not receive confident AI recommendations. They should show why the signal is weak or what event is missing.
+- The demo should tell three fixed stories first: a size-confidence Leaker, a media/trust Leaker, and a Hidden Winner.
 
 ## Current Product Scope
 
@@ -62,8 +78,12 @@ The core product promise is:
 - [x] Merchants can switch board rankings across `24h`, `7d`, and `30d`.
 - [x] Merchants can drill from a board entry into a product analysis page.
 - [x] Ranking logic uses opportunity/gap scoring when the required funnel inputs are present.
+- [ ] The home page is not yet a 3-card daily decision board.
+- [ ] Winner cards do not yet explicitly frame hidden gems as high intent and underexposed.
+- [ ] Leaker cards do not yet explicitly frame leaks as high attention and weak progression.
 - [ ] Board entries do not yet explain the specific reason a product was flagged.
-- [ ] Board entries do not yet show the likely drop-off step or the first AI recommendation inline.
+- [ ] Board entries do not yet show the likely drop-off step, suspected friction, or first fix inline.
+- [ ] Board entries do not yet expose `Ready`, `Weak signal`, `Insufficient data`, or `Tracking issue` states.
 
 ### 4. Product Drop-Off Diagnosis
 
@@ -77,7 +97,9 @@ The core product promise is:
 - [x] Diagnosis results are reused when the same product snapshot has already been analyzed.
 - [x] A fallback diagnosis path exists when OpenAI-compatible AI output is unavailable.
 - [ ] The product page does not yet present a step-by-step shopper journey with the primary drop-off step highlighted.
-- [ ] The diagnosis prompt and UI do not yet reliably connect a drop-off step to a merchant-controlled PDP cause.
+- [ ] The diagnosis prompt and UI do not yet reliably connect a drop-off step to one primary suspected PDP friction.
+- [ ] Diagnosis output is not yet normalized into `Observed`, `Evidence`, `Suspected friction`, and `First fix to try`.
+- [ ] Diagnosis cards do not yet enforce one primary conclusion and one first fix.
 - [ ] The web-triggered diagnosis payload does not yet include every behavior field that the backend snapshot model supports.
 
 ### 5. Demo And Delivery Readiness
@@ -87,14 +109,16 @@ The core product promise is:
 - [x] The web app defaults missing or invalid analytics windows to `24h`.
 - [x] Request tracing propagates `X-SKU-Lens-Request-Id` across server, web, and storefront flows.
 - [x] Browser-side debug logging is intentionally silent by default and can be enabled manually with `localStorage['sku-lens:debug'] = '1'`.
-- [ ] The demo does not yet tell the full Winners / Leakers story with realistic PDP drop-off causes.
+- [ ] The demo does not yet tell the 3-card daily decision story with two Leakers and one Hidden Winner.
+- [ ] The demo does not yet show size confidence, media trust, and underexposed-winner narratives as fixed examples.
 
 ## Product Gaps To Close Next
 
 - [ ] Complete storefront funnel tracking for PDP `view`, buy-box intent, PDP component clicks, `add_to_cart`, and related conversion actions so Winners / Leakers placement is based on full shopper behavior.
-- [ ] Convert board rows into board cards that answer: why this product is here, where shoppers drop off, and what AI recommends next.
-- [ ] Define a drop-off taxonomy that maps funnel steps to likely PDP causes, such as product image friction, missing social proof, unclear sizing, variant selection friction, hidden shipping/returns, or weak CTA placement.
-- [ ] Normalize diagnosis markdown generation and parsing so every producer maps cleanly to `Problem`, `Drop-Off Evidence`, `Likely Cause`, and `Recommended Fixes`.
+- [ ] Convert board rows into daily decision cards that answer: why this product is here, where shoppers drop off or where the opportunity is, what evidence supports the call, and what first fix or promotion action to try.
+- [ ] Define a drop-off taxonomy that maps funnel steps to suspected PDP frictions, such as product image friction, missing social proof, unclear sizing, variant selection friction, hidden shipping/returns, or weak CTA placement.
+- [ ] Normalize diagnosis generation and parsing so every producer maps cleanly to `Observed`, `Evidence`, `Suspected friction`, and `First fix to try`.
+- [ ] Add signal-state logic for `Ready`, `Weak signal`, `Insufficient data`, and `Tracking issue`.
 - [ ] Include all supported behavior fields in web-created diagnosis snapshots, including impressions, clicks, media interactions, variant changes, dwell, scroll, and component impressions.
 - [ ] Replace the raw JSON/POST-only OAuth callback handling with a merchant-friendly browser install, post-install, and onboarding flow inside the embedded app.
 - [ ] Add a merchant-visible integration health check that confirms tracker install, webhook connectivity, and recent data arrival.
@@ -103,16 +127,21 @@ The core product promise is:
 
 ### Near-Term
 
-- [ ] Reframe the dashboard as a richer Winners / Leakers home screen, not a generic analytics dashboard.
-- [ ] Add inline AI explanations to each board item: flag reason, suspected drop-off step, confidence, and first recommendation.
+- [ ] Reframe the home page as `Today's product priorities`, not a generic dashboard.
+- [ ] Default the first screen to 3 priority cards: 2 Leakers and 1 Hidden Winner.
+- [ ] Define Winner as `High intent, underexposed` in the UI.
+- [ ] Define Leaker as `High attention, weak progression` in the UI.
+- [ ] Add inline explanations to each priority card: why flagged, drop-off or opportunity, evidence, suspected friction, and first fix.
+- [ ] Add signal states to priority cards so low-data products show `Weak signal`, `Insufficient data`, or `Tracking issue` instead of confident recommendations.
 - [ ] Add a product detail diagnosis layout centered on the shopper journey: exposure, click, PDP view, media/review/size/variant engagement, add-to-cart, and order.
 - [ ] Highlight the primary drop-off step in the product detail page and show the evidence that supports it.
-- [ ] Update demo seed content so the top Winners and Leakers demonstrate clear, realistic stories.
+- [ ] Update demo seed content so the first three cards tell clear stories: size-confidence leak, media/trust leak, and hidden winner.
 - [ ] Improve board and diagnosis terminology around `winning`, `leaking shoppers`, `drop-off`, `likely cause`, and `recommended fix`.
 
 ### Mid-Term
 
 - [ ] Add better storefront component labeling so AI can reason about real theme sections instead of generic component ids.
+- [ ] Add a compact "View more products" path after the 3-card daily decision board without turning the home page into a dashboard.
 - [ ] Add trend context for board entries so merchants can see whether a product is newly flagged, worsening, or improving.
 - [ ] Add diagnosis freshness, last generated time, and explicit re-run controls.
 - [ ] Add a lightweight recommendation status for each diagnosis: `New`, `Planned`, `Testing`, `Implemented`, and `Improved`.
@@ -130,7 +159,8 @@ The core product promise is:
 ## Recommended Priority Order
 
 1. Complete the missing funnel instrumentation so Winners / Leakers placement has stronger ground truth.
-2. Redesign board entries around explanation: why flagged, where drop-off happens, and what to do next.
-3. Redesign the product page around drop-off diagnosis rather than generic scoring.
-4. Normalize AI diagnosis structure and snapshot data so recommendations stay evidence-backed.
-5. Add history, status, and impact tracking only after the board plus diagnosis loop is reliable.
+2. Redesign the home page into a 3-card daily decision board.
+3. Add signal states so weak or missing data does not produce overconfident AI recommendations.
+4. Normalize AI diagnosis structure and snapshot data so every recommendation stays evidence-backed.
+5. Redesign the product page around one primary drop-off, one suspected friction, and one first fix.
+6. Add history, status, and impact tracking only after the daily decision board is reliable.
