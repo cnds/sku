@@ -1,0 +1,19 @@
+ROADMAP.md
+  s_f6f50995afbe68::t_652471abea43e4 15,17,21-24,28-34,38-49,81-83,85-86,100-102,112-113,118-121,130-135,138,144,162-166
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "5e5dec35989eb1cb2cc56d1eccbd2da07ae3b346",
+  "prompts": {},
+  "sessions": {
+    "s_f6f50995afbe68": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e241c-c264-7100-822c-78801a16d6f5",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
