@@ -15,19 +15,19 @@ export const messages = {
   },
 
   dashboard: {
-    subtitle: "AI-powered product performance ranking",
-    viewTopProduct: "View top product",
+    subtitle: "Daily decision board for product priorities",
+    viewTopProduct: "View top priority",
     bannerText: (count: number, window: string) =>
-      `Tracking ${count} products for ${window}. SKU Lens ranks products into Winners and Leakers.`,
+      `Tracking ${count} products for ${window}. SKU Lens prioritizes Winners and Leakers for this window.`,
     prioritiesTitle: "Today's product priorities",
     prioritiesSubtitle: "Two Leakers to fix first and one Hidden Winner to scale when the signal is ready.",
     prioritiesEmpty: "Priority cards will appear once storefront and PDP events are collected.",
     viewMoreProducts: "View more products",
-    errorMessage: "Failed to load the dashboard. The analytics server may be unavailable.",
+    errorMessage: "Failed to load the board. The analytics server may be unavailable.",
     blackboardTitle: "Leakers",
-    blackboardSubtitle: "Products losing shoppers before they buy",
+    blackboardSubtitle: "High attention, weak progression",
     redboardTitle: "Winners",
-    redboardSubtitle: "Products converting better than their traffic suggests",
+    redboardSubtitle: "High intent, underexposed",
   },
 
   product: {
@@ -35,7 +35,7 @@ export const messages = {
     errorTitle: "Product Analysis",
     errorMessage: "Failed to load product analysis. The product may not exist or the server is unavailable.",
     notFound: "This product was not found.",
-    subtitle: (benchmark: string) => `Scoring & AI diagnosis · benchmark: ${benchmark}`,
+    subtitle: (benchmark: string) => `Shopper journey and diagnosis · benchmark: ${benchmark}`,
   },
 
   leaderboard: {
@@ -43,17 +43,12 @@ export const messages = {
     resourcePlural: "products",
     emptyHeading: (title: string) => `No ${title.toLowerCase()} products yet`,
     emptyDescription: "Products will appear here once enough engagement data has been collected.",
-    columnRank: "#",
     columnProduct: "Product",
-    columnViews: "Views",
-    columnAddToCart: "Add to Cart",
-    columnOrders: "Orders",
-    columnScore: "Score",
+    columnSignal: "Recent signal",
     productCount: (count: number) => `${count} ${count === 1 ? "product" : "products"}`,
   },
 
   analysis: {
-    scoringHeading: "Scoring Dimensions",
     journeyHeading: "Shopper Journey",
     primaryDropOff: "Primary drop-off",
     diagnosisHeading: "AI Diagnosis",
@@ -71,11 +66,8 @@ export const messages = {
     dimensionClick: "Click",
     dimensionPdpView: "PDP view",
     dimensionEngagement: "Engagement",
-    dimensionViews: "Views",
     dimensionAddToCart: "Add to cart",
     dimensionOrders: "Order",
-    dimensionCtr: "CTR",
-    dimensionConversion: "Conversion",
   },
 
   timeWindows: {
@@ -84,9 +76,4 @@ export const messages = {
     "30d": "30 Days",
   },
 
-  componentLabels: {
-    description: "Description",
-    review_tab: "Review Tab",
-    size_chart: "Size Chart",
-  } as Record<string, string>,
 } as const;

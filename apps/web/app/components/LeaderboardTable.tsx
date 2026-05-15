@@ -11,6 +11,8 @@ import type { LeaderboardEntry, TimeWindow } from "@/lib/contracts";
 import { messages } from "@/lib/messages";
 import { productPath } from "@/lib/url";
 
+type ActivityRow = Pick<LeaderboardEntry, "add_to_carts" | "orders" | "views">;
+
 interface LeaderboardTableProps {
   rows: LeaderboardEntry[];
   shopId: string;
@@ -18,6 +20,18 @@ interface LeaderboardTableProps {
   subtitle: string;
   tone: "critical" | "success";
   window: TimeWindow;
+}
+
+function formatCount(value: number, singular: string, plural: string): string {
+  return `${value.toLocaleString("en-US")} ${value === 1 ? singular : plural}`;
+}
+
+export function formatLeaderboardActivity(row: ActivityRow): string {
+  return [
+    formatCount(row.views, "view", "views"),
+    formatCount(row.add_to_carts, "cart", "carts"),
+    formatCount(row.orders, "order", "orders"),
+  ].join(" · ");
 }
 
 export function LeaderboardTable({
@@ -68,9 +82,8 @@ export function LeaderboardTable({
         resourceName={resourceName}
         itemCount={rows.length}
         headings={[
-          { title: messages.leaderboard.columnRank },
           { title: messages.leaderboard.columnProduct },
-          { title: messages.leaderboard.columnScore, alignment: "end" },
+          { title: messages.leaderboard.columnSignal },
         ]}
         selectable={false}
       >
@@ -80,11 +93,6 @@ export function LeaderboardTable({
             key={row.product_id}
             position={index}
           >
-            <IndexTable.Cell>
-              <Text as="span" variant="bodyMd" fontWeight="bold" tone={tone === "critical" ? "critical" : "success"}>
-                {index + 1}
-              </Text>
-            </IndexTable.Cell>
             <IndexTable.Cell>
               <Text as="span" variant="bodyMd" fontWeight="semibold">
                 <a
@@ -96,11 +104,9 @@ export function LeaderboardTable({
               </Text>
             </IndexTable.Cell>
             <IndexTable.Cell>
-              <InlineStack align="end">
-                <Badge tone={tone}>
-                  {row.score.toFixed(1)}
-                </Badge>
-              </InlineStack>
+              <Text as="span" variant="bodySm" tone="subdued">
+                {formatLeaderboardActivity(row)}
+              </Text>
             </IndexTable.Cell>
           </IndexTable.Row>
         ))}

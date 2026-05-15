@@ -54,9 +54,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app = FastAPI(
         title="SKU Lens",
         description=(
-            "AI Winner & Loser Analysis. "
-            "Use AI to audit product pages by tracking component-level engagement "
-            "(Size Chart, Reviews, etc.) and quantifying Order Gaps."
+            "SKU Lens is a daily decision board for Shopify products. "
+            "It surfaces Winners and Leakers with storefront evidence, shopper drop-offs, "
+            "suspected friction, and the first fix to try."
         ),
         lifespan=lifespan,
     )

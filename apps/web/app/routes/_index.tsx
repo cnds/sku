@@ -41,6 +41,20 @@ function priorityBoardLabel(board: PriorityCard["board"]): string {
   return board === "hidden_winner" ? "Hidden Winner" : messages.dashboard.blackboardTitle;
 }
 
+const PRIORITY_STEP_LABELS: Record<string, string> = {
+  cart_to_order: "Drop-off: add-to-cart to order",
+  collection_click: "Drop-off: collection impression to click",
+  data_volume: "Signal: data volume",
+  merchandising_reach: "Opportunity: merchandising reach",
+  pdp_add_to_cart: "Drop-off: PDP view to add-to-cart",
+  pdp_decision: "Drop-off: PDP decision",
+  tracking_coverage: "Tracking: event coverage",
+};
+
+export function priorityStepLabel(step: string): string {
+  return PRIORITY_STEP_LABELS[step] ?? `Signal: ${step.replaceAll("_", " ")}`;
+}
+
 function priorityTone(card: PriorityCard): "attention" | "critical" | "info" | "success" {
   if (card.signal_state === "Tracking issue") return "attention";
   if (card.signal_state === "Insufficient data" || card.signal_state === "Weak signal") return "info";
@@ -83,6 +97,9 @@ function PriorityCards({
                 </a>
               </Text>
               <Text as="p" variant="bodySm" tone="subdued">{card.flag_reason}</Text>
+              <InlineStack>
+                <Badge>{priorityStepLabel(card.primary_step)}</Badge>
+              </InlineStack>
             </BlockStack>
             <BlockStack gap="100">
               {card.evidence.slice(0, 3).map((item) => (

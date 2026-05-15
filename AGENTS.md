@@ -39,7 +39,7 @@ Avoid committing generated output such as `build/`, `dist/`, `coverage/`, `node_
 - `docker compose down`: stop the containerized stack.
 - `uv sync --directory apps/server --extra dev`: install Python 3.14 backend dependencies for bare-metal workflows.
 - `uv run --directory apps/server sku-lens-server`: run the backend outside Docker.
-- `uv run --directory apps/server sku-lens-seed-demo`: seed repeatable `demo.myshopify.com` dashboard data and ready-made diagnosis cards for local UI testing.
+- `uv run --directory apps/server sku-lens-seed-demo`: seed repeatable `demo.myshopify.com` board data and ready-made diagnosis cards for local UI testing.
 - `uv run --directory apps/server sku-lens-worker`: run the worker outside Docker.
 - `pnpm install`: install frontend dependencies for bare-metal workflows.
 - `pnpm dev`: run the admin app outside Docker.
@@ -74,7 +74,7 @@ This branch has no established git history yet. Commit subjects must start with 
 - `test:` for adding or updating tests without production behavior changes
 - `revert:` for reverting an earlier commit
 
-Keep subjects short, imperative, and scoped after the label, for example `feat: server flatten src imports`, `fix: web update dashboard branding`, or `docs: clarify local demo seed workflow`. PRs should include:
+Keep subjects short, imperative, and scoped after the label, for example `feat: server flatten src imports`, `fix: web update board branding`, or `docs: clarify local demo seed workflow`. PRs should include:
 
 - a brief summary of user-visible changes
 - affected apps (`server`, `web`, `extension`)

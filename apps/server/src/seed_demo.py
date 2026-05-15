@@ -237,7 +237,7 @@ async def seed_demo_data(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Seed repeatable demo data so the SKU Lens dashboard has visible local content.",
+        description="Seed repeatable demo data so the SKU Lens board has visible local content.",
     )
     parser.add_argument("--shop-domain", default=DEFAULT_SHOP_DOMAIN)
     parser.add_argument("--public-token", default=DEFAULT_PUBLIC_TOKEN)

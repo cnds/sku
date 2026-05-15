@@ -23,5 +23,6 @@ def test_fastapi_metadata_exposes_current_brand(
     )
 
     assert app.title == "SKU Lens"
-    assert "AI Winner & Loser Analysis" in app.description
-    assert "Order Gaps" in app.description
+    assert "daily decision board" in app.description
+    assert "Winners and Leakers" in app.description
+    assert "Order Gaps" not in app.description
