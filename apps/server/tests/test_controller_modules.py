@@ -20,6 +20,7 @@ from schemas import (
     PriorityBoardType,
     PriorityCard,
     PrioritySignalState,
+    PriorityTrendState,
     ProductAnalysisResult,
     TimeWindow,
 )
@@ -116,6 +117,7 @@ def test_all_business_routes_are_owned_by_controller_modules(
 ) -> None:
     app = create_app(_settings(sqlite_database_url, redis_url))
     expected = {
+        ("/api/integration/health", ("GET",), "controllers.analytics"),
         ("/api/leaderboard", ("GET",), "controllers.analytics"),
         ("/api/priorities", ("GET",), "controllers.analytics"),
         ("/api/products/{product_id}/analysis", ("GET",), "controllers.analytics"),
@@ -207,6 +209,8 @@ async def test_priorities_endpoint_smoke(
             product_id="prod-1",
             board=PriorityBoardType.LEAKER,
             signal_state=PrioritySignalState.READY,
+            trend_state=PriorityTrendState.NEW,
+            trend_reason="No previous 24h comparison window yet.",
             flag_reason="Orders lag similar traffic",
             primary_step="pdp_add_to_cart",
             evidence=["120 PDP views", "8 add-to-carts", "1 order"],

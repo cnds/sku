@@ -49,6 +49,24 @@ class PrioritySignalState(StrEnum):
     TRACKING_ISSUE = "Tracking issue"
 
 
+class PriorityTrendState(StrEnum):
+    NEW = "New"
+    WORSENING = "Worsening"
+    IMPROVING = "Improving"
+    STABLE = "Stable"
+
+
+class IntegrationHealthStatus(StrEnum):
+    HEALTHY = "healthy"
+    PARTIAL = "partial"
+    NOT_CONNECTED = "not_connected"
+
+
+class IntegrationCheckStatus(StrEnum):
+    OK = "ok"
+    MISSING = "missing"
+
+
 class IngestEvent(BaseModel):
     event_type: EventType
     occurred_at: datetime
@@ -145,6 +163,8 @@ class PriorityCard(BaseModel):
     product_id: str
     board: PriorityBoardType
     signal_state: PrioritySignalState
+    trend_state: PriorityTrendState
+    trend_reason: str
     flag_reason: str
     primary_step: str
     evidence: list[str]
@@ -163,3 +183,27 @@ class DiagnosisResult(BaseModel):
     snapshot_hash: str
     report_markdown: str | None
     summary_json: dict[str, Any]
+    generated_at: datetime | None
+
+
+class IntegrationHealthCoverage(BaseModel):
+    impressions: int
+    clicks: int
+    views: int
+    component_clicks: int
+    add_to_carts: int
+    orders: int
+
+
+class IntegrationHealthCheck(BaseModel):
+    key: str
+    label: str
+    status: IntegrationCheckStatus
+    message: str
+
+
+class IntegrationHealthResponse(BaseModel):
+    status: IntegrationHealthStatus
+    last_event_at: datetime | None
+    coverage: IntegrationHealthCoverage
+    checks: list[IntegrationHealthCheck]

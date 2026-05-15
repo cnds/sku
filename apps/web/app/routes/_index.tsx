@@ -17,8 +17,8 @@ import {
 
 import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { TIME_WINDOWS, formatTimeWindowLabel } from "@/lib/analytics";
-import { fetchLeaderboard, fetchPriorities, parseTimeWindow } from "@/lib/api.server";
-import type { PriorityCard } from "@/lib/contracts";
+import { fetchIntegrationHealth, fetchLeaderboard, fetchPriorities, parseTimeWindow } from "@/lib/api.server";
+import type { IntegrationHealthResponse, PriorityCard, PriorityTrendState } from "@/lib/contracts";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
 import { dashboardPath, productPath } from "@/lib/url";
@@ -28,13 +28,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestId = requestIdFromHeaders(request.headers);
   const shopId = url.searchParams.get("shop") ?? "demo.myshopify.com";
   const window = parseTimeWindow(url.searchParams.get("window"));
-  const [priorities, blackboard, redboard] = await Promise.all([
+  const [health, priorities, blackboard, redboard] = await Promise.all([
+    fetchIntegrationHealth({ requestId, shopId, window }),
     fetchPriorities({ requestId, shopId, window }),
     fetchLeaderboard({ board: "black", requestId, shopId, window }),
     fetchLeaderboard({ board: "red", requestId, shopId, window }),
   ]);
 
-  return { blackboard, priorities, redboard, shopId, window };
+  return { blackboard, health, priorities, redboard, shopId, window };
 }
 
 function priorityBoardLabel(board: PriorityCard["board"]): string {
@@ -61,6 +62,47 @@ function priorityTone(card: PriorityCard): "attention" | "critical" | "info" | "
   return card.board === "hidden_winner" ? "success" : "critical";
 }
 
+export function priorityTrendTone(
+  trend: PriorityTrendState,
+): "critical" | "success" | "info" | undefined {
+  if (trend === "Worsening") return "critical";
+  if (trend === "Improving") return "success";
+  if (trend === "New") return "info";
+  return undefined;
+}
+
+export function healthBannerContent(
+  health: IntegrationHealthResponse,
+): { message: string; tone: "critical" | "info" | "success" | "warning" } {
+  if (health.status === "healthy") {
+    return {
+      message: "Integration healthy: tracker, PDP, buy-box, and order coverage are present.",
+      tone: "success",
+    };
+  }
+
+  if (health.status === "not_connected") {
+    return {
+      message: "Integration not connected: check the theme app embed and ingest event delivery.",
+      tone: "critical",
+    };
+  }
+
+  const missing = health.checks
+    .filter((check) => check.status === "missing")
+    .map((check) => check.label);
+  const missingText = missing.length > 0
+    ? missing.length === 1
+      ? missing[0]
+      : `${missing.slice(0, -1).join(", ")} and ${missing[missing.length - 1]}`
+    : "some event coverage";
+
+  return {
+    message: `Integration partial: missing ${missingText}.`,
+    tone: "warning",
+  };
+}
+
 function PriorityCards({
   cards,
   shopId,
@@ -85,7 +127,10 @@ function PriorityCards({
           <BlockStack gap="300">
             <InlineStack align="space-between" blockAlign="center">
               <Badge tone={priorityTone(card)}>{priorityBoardLabel(card.board)}</Badge>
-              <Badge>{card.signal_state}</Badge>
+              <InlineStack gap="100">
+                <Badge tone={priorityTrendTone(card.trend_state)}>{card.trend_state}</Badge>
+                <Badge>{card.signal_state}</Badge>
+              </InlineStack>
             </InlineStack>
             <BlockStack gap="100">
               <Text as="h3" variant="headingMd">
@@ -97,6 +142,7 @@ function PriorityCards({
                 </a>
               </Text>
               <Text as="p" variant="bodySm" tone="subdued">{card.flag_reason}</Text>
+              <Text as="p" variant="bodySm" tone="subdued">{card.trend_reason}</Text>
               <InlineStack>
                 <Badge>{priorityStepLabel(card.primary_step)}</Badge>
               </InlineStack>
@@ -145,6 +191,7 @@ export default function DashboardRoute() {
 
   const totalTracked = data.blackboard.length + data.redboard.length;
   const primaryProductId = data.priorities[0]?.product_id ?? data.blackboard[0]?.product_id;
+  const integrationHealth = healthBannerContent(data.health);
 
   return (
     <Page
@@ -161,6 +208,11 @@ export default function DashboardRoute() {
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
+            <Banner tone={integrationHealth.tone}>
+              <Text as="p" variant="bodyMd">
+                {integrationHealth.message}
+              </Text>
+            </Banner>
             <Banner tone="info">
               <Text as="p" variant="bodyMd">
                 {messages.dashboard.bannerText(totalTracked, formatTimeWindowLabel(data.window))}

@@ -84,19 +84,28 @@ class AnalyticsRepository:
     async def fetch_product_snapshots(
         self,
         *,
-        shop_id: str,
-        window: TimeWindow,
+        end_date: date | None = None,
         reference_date: date | None = None,
+        shop_id: str,
+        start_date: date | None = None,
+        window: TimeWindow,
     ) -> dict[str, ProductSnapshot]:
-        statement = (
-            sqlmodel_select(DailyProductStat)
-            .where(
-                DailyProductStat.shop_id == shop_id,
-                DailyProductStat.stat_date >= self._window_start_date(
+        filters = [
+            DailyProductStat.shop_id == shop_id,
+            DailyProductStat.stat_date >= (
+                start_date
+                or self._window_start_date(
                     window=window,
                     reference_date=reference_date,
-                ),
-            )
+                )
+            ),
+        ]
+        if end_date is not None:
+            filters.append(DailyProductStat.stat_date <= end_date)
+
+        statement = (
+            sqlmodel_select(DailyProductStat)
+            .where(*filters)
         )
 
         rows = (await get_db_session().exec(statement)).all()

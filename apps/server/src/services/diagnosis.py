@@ -36,6 +36,7 @@ class ProductDiagnosisService:
     async def prepare_report(
         self,
         *,
+        force: bool = False,
         product_id: str,
         shop_id: str,
         snapshot: ProductSnapshot,
@@ -48,7 +49,7 @@ class ProductDiagnosisService:
             window=window,
         )
 
-        if existing and existing.snapshot_hash == snapshot_hash:
+        if existing and existing.snapshot_hash == snapshot_hash and not force:
             return DiagnosisPreparation(
                 result=self._repository.to_result(existing),
                 enqueue_request=None,

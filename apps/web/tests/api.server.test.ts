@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ApiError, fetchDiagnosis, fetchPriorities, fetchProductAnalysis } from "../app/lib/api.server";
+import {
+  ApiError,
+  createDiagnosis,
+  fetchDiagnosis,
+  fetchIntegrationHealth,
+  fetchPriorities,
+  fetchProductAnalysis,
+} from "../app/lib/api.server";
 
 describe("api.server logging", () => {
   const originalFetch = global.fetch;
@@ -122,5 +129,79 @@ describe("api.server logging", () => {
 
     expect(String(url)).toBe("http://localhost:8000/api/priorities?shop_id=shop-1&window=24h");
     expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-priority");
+  });
+
+  it("fetches integration health from the backend health endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          checks: [],
+          coverage: {
+            add_to_carts: 0,
+            clicks: 0,
+            component_clicks: 0,
+            impressions: 0,
+            orders: 0,
+            views: 0,
+          },
+          last_event_at: null,
+          status: "not_connected",
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        },
+      ),
+    ) as typeof fetch;
+
+    await fetchIntegrationHealth({
+      requestId: "req-health",
+      shopId: "shop-1",
+      window: "24h",
+    });
+
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] ?? [];
+    const headers = new Headers(init?.headers);
+
+    expect(String(url)).toBe("http://localhost:8000/api/integration/health?shop_id=shop-1&window=24h");
+    expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-health");
+  });
+
+  it("passes force=true when manually rerunning diagnosis", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          generated_at: null,
+          report_markdown: null,
+          snapshot_hash: "snapshot-1",
+          status: "pending",
+          summary_json: {},
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        },
+      ),
+    ) as typeof fetch;
+
+    await createDiagnosis({
+      force: true,
+      productId: "product-1",
+      requestId: "req-diagnosis",
+      shopId: "shop-1",
+      snapshot: {
+        add_to_carts: 2,
+        component_clicks_distribution: {},
+        orders: 1,
+        views: 20,
+      },
+      window: "7d",
+    });
+
+    const [url] = vi.mocked(global.fetch).mock.calls[0] ?? [];
+
+    expect(String(url)).toBe(
+      "http://localhost:8000/api/products/product-1/diagnosis?shop_id=shop-1&window=7d&force=true",
+    );
   });
 });

@@ -57,6 +57,7 @@ async def test_diagnosis_service_reuses_cached_report_when_snapshot_hash_matches
 
     assert reused.status is DiagnosisStatus.READY
     assert reused.report_markdown == "Existing report"
+    assert reused.generated_at == datetime(2026, 4, 23, 10, 0, tzinfo=UTC)
 
 
 @pytest.mark.asyncio
@@ -142,6 +143,52 @@ async def test_diagnosis_service_does_not_prepare_duplicate_enqueue_for_same_pen
     assert second.result.status is DiagnosisStatus.PENDING
     assert second.result.snapshot_hash == first.result.snapshot_hash
     assert second.enqueue_request is None
+
+
+@pytest.mark.asyncio
+async def test_diagnosis_service_force_prepares_enqueue_for_same_snapshot(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+    service = ProductDiagnosisService()
+    snapshot = ProductSnapshot(
+        add_to_carts=12,
+        component_clicks_distribution={"size_chart": 1},
+        orders=4,
+        views=100,
+    )
+
+    async with db_session_context(session_factory) as session:
+        cached = await service.prepare_report(
+            shop_id="shop-1",
+            product_id="product-1",
+            snapshot=snapshot,
+            window=TimeWindow.DAYS_7,
+        )
+        await service.store_generated_report(
+            product_id="product-1",
+            report_markdown="Existing report",
+            shop_id="shop-1",
+            snapshot_hash=cached.result.snapshot_hash,
+            summary_json={"summary": "cached"},
+            window=TimeWindow.DAYS_7,
+        )
+        await session.commit()
+
+    async with db_session_context(session_factory):
+        forced = await service.prepare_report(
+            shop_id="shop-1",
+            product_id="product-1",
+            snapshot=snapshot,
+            window=TimeWindow.DAYS_7,
+            force=True,
+        )
+
+    assert forced.result.status is DiagnosisStatus.PENDING
+    assert forced.result.snapshot_hash == cached.result.snapshot_hash
+    assert forced.result.generated_at is None
+    assert forced.enqueue_request is not None
 
 
 @pytest.mark.asyncio

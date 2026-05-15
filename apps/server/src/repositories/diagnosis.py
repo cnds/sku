@@ -30,11 +30,15 @@ class DiagnosisRepository:
 
     @staticmethod
     def to_result(diagnosis: ProductDiagnosis) -> DiagnosisResult:
+        generated_at = diagnosis.generated_at
+        if generated_at is not None and generated_at.tzinfo is None:
+            generated_at = generated_at.replace(tzinfo=UTC)
         return DiagnosisResult(
             status=diagnosis.status,
             snapshot_hash=diagnosis.snapshot_hash,
             report_markdown=diagnosis.report_markdown,
             summary_json=diagnosis.summary_json,
+            generated_at=generated_at,
         )
 
     async def upsert_pending_report(

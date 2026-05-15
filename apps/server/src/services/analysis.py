@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
 from config import Settings
 from repositories.analytics import AnalyticsRepository
@@ -15,6 +15,7 @@ from schemas import (
     PriorityBoardType,
     PriorityCard,
     PrioritySignalState,
+    PriorityTrendState,
     ProductAnalysisResult,
     ProductSnapshot,
     TimeWindow,
@@ -128,6 +129,26 @@ class ProductAnalysisService:
         if not snapshots:
             return []
 
+        previous_start, previous_end = self._previous_window_bounds(
+            reference_date=reference_date,
+            window=window,
+        )
+        previous_snapshots = await self._repository.fetch_product_snapshots(
+            shop_id=shop_id,
+            window=window,
+            start_date=previous_start,
+            end_date=previous_end,
+        )
+        previous_entries = {
+            PriorityBoardType.LEAKER: self._score_entries(
+                board=PriorityBoardType.LEAKER,
+                snapshots=previous_snapshots,
+            ),
+            PriorityBoardType.HIDDEN_WINNER: self._score_entries(
+                board=PriorityBoardType.HIDDEN_WINNER,
+                snapshots=previous_snapshots,
+            ),
+        }
         leaker_entries = await self._repository.fetch_leaderboard(
             board=LeaderboardType.BLACK,
             shop_id=shop_id,
@@ -151,7 +172,9 @@ class ProductAnalysisService:
                 self._priority_card(
                     board=PriorityBoardType.LEAKER,
                     entry=entry,
+                    previous_entry=previous_entries[PriorityBoardType.LEAKER].get(entry.product_id),
                     snapshot=snapshots[entry.product_id],
+                    window=window,
                 )
             )
             selected_product_ids.add(entry.product_id)
@@ -168,7 +191,9 @@ class ProductAnalysisService:
                 self._priority_card(
                     board=PriorityBoardType.HIDDEN_WINNER,
                     entry=entry,
+                    previous_entry=previous_entries[PriorityBoardType.HIDDEN_WINNER].get(entry.product_id),
                     snapshot=snapshots[entry.product_id],
+                    window=window,
                 )
             )
             break
@@ -226,14 +251,24 @@ class ProductAnalysisService:
         *,
         board: PriorityBoardType,
         entry: LeaderboardEntry,
+        previous_entry: LeaderboardEntry | None,
         snapshot: ProductSnapshot,
+        window: TimeWindow,
     ) -> PriorityCard:
         signal_state = self.derive_priority_signal_state(snapshot)
         primary_step = self._primary_step(board=board, signal_state=signal_state, snapshot=snapshot)
+        trend_state, trend_reason = self._priority_trend(
+            board=board,
+            current_score=entry.score,
+            previous_entry=previous_entry,
+            window=window,
+        )
         return PriorityCard(
             product_id=entry.product_id,
             board=board,
             signal_state=signal_state,
+            trend_state=trend_state,
+            trend_reason=trend_reason,
             flag_reason=self._flag_reason(board=board, signal_state=signal_state),
             primary_step=primary_step,
             evidence=self._priority_evidence(snapshot=snapshot, signal_state=signal_state),
@@ -299,14 +334,14 @@ class ProductAnalysisService:
         if signal_state is PrioritySignalState.TRACKING_ISSUE:
             return [
                 f"{snapshot.views} PDP views",
-                "Missing collection impression/click coverage",
+                "Missing event coverage for collection or PDP components",
                 "Verify the theme app embed before acting on page content",
             ]
         if signal_state is PrioritySignalState.INSUFFICIENT_DATA:
             return [
                 f"{snapshot.views} PDP views",
                 f"{snapshot.add_to_carts} add-to-carts",
-                "Collect more sessions before changing merchandising",
+                "Collect more PDP sessions or run a small traffic test",
             ]
 
         evidence = [
@@ -330,11 +365,11 @@ class ProductAnalysisService:
         snapshot: ProductSnapshot,
     ) -> str:
         if signal_state is PrioritySignalState.TRACKING_ISSUE:
-            return "Collection and PDP tracking coverage is incomplete."
+            return "Missing event coverage makes this card a tracking check, not a PDP content recommendation."
         if signal_state is PrioritySignalState.INSUFFICIENT_DATA:
-            return "The product does not have enough recent shopper sessions for a confident call."
+            return "This product needs more recent PDP sessions before SKU Lens can make a confident call."
         if signal_state is PrioritySignalState.WEAK_SIGNAL:
-            return "The product has an early pattern, but the sample is still thin."
+            return "This is a watch item: the pattern is early, and the sample is still thin."
         if board is PriorityBoardType.HIDDEN_WINNER:
             return "Demand is proving out once shoppers reach the PDP, but exposure is still constrained."
 
@@ -380,6 +415,94 @@ class ProductAnalysisService:
         if not candidates:
             return None
         return sorted(candidates, key=lambda item: (item[0], item[1]))[0][1]
+
+    @classmethod
+    def _priority_trend(
+        cls,
+        *,
+        board: PriorityBoardType,
+        current_score: float,
+        previous_entry: LeaderboardEntry | None,
+        window: TimeWindow,
+    ) -> tuple[PriorityTrendState, str]:
+        if previous_entry is None:
+            return (
+                PriorityTrendState.NEW,
+                f"No previous {window.value} comparison window yet.",
+            )
+
+        delta = current_score - previous_entry.score
+        threshold = max(0.5, abs(previous_entry.score) * 0.1)
+        if abs(delta) < threshold:
+            return (
+                PriorityTrendState.STABLE,
+                f"Signal is steady versus the previous {window.value} window.",
+            )
+
+        if board is PriorityBoardType.HIDDEN_WINNER:
+            if delta > 0:
+                return (
+                    PriorityTrendState.WORSENING,
+                    f"Opportunity gap is growing versus the previous {window.value} window.",
+                )
+            return (
+                PriorityTrendState.IMPROVING,
+                f"Opportunity gap is narrowing versus the previous {window.value} window.",
+            )
+
+        if delta > 0:
+            return (
+                PriorityTrendState.WORSENING,
+                f"Leaker gap is up versus the previous {window.value} window.",
+            )
+        return (
+            PriorityTrendState.IMPROVING,
+            f"Leaker gap is down versus the previous {window.value} window.",
+        )
+
+    @classmethod
+    def _score_entries(
+        cls,
+        *,
+        board: PriorityBoardType,
+        snapshots: dict[str, ProductSnapshot],
+    ) -> dict[str, LeaderboardEntry]:
+        if not snapshots:
+            return {}
+
+        total_views = sum(snapshot.views for snapshot in snapshots.values())
+        total_orders = sum(snapshot.orders for snapshot in snapshots.values())
+        store_avg_cr = 0.0 if total_views == 0 else total_orders / total_views
+        store_avg_views = total_views / len(snapshots)
+
+        entries: dict[str, LeaderboardEntry] = {}
+        for product_id, snapshot in snapshots.items():
+            if board is PriorityBoardType.HIDDEN_WINNER:
+                score = cls._rate(snapshot.add_to_carts, snapshot.views) * store_avg_views - snapshot.views
+            else:
+                score = snapshot.views * store_avg_cr - snapshot.orders
+            entries[product_id] = LeaderboardEntry(
+                product_id=product_id,
+                views=snapshot.views,
+                add_to_carts=snapshot.add_to_carts,
+                orders=snapshot.orders,
+                impressions=snapshot.impressions,
+                clicks=snapshot.clicks,
+                score=score,
+            )
+        return entries
+
+    @staticmethod
+    def _previous_window_bounds(
+        *,
+        reference_date: date,
+        window: TimeWindow,
+    ) -> tuple[date, date]:
+        current_start = window.start_date_from_reference_date(reference_date=reference_date)
+        previous_end = current_start - timedelta(days=1)
+        bucket_days = max(1, window.delta.days)
+        previous_start = previous_end - timedelta(days=bucket_days - 1)
+        return previous_start, previous_end
 
     def _select_benchmark(
         self,

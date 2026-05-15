@@ -99,4 +99,52 @@ describe("diagnosis resource route", () => {
       summary_json: {},
     });
   });
+
+  it("passes force through when the browser requests a manual rerun", async () => {
+    createDiagnosisMock.mockResolvedValue({
+      generated_at: null,
+      report_markdown: null,
+      snapshot_hash: "snapshot-3",
+      status: "pending",
+      summary_json: {},
+    });
+
+    const response = await action({
+      params: { productId: "product-1" },
+      request: new Request(
+        "https://example.test/resources/products/product-1/diagnosis?shop=test-shop.myshopify.com&window=7d&force=true",
+        {
+          body: JSON.stringify({
+            add_to_carts: 2,
+            component_clicks_distribution: { review_tab: 1 },
+            orders: 1,
+            views: 50,
+          }),
+          headers: { "Content-Type": "application/json" },
+          method: "POST",
+        },
+      ),
+    } as never);
+
+    expect(createDiagnosisMock).toHaveBeenCalledWith({
+      force: true,
+      productId: "product-1",
+      requestId: expect.any(String),
+      shopId: "test-shop.myshopify.com",
+      snapshot: {
+        add_to_carts: 2,
+        component_clicks_distribution: { review_tab: 1 },
+        orders: 1,
+        views: 50,
+      },
+      window: "7d",
+    });
+    expect(await response.json()).toEqual({
+      generated_at: null,
+      report_markdown: null,
+      snapshot_hash: "snapshot-3",
+      status: "pending",
+      summary_json: {},
+    });
+  });
 });

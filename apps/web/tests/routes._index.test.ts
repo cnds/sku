@@ -1,16 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
+  fetchIntegrationHealthMock,
   fetchLeaderboardMock,
   fetchPrioritiesMock,
   parseTimeWindowMock,
 } = vi.hoisted(() => ({
+  fetchIntegrationHealthMock: vi.fn(),
   fetchLeaderboardMock: vi.fn(),
   fetchPrioritiesMock: vi.fn(),
   parseTimeWindowMock: vi.fn(),
 }));
 
 vi.mock("../app/lib/api.server", () => ({
+  fetchIntegrationHealth: fetchIntegrationHealthMock,
   fetchLeaderboard: fetchLeaderboardMock,
   fetchPriorities: fetchPrioritiesMock,
   parseTimeWindow: parseTimeWindowMock,
@@ -24,6 +27,19 @@ describe("dashboard route loader", () => {
     fetchPrioritiesMock.mockReset();
     parseTimeWindowMock.mockReset();
     parseTimeWindowMock.mockReturnValue("24h");
+    fetchIntegrationHealthMock.mockResolvedValue({
+      checks: [],
+      coverage: {
+        add_to_carts: 0,
+        clicks: 0,
+        component_clicks: 0,
+        impressions: 0,
+        orders: 0,
+        views: 0,
+      },
+      last_event_at: null,
+      status: "not_connected",
+    });
     fetchLeaderboardMock.mockResolvedValue([]);
     fetchPrioritiesMock.mockResolvedValue([]);
   });
@@ -40,8 +56,16 @@ describe("dashboard route loader", () => {
       shopId: "test-shop.myshopify.com",
       window: "24h",
     });
+    expect(fetchIntegrationHealthMock).toHaveBeenCalledWith({
+      requestId: expect.any(String),
+      shopId: "test-shop.myshopify.com",
+      window: "24h",
+    });
     expect(fetchLeaderboardMock).toHaveBeenCalledTimes(2);
     expect(payload).toMatchObject({
+      health: {
+        status: "not_connected",
+      },
       priorities: [],
       shopId: "test-shop.myshopify.com",
       window: "24h",

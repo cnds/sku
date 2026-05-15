@@ -2,7 +2,10 @@ export type TimeWindow = "24h" | "7d" | "30d";
 export type LeaderboardType = "black" | "red";
 export type PriorityBoardType = "leaker" | "hidden_winner";
 export type PrioritySignalState = "Ready" | "Weak signal" | "Insufficient data" | "Tracking issue";
+export type PriorityTrendState = "New" | "Worsening" | "Improving" | "Stable";
 export type DiagnosisStatus = "pending" | "ready" | "failed";
+export type IntegrationHealthStatus = "healthy" | "partial" | "not_connected";
+export type IntegrationCheckStatus = "ok" | "missing";
 
 export interface LeaderboardEntry {
   product_id: string;
@@ -68,6 +71,8 @@ export interface PriorityCard {
   product_id: string;
   board: PriorityBoardType;
   signal_state: PrioritySignalState;
+  trend_state: PriorityTrendState;
+  trend_reason: string;
   flag_reason: string;
   primary_step: string;
   evidence: string[];
@@ -86,4 +91,28 @@ export interface DiagnosisResult {
   snapshot_hash: string;
   report_markdown: string | null;
   summary_json: Record<string, string>;
+  generated_at: string | null;
+}
+
+export interface IntegrationHealthCoverage {
+  impressions: number;
+  clicks: number;
+  views: number;
+  component_clicks: number;
+  add_to_carts: number;
+  orders: number;
+}
+
+export interface IntegrationHealthCheck {
+  key: string;
+  label: string;
+  status: IntegrationCheckStatus;
+  message: string;
+}
+
+export interface IntegrationHealthResponse {
+  status: IntegrationHealthStatus;
+  last_event_at: string | null;
+  coverage: IntegrationHealthCoverage;
+  checks: IntegrationHealthCheck[];
 }

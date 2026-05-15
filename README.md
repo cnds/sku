@@ -9,9 +9,9 @@ and one Hidden Winner with high intent but limited exposure.
 
 ## Apps
 
-- `apps/server`: FastAPI + SQLModel APIs, ingest pipeline, Shopify validation, and worker runtime.
-- `apps/web`: Embedded Shopify admin app built with Remix + Vite + Polaris. The shell publishes Shopify App Bridge metadata, defaults missing or invalid `window` params to `24h`, and loads product diagnosis asynchronously after first paint.
-- `apps/extension`: Theme App Extension assets for storefront tracking. The shipped tracker batches `impression`, `click`, `view`, `component_click`, `add_to_cart`, `media`, `variant`, and `engage` events, then posts them to `/ingest/events` with per-visitor and per-session identifiers.
+- `apps/server`: FastAPI + SQLModel APIs, ingest pipeline, integration health, Shopify validation, diagnosis, and worker runtime.
+- `apps/web`: Embedded Shopify admin app built with Remix + Vite + Polaris. The shell publishes Shopify App Bridge metadata, defaults missing or invalid `window` params to `24h`, loads integration health on the board, and loads product diagnosis asynchronously after first paint with freshness and manual re-run controls.
+- `apps/extension`: Theme App Extension assets for storefront tracking. The shipped tracker batches `impression`, `click`, `view`, `component_click`, `add_to_cart`, `media`, `variant`, and `engage` events, maps common PDP sections to stable component labels, then posts them to `/ingest/events` with per-visitor and per-session identifiers.
 
 ## Backend Runtime Conventions
 
@@ -32,6 +32,7 @@ and one Hidden Winner with high intent but limited exposure.
 - Uvicorn access logs are intentionally disabled in the Python dev entrypoints. Treat the application log lines keyed by `request_id` and `job_id` as the canonical request trace.
 - FastAPI, worker jobs, Remix server fetches, and the storefront tracker all propagate `X-SKU-Lens-Request-Id` when available. Queue payloads also carry `job_id` so server enqueue logs and worker processing logs can be correlated.
 - The Remix loaders and resource routes default analytics and diagnosis requests to `24h` when `window` is missing or invalid; preserve the supported `24h`, `7d`, and `30d` values end-to-end.
+- Current analytics windows use shop-local calendar-day buckets; `24h` is not an exact rolling 24-hour lookback.
 - Browser-side logs stay silent by default. To inspect `apps/web` browser polling or `apps/extension` tracker behavior locally, set `localStorage['sku-lens:debug'] = '1'` before reproducing the flow.
 
 ## Containerized Development
@@ -78,7 +79,7 @@ The `server` and `web` services use source mounts for live development. The work
 
 `SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook verification, and `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for generated diagnosis reports; without a real `AI_API_KEY`, diagnosis generation uses the local fallback report. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs.
 
-The demo seed command upserts `demo.myshopify.com`, replaces the repo's `demo-*` products for that shop, and pre-generates diagnosis cards so `http://localhost:3000/?shop=demo.myshopify.com&window=24h` renders real board and product data immediately.
+The demo seed command upserts `demo.myshopify.com`, replaces the repo's `demo-*` products for that shop, includes stable PDP component labels such as `product_description`, `shipping_returns`, and `recommendations`, and pre-generates diagnosis cards so `http://localhost:3000/?shop=demo.myshopify.com&window=24h` renders real board and product data immediately.
 
 ## Verification
 

@@ -4,8 +4,8 @@
 
 - Repository root: `docker-compose.yml`, root `package.json`, `pnpm-workspace.yaml`, `.env.example`, and helper scripts in `scripts/` drive the monorepo workflows.
 - `apps/server`: FastAPI backend. Python source lives directly in `apps/server/src` and is imported from that root (`from services.analysis import ...`). Tests live in `apps/server/tests`.
-- `apps/web`: Shopify admin app built with Remix, Vite, and Polaris. App code is in `apps/web/app`; web tests live in `apps/web/tests`. The shell publishes the `shopify-api-key` meta tag, defaults missing or invalid `window` params to `24h`, and loads diagnosis data through Remix loaders/resource routes.
-- `apps/extension`: Theme App Extension assets. Storefront tracking code is in `assets/sku-lens-tracker.js`; Liquid block config is in `blocks/sku-lens-tracker.liquid`. The tracker batches `impression`, `click`, `media`, `variant`, and `engage` events for `/ingest/events`.
+- `apps/web`: Shopify admin app built with Remix, Vite, and Polaris. App code is in `apps/web/app`; web tests live in `apps/web/tests`. The shell publishes the `shopify-api-key` meta tag, defaults missing or invalid `window` params to `24h`, loads integration health on the board, and loads diagnosis data with freshness and manual re-run controls through Remix loaders/resource routes.
+- `apps/extension`: Theme App Extension assets. Storefront tracking code is in `assets/sku-lens-tracker.js`; Liquid block config is in `blocks/sku-lens-tracker.liquid`. The tracker batches `impression`, `click`, `view`, `component_click`, `add_to_cart`, `media`, `variant`, and `engage` events for `/ingest/events`, and maps common PDP sections to stable component labels.
 
 Backend runtime boundaries:
 
@@ -22,6 +22,7 @@ Backend runtime boundaries:
 - Application logs use standard Python `logging` configured through `logging.basicConfig(...)`, and Uvicorn access logs stay disabled in the Python dev entrypoints. Prefer `logging.getLogger(__name__)` plus ordinary `.info()`, `.warning()`, and `.exception()` calls over bespoke wrappers, `print(...)`, or raw `console.*`.
 - Preserve `X-SKU-Lens-Request-Id` propagation across FastAPI, Remix server fetches, and the storefront tracker when touching request flows. Queue payloads should keep `job_id` so enqueue and worker logs can be correlated.
 - Keep the supported analytics window values aligned end-to-end: `24h`, `7d`, and `30d`. The Remix loaders/resource routes now default to `24h` when `window` is missing or invalid, so do not silently reintroduce a `7d` fallback.
+- Current analytics windows use shop-local calendar-day buckets; `24h` is not an exact rolling 24-hour lookback.
 - Browser logs are debug-gated. Keep `apps/web` browser-side and `apps/extension` tracker logs silent by default and only emit them when `localStorage['sku-lens:debug'] === '1'`.
 - Prefer raising domain errors from services and mapping them in `main.py` exception handlers instead of rebuilding ad hoc HTTP error branches inside controllers.
 - Do not reintroduce session/session-factory constructor plumbing into handlers, services, or repositories unless a call path genuinely runs outside the request/job context.

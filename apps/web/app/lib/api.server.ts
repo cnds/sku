@@ -1,5 +1,6 @@
 import type {
   DiagnosisResult,
+  IntegrationHealthResponse,
   LeaderboardEntry,
   LeaderboardType,
   PriorityCard,
@@ -56,6 +57,20 @@ export async function fetchPriorities(args: {
     {
       requestId: args.requestId,
       route: "priorities",
+    },
+  );
+}
+
+export async function fetchIntegrationHealth(args: {
+  requestId: string;
+  shopId: string;
+  window: TimeWindow;
+}): Promise<IntegrationHealthResponse> {
+  return fetchJson<IntegrationHealthResponse>(
+    apiPath("/api/integration/health", shopParams(args.shopId, args.window)),
+    {
+      requestId: args.requestId,
+      route: "integration_health",
     },
   );
 }
@@ -130,14 +145,18 @@ export async function fetchDiagnosis(args: {
 }
 
 export async function createDiagnosis(args: {
+  force?: boolean;
   productId: string;
   requestId: string;
   shopId: string;
   snapshot: ProductSnapshot;
   window: TimeWindow;
 }): Promise<DiagnosisResult> {
+  const params = args.force
+    ? { ...shopParams(args.shopId, args.window), force: "true" }
+    : shopParams(args.shopId, args.window);
   return fetchJson<DiagnosisResult>(
-    apiPath(`/api/products/${encodeURIComponent(args.productId)}/diagnosis`, shopParams(args.shopId, args.window)),
+    apiPath(`/api/products/${encodeURIComponent(args.productId)}/diagnosis`, params),
     {
       requestId: args.requestId,
       route: "diagnosis.create",

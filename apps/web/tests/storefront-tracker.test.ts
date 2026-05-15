@@ -15,4 +15,13 @@ describe("storefront tracker event surface", () => {
     expect(source).toContain('componentId: "buy_box"');
     expect(source).toContain('componentId: "product_media"');
   });
+
+  it("maps common PDP sections into stable component labels with debug hints", () => {
+    expect(source).toContain('"product_description"');
+    expect(source).toContain('"shipping_returns"');
+    expect(source).toContain('"recommendations"');
+    expect(source).toContain('"product_details"');
+    expect(source).toContain("section_hint");
+    expect(source).toContain("class_hint");
+  });
 });

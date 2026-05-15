@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { parseDiagnosisSections, snapshotFromAnalysis } from "../app/lib/diagnosis";
+import {
+  createFailedDiagnosis,
+  createPendingDiagnosis,
+  diagnosisFreshnessText,
+  diagnosisRerunPath,
+  parseDiagnosisSections,
+  snapshotFromAnalysis,
+} from "../app/lib/diagnosis";
 
 describe("diagnosis contract", () => {
   it("posts every backend-supported snapshot field from product analysis", () => {
@@ -80,5 +87,46 @@ describe("diagnosis contract", () => {
       observed: "Orders trail traffic.",
       suspectedFriction: "Size confidence is weak.",
     });
+  });
+
+  it("keeps generated_at in synthetic pending and failed diagnosis states", () => {
+    expect(createPendingDiagnosis().generated_at).toBeNull();
+    expect(createFailedDiagnosis("No report.").generated_at).toBeNull();
+  });
+
+  it("formats diagnosis freshness by status", () => {
+    expect(
+      diagnosisFreshnessText({
+        generated_at: "2026-04-29T12:00:00Z",
+        report_markdown: "Ready",
+        snapshot_hash: "hash-1",
+        status: "ready",
+        summary_json: {},
+      }),
+    ).toBe("Generated Apr 29, 2026, 12:00 PM");
+    expect(
+      diagnosisFreshnessText({
+        generated_at: null,
+        report_markdown: null,
+        snapshot_hash: "hash-2",
+        status: "pending",
+        summary_json: {},
+      }),
+    ).toBe("Generating new diagnosis");
+    expect(
+      diagnosisFreshnessText({
+        generated_at: null,
+        report_markdown: null,
+        snapshot_hash: "hash-3",
+        status: "failed",
+        summary_json: {},
+      }),
+    ).toBe("Last diagnosis failed");
+  });
+
+  it("builds a forced diagnosis rerun resource path", () => {
+    expect(
+      diagnosisRerunPath("/resources/products/product-1/diagnosis?shop=shop-1&window=7d"),
+    ).toBe("/resources/products/product-1/diagnosis?shop=shop-1&window=7d&force=true");
   });
 });

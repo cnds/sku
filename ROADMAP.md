@@ -57,6 +57,7 @@ The core product promise is:
 - [x] Each installed shop stores its IANA timezone and uses it as the basis for analytics windows and daily rollups.
 - [x] A Theme App Extension block can inject the SKU Lens storefront tracker into a Shopify storefront.
 - [x] The shipped tracker batches `impression`, `click`, `view`, `component_click`, `add_to_cart`, `media`, `variant`, and `engage` events to `/ingest/events`.
+- [x] PDP component tracking maps common storefront sections into stable labels such as `product_media`, `buy_box`, `review_tab`, `size_chart`, `product_description`, `shipping_returns`, `product_details`, and `recommendations`, while keeping section/class hints for debugging.
 - [x] The tracker keeps per-visitor and per-session identifiers so storefront behavior can be grouped over time.
 - [x] Shopify order webhooks can be converted into product-level order ingestion events.
 - [x] Ingest requests are protected by a shop-specific public token plus timestamp validation.
@@ -71,7 +72,7 @@ The core product promise is:
 - [x] Product behavior can be queried for `24h`, `7d`, and `30d` windows.
 - [x] `/api/priorities` is the board API for the daily decision cards.
 - [x] `/api/leaderboard` remains available as a secondary/internal product-list API.
-- [ ] Current windows are day-bucket based, not exact rolling-hour behavioral windows.
+- [x] Current windows use shop-local calendar-day buckets; `24h` is not an exact rolling 24-hour lookback.
 
 ### 3. Daily Decision Board
 
@@ -82,7 +83,10 @@ The core product promise is:
 - [x] `Leakers` are framed as `High attention, weak progression`.
 - [x] Merchants can switch the board window across `24h`, `7d`, and `30d`.
 - [x] Priority cards expose `Ready`, `Weak signal`, `Insufficient data`, and `Tracking issue`.
+- [x] Priority cards expose trend context: `New`, `Worsening`, `Improving`, or `Stable`.
 - [x] Each priority card shows why the product was flagged, the drop-off or opportunity step, supporting evidence, suspected friction, and first fix.
+- [x] Low-data priority cards avoid confident PDP-friction claims and frame `Weak signal`, `Insufficient data`, and `Tracking issue` as watch, traffic, or event-coverage states.
+- [x] The board shows merchant-visible integration health for tracker installation, storefront events, PDP views, component coverage, add-to-cart coverage, and order/webhook coverage.
 - [x] Merchants can drill from a priority card or secondary product list into a product analysis page.
 - [x] `View more products` is present as a compact secondary discovery path after the priority cards.
 - [x] Secondary product lists keep score internal and show recent activity instead of score-first table columns.
@@ -97,6 +101,7 @@ The core product promise is:
 - [x] AI diagnosis is generated asynchronously and returns `pending`, `ready`, or `failed` states.
 - [x] Diagnosis responses are stored and returned as markdown plus summary metadata.
 - [x] Diagnosis results are reused when the same product snapshot has already been analyzed.
+- [x] Diagnosis responses expose generated freshness and can be manually re-run with `force=true` for the same snapshot.
 - [x] A fallback diagnosis path exists when OpenAI-compatible AI output is unavailable.
 - [x] Diagnosis output is normalized into `Observed`, `Evidence`, `Suspected friction`, and `First fix to try`.
 - [x] Web-triggered diagnosis snapshots include the behavior fields supported by the backend snapshot model.
@@ -106,17 +111,15 @@ The core product promise is:
 - [x] The repo can seed a repeatable demo shop at `demo.myshopify.com`.
 - [x] Demo seed data includes product behavior, priority-board inputs, product analysis inputs, and ready-made diagnosis cards.
 - [x] The demo tells three fixed stories: a size-confidence Leaker, a media/trust Leaker, and a Hidden Winner.
+- [x] Demo component data includes stable PDP labels for description, shipping/returns, and recommendations.
 - [x] The web app defaults missing or invalid analytics windows to `24h`.
 - [x] Request tracing propagates `X-SKU-Lens-Request-Id` across server, web, and storefront flows.
 - [x] Browser-side debug logging is intentionally silent by default and can be enabled manually with `localStorage['sku-lens:debug'] = '1'`.
 
 ## Product Gaps To Close Next
 
-- [ ] Improve storefront component labeling so AI can reason about real theme sections instead of generic or theme-specific component ids.
 - [ ] Replace the raw JSON/POST-only OAuth callback handling with a merchant-friendly browser install, post-install, and onboarding flow inside the embedded app.
-- [ ] Add a merchant-visible integration health check that confirms tracker install, webhook connectivity, recent data arrival, and event coverage by funnel step.
-- [ ] Add trend context for board entries so merchants can see whether a product is newly flagged, worsening, or improving.
-- [ ] Add diagnosis freshness, history, and lightweight recommendation status so merchants can track what changed after a fix.
+- [ ] Store diagnosis history and add lightweight recommendation status so merchants can track what changed after a fix.
 - [ ] Add cautious impact estimates only after funnel coverage and order attribution are strong enough, starting with directional upside/downside instead of precise revenue claims.
 - [ ] Move from day-bucket windows to exact rolling behavioral windows if merchants need stricter `24h` semantics.
 
@@ -124,11 +127,11 @@ The core product promise is:
 
 ### Near-Term
 
-- [ ] Improve component labeling and PDP section detection in the storefront tracker.
-- [ ] Add integration health and event coverage status to the board experience.
-- [ ] Add trend labels for priority cards, such as `New`, `Worsening`, or `Improving`.
-- [ ] Add diagnosis freshness and explicit re-run controls on product detail.
-- [ ] Tighten low-data card copy so `Weak signal`, `Insufficient data`, and `Tracking issue` states stay actionable without overclaiming.
+- [x] Improve component labeling and PDP section detection in the storefront tracker.
+- [x] Add integration health and event coverage status to the board experience.
+- [x] Add trend labels for priority cards, such as `New`, `Worsening`, or `Improving`.
+- [x] Add diagnosis freshness and explicit re-run controls on product detail.
+- [x] Tighten low-data card copy so `Weak signal`, `Insufficient data`, and `Tracking issue` states stay actionable without overclaiming.
 
 ### Mid-Term
 
@@ -148,8 +151,8 @@ The core product promise is:
 
 ## Recommended Priority Order
 
-1. Improve tracker component labeling and integration health so the board's evidence is easier to trust.
-2. Add trend, freshness, and status signals around the existing priority-card loop.
-3. Build merchant-friendly install and onboarding so the current product can be used outside local/demo flows.
-4. Add history and improvement detection after merchants can reliably act on recommendations.
-5. Add cautious impact estimates only after coverage, attribution, and history are strong enough.
+1. Build merchant-friendly install and onboarding so the current product can be used outside local/demo flows.
+2. Store diagnosis history and recommendation status after merchants can reliably act on recommendations.
+3. Add cautious impact estimates only after coverage, attribution, and history are strong enough.
+4. Add exact rolling behavioral windows if the day-bucket `24h` approximation becomes misleading in production.
+5. Add improvement detection once history and merchant action states exist.

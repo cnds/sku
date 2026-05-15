@@ -93,6 +93,21 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
     assert "## Observed" in diagnosis.json()["report_markdown"]
     assert "## Suspected friction" in diagnosis.json()["report_markdown"]
 
+    async with create_session_factory(settings.database_url)() as session:
+        daily_stats = (
+            await session.exec(
+                select(DailyProductStat).where(
+                    DailyProductStat.shop_id == "demo.myshopify.com"
+                )
+            )
+        ).all()
+    component_labels = set()
+    for daily_stat in daily_stats:
+        component_labels.update(daily_stat.component_clicks_distribution)
+        component_labels.update(daily_stat.component_impressions_distribution)
+
+    assert {"product_description", "shipping_returns", "recommendations"}.issubset(component_labels)
+
 
 @pytest.mark.asyncio
 async def test_seed_demo_data_is_idempotent_for_demo_products(

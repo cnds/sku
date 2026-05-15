@@ -4,6 +4,7 @@ import {
   Banner,
   BlockStack,
   Box,
+  Button,
   Card,
   InlineGrid,
   InlineStack,
@@ -11,11 +12,14 @@ import {
   Spinner,
   Text,
 } from "@shopify/polaris";
+import { RefreshIcon } from "@shopify/polaris-icons";
 import type { DiagnosisResult, ProductAnalysisResult } from "@/lib/contracts";
 
 import {
   createFailedDiagnosis,
   createPendingDiagnosis,
+  diagnosisFreshnessText,
+  diagnosisRerunPath,
   parseDiagnosisSections,
   snapshotFromAnalysis,
 } from "@/lib/diagnosis";
@@ -222,18 +226,48 @@ function ShopperJourneyCard({ analysis }: { analysis: ProductAnalysisResult }) {
   );
 }
 
-function DiagnosisCards({ diagnosis }: { diagnosis: DiagnosisResult }) {
+function DiagnosisHeader({
+  diagnosis,
+  onRerun,
+  showRerun,
+}: {
+  diagnosis: DiagnosisResult;
+  onRerun: () => void;
+  showRerun: boolean;
+}) {
+  return (
+    <InlineStack align="space-between" blockAlign="center" gap="300">
+      <InlineStack gap="200" blockAlign="center">
+        {diagnosis.status === "pending" ? <Spinner size="small" /> : null}
+        <Text as="h2" variant="headingMd">
+          {messages.analysis.diagnosisHeading}
+        </Text>
+        {diagnosis.status === "ready" ? <Badge tone="success">{messages.analysis.diagnosisReady}</Badge> : null}
+        {diagnosis.status === "pending" ? <Badge tone="attention">{messages.analysis.diagnosisGenerating}</Badge> : null}
+        {diagnosis.status === "failed" ? <Badge tone="critical">{messages.analysis.diagnosisFailed}</Badge> : null}
+      </InlineStack>
+      {showRerun ? (
+        <Button icon={RefreshIcon} onClick={onRerun} size="slim">
+          Re-run
+        </Button>
+      ) : null}
+    </InlineStack>
+  );
+}
+
+function DiagnosisCards({
+  diagnosis,
+  onRerun,
+}: {
+  diagnosis: DiagnosisResult;
+  onRerun: () => void;
+}) {
   if (diagnosis.status === "pending") {
     return (
       <Card>
         <BlockStack gap="400">
-          <InlineStack gap="200" blockAlign="center">
-            <Spinner size="small" />
-            <Text as="h2" variant="headingMd">
-              {messages.analysis.diagnosisHeading}
-            </Text>
-            <Badge tone="attention">{messages.analysis.diagnosisGenerating}</Badge>
-          </InlineStack>
+          <DiagnosisHeader diagnosis={diagnosis} onRerun={onRerun} showRerun={false} />
+          <Text as="p" variant="bodySm" tone="subdued">{diagnosisFreshnessText(diagnosis)}</Text>
           <Banner tone="info">
             {messages.analysis.diagnosisPendingBanner}
           </Banner>
@@ -247,12 +281,8 @@ function DiagnosisCards({ diagnosis }: { diagnosis: DiagnosisResult }) {
     return (
       <Card>
         <BlockStack gap="300">
-          <InlineStack gap="200" blockAlign="center">
-            <Text as="h2" variant="headingMd">
-              {messages.analysis.diagnosisHeading}
-            </Text>
-            <Badge tone="critical">{messages.analysis.diagnosisFailed}</Badge>
-          </InlineStack>
+          <DiagnosisHeader diagnosis={diagnosis} onRerun={onRerun} showRerun />
+          <Text as="p" variant="bodySm" tone="subdued">{diagnosisFreshnessText(diagnosis)}</Text>
           <Banner tone="critical">
             {diagnosis.report_markdown ?? messages.analysis.diagnosisFailedFallback}
           </Banner>
@@ -297,10 +327,10 @@ function DiagnosisCards({ diagnosis }: { diagnosis: DiagnosisResult }) {
   return (
     <Box>
       <Box paddingBlockEnd="300">
-        <InlineStack gap="200" blockAlign="center">
-          <Text as="h2" variant="headingMd">{messages.analysis.diagnosisHeading}</Text>
-          <Badge tone="success">{messages.analysis.diagnosisReady}</Badge>
-        </InlineStack>
+        <BlockStack gap="100">
+          <DiagnosisHeader diagnosis={diagnosis} onRerun={onRerun} showRerun />
+          <Text as="p" variant="bodySm" tone="subdued">{diagnosisFreshnessText(diagnosis)}</Text>
+        </BlockStack>
       </Box>
       <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
         {cards.map((card) => (
@@ -335,16 +365,18 @@ function DiagnosisCards({ diagnosis }: { diagnosis: DiagnosisResult }) {
 
 export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
   const [diagnosis, setDiagnosis] = useState<DiagnosisResult>(createPendingDiagnosis);
+  const [rerunToken, setRerunToken] = useState(0);
 
   useEffect(() => {
     const abortController = new AbortController();
     let pollTimer: number | undefined;
+    let forceConsumed = false;
 
-    async function fetchDiagnosis(init?: RequestInit): Promise<DiagnosisResult> {
+    async function fetchDiagnosis(init?: RequestInit, path = diagnosisPath): Promise<DiagnosisResult> {
       const requestId = generateRequestId();
       const headers = new Headers(init?.headers);
       headers.set(REQUEST_ID_HEADER, requestId);
-      const response = await fetch(diagnosisPath, {
+      const response = await fetch(path, {
         ...init,
         headers,
         signal: abortController.signal,
@@ -376,7 +408,18 @@ export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
 
     async function syncDiagnosis() {
       try {
-        const nextDiagnosis = await fetchDiagnosis();
+        const shouldForce = rerunToken > 0 && !forceConsumed;
+        forceConsumed = forceConsumed || shouldForce;
+        const nextDiagnosis = shouldForce
+          ? await fetchDiagnosis(
+            {
+              body: JSON.stringify(snapshotFromAnalysis(analysis)),
+              headers: { "Content-Type": "application/json" },
+              method: "POST",
+            },
+            diagnosisRerunPath(diagnosisPath),
+          )
+          : await fetchDiagnosis();
         startTransition(() => {
           setDiagnosis(nextDiagnosis);
         });
@@ -415,12 +458,18 @@ export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
         window.clearTimeout(pollTimer);
       }
     };
-  }, [analysis, diagnosisPath]);
+  }, [analysis, diagnosisPath, rerunToken]);
 
   return (
     <BlockStack gap="500">
       <ShopperJourneyCard analysis={analysis} />
-      <DiagnosisCards diagnosis={diagnosis} />
+      <DiagnosisCards
+        diagnosis={diagnosis}
+        onRerun={() => {
+          setDiagnosis(createPendingDiagnosis());
+          setRerunToken((current) => current + 1);
+        }}
+      />
     </BlockStack>
   );
 }

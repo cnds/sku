@@ -28,9 +28,17 @@ export async function action({ params, request }: ActionFunctionArgs) {
   const requestId = requestIdFromHeaders(request.headers);
   const shopId = url.searchParams.get("shop") ?? "demo.myshopify.com";
   const window = parseTimeWindow(url.searchParams.get("window"));
+  const force = url.searchParams.get("force") === "true";
   const productId = params.productId ?? "";
   const snapshot = (await request.json()) as ProductSnapshot;
 
-  const result = await createDiagnosis({ productId, requestId, shopId, snapshot, window });
+  const result = await createDiagnosis({
+    ...(force ? { force: true } : {}),
+    productId,
+    requestId,
+    shopId,
+    snapshot,
+    window,
+  });
   return Response.json(result);
 }

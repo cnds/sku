@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { formatLeaderboardActivity } from "../app/components/LeaderboardTable";
 import { messages } from "../app/lib/messages";
-import { priorityStepLabel } from "../app/routes/_index";
+import { healthBannerContent, priorityStepLabel, priorityTrendTone } from "../app/routes/_index";
 import { boardLabelForGap } from "../app/routes/products.$productId";
 
 describe("board copy", () => {
@@ -37,6 +37,66 @@ describe("board copy", () => {
     expect(priorityStepLabel("pdp_add_to_cart")).toBe("Drop-off: PDP view to add-to-cart");
     expect(priorityStepLabel("cart_to_order")).toBe("Drop-off: add-to-cart to order");
     expect(priorityStepLabel("merchandising_reach")).toBe("Opportunity: merchandising reach");
+  });
+
+  it("labels priority card trend states", () => {
+    expect(priorityTrendTone("Worsening")).toBe("critical");
+    expect(priorityTrendTone("Improving")).toBe("success");
+    expect(priorityTrendTone("New")).toBe("info");
+    expect(priorityTrendTone("Stable")).toBeUndefined();
+  });
+
+  it("summarizes integration health for the board banner", () => {
+    expect(
+      healthBannerContent({
+        checks: [],
+        coverage: {
+          add_to_carts: 12,
+          clicks: 30,
+          component_clicks: 18,
+          impressions: 120,
+          orders: 4,
+          views: 80,
+        },
+        last_event_at: "2026-04-29T12:00:00Z",
+        status: "healthy",
+      }),
+    ).toEqual({
+      message: "Integration healthy: tracker, PDP, buy-box, and order coverage are present.",
+      tone: "success",
+    });
+
+    expect(
+      healthBannerContent({
+        checks: [
+          {
+            key: "component_tracking",
+            label: "Component tracking",
+            message: "No PDP component interactions are present for this window.",
+            status: "missing",
+          },
+          {
+            key: "orders_webhook",
+            label: "Orders / webhook",
+            message: "No order or webhook events are present for this window.",
+            status: "missing",
+          },
+        ],
+        coverage: {
+          add_to_carts: 0,
+          clicks: 0,
+          component_clicks: 0,
+          impressions: 0,
+          orders: 0,
+          views: 20,
+        },
+        last_event_at: "2026-04-29T12:00:00Z",
+        status: "partial",
+      }),
+    ).toEqual({
+      message: "Integration partial: missing Component tracking and Orders / webhook.",
+      tone: "warning",
+    });
   });
 
   it("keeps secondary product lists focused on activity instead of exposed scores", () => {

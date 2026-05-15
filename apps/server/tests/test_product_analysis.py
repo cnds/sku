@@ -6,7 +6,15 @@ import pytest
 
 from db import create_session_factory, db_session_context, init_db
 from models import DailyProductStat, ShopInstallation
-from schemas import LeaderboardType, PriorityBoardType, PrioritySignalState, ProductSnapshot, TimeWindow
+from schemas import (
+    LeaderboardEntry,
+    LeaderboardType,
+    PriorityBoardType,
+    PrioritySignalState,
+    PriorityTrendState,
+    ProductSnapshot,
+    TimeWindow,
+)
 from services.analysis import ProductAnalysisService
 
 
@@ -242,6 +250,8 @@ async def test_product_priorities_returns_two_leakers_and_one_hidden_winner(
         PriorityBoardType.HIDDEN_WINNER,
     ]
     assert all(priority.signal_state is PrioritySignalState.READY for priority in priorities)
+    assert priorities[0].trend_state is PriorityTrendState.NEW
+    assert priorities[0].trend_reason == "No previous 7d comparison window yet."
     assert priorities[0].primary_step == "pdp_add_to_cart"
     assert "size_chart" in priorities[0].suspected_friction
     assert priorities[2].flag_reason == "Strong buying intent with limited traffic"
@@ -299,6 +309,298 @@ def test_priority_signal_state_derives_tracking_and_volume_quality() -> None:
     assert service.derive_priority_signal_state(
         ProductSnapshot(views=80, add_to_carts=10, orders=3, impressions=120, clicks=30),
     ) is PrioritySignalState.READY
+
+
+@pytest.mark.asyncio
+async def test_product_priorities_marks_leaker_trend_when_gap_worsens(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="leaker",
+                    stat_date=date(2026, 4, 28),
+                    views=100,
+                    add_to_carts=5,
+                    orders=0,
+                    impressions=180,
+                    clicks=40,
+                    component_clicks_distribution={"size_chart": 1},
+                    component_impressions_distribution={"size_chart": 60},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="benchmark",
+                    stat_date=date(2026, 4, 28),
+                    views=100,
+                    add_to_carts=20,
+                    orders=10,
+                    impressions=180,
+                    clicks=48,
+                    component_clicks_distribution={"size_chart": 10},
+                    component_impressions_distribution={"size_chart": 60},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="leaker",
+                    stat_date=date(2026, 4, 27),
+                    views=100,
+                    add_to_carts=10,
+                    orders=6,
+                    impressions=180,
+                    clicks=40,
+                    component_clicks_distribution={"size_chart": 5},
+                    component_impressions_distribution={"size_chart": 60},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="benchmark",
+                    stat_date=date(2026, 4, 27),
+                    views=100,
+                    add_to_carts=20,
+                    orders=10,
+                    impressions=180,
+                    clicks=48,
+                    component_clicks_distribution={"size_chart": 10},
+                    component_impressions_distribution={"size_chart": 60},
+                ),
+            ]
+        )
+        await session.commit()
+
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
+    async with db_session_context(session_factory):
+        priorities = await analysis_service.get_product_priorities(
+            shop_id="shop-1",
+            window=TimeWindow.HOURS_24,
+        )
+
+    leaker = next(priority for priority in priorities if priority.product_id == "leaker")
+    assert leaker.trend_state is PriorityTrendState.WORSENING
+    assert leaker.trend_reason == "Leaker gap is up versus the previous 24h window."
+
+
+@pytest.mark.asyncio
+async def test_product_priorities_marks_leaker_trend_when_gap_improves(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="leaker",
+                    stat_date=date(2026, 4, 28),
+                    views=100,
+                    add_to_carts=14,
+                    orders=8,
+                    impressions=180,
+                    clicks=40,
+                    component_clicks_distribution={"size_chart": 6},
+                    component_impressions_distribution={"size_chart": 60},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="benchmark",
+                    stat_date=date(2026, 4, 28),
+                    views=100,
+                    add_to_carts=20,
+                    orders=10,
+                    impressions=180,
+                    clicks=48,
+                    component_clicks_distribution={"size_chart": 10},
+                    component_impressions_distribution={"size_chart": 60},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="leaker",
+                    stat_date=date(2026, 4, 27),
+                    views=100,
+                    add_to_carts=5,
+                    orders=0,
+                    impressions=180,
+                    clicks=40,
+                    component_clicks_distribution={"size_chart": 1},
+                    component_impressions_distribution={"size_chart": 60},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="benchmark",
+                    stat_date=date(2026, 4, 27),
+                    views=100,
+                    add_to_carts=20,
+                    orders=10,
+                    impressions=180,
+                    clicks=48,
+                    component_clicks_distribution={"size_chart": 10},
+                    component_impressions_distribution={"size_chart": 60},
+                ),
+            ]
+        )
+        await session.commit()
+
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
+    async with db_session_context(session_factory):
+        priorities = await analysis_service.get_product_priorities(
+            shop_id="shop-1",
+            window=TimeWindow.HOURS_24,
+        )
+
+    leaker = next(priority for priority in priorities if priority.product_id == "leaker")
+    assert leaker.trend_state is PriorityTrendState.IMPROVING
+    assert leaker.trend_reason == "Leaker gap is down versus the previous 24h window."
+
+
+@pytest.mark.asyncio
+async def test_product_priorities_marks_hidden_winner_opportunity_gap_growth(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="steady-leaker",
+                    stat_date=date(2026, 4, 28),
+                    views=100,
+                    add_to_carts=6,
+                    orders=1,
+                    impressions=180,
+                    clicks=36,
+                    component_clicks_distribution={"size_chart": 1},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="hidden-winner",
+                    stat_date=date(2026, 4, 28),
+                    views=10,
+                    add_to_carts=8,
+                    orders=4,
+                    impressions=30,
+                    clicks=16,
+                    component_clicks_distribution={"review_tab": 5},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="benchmark",
+                    stat_date=date(2026, 4, 28),
+                    views=140,
+                    add_to_carts=18,
+                    orders=8,
+                    impressions=220,
+                    clicks=60,
+                    component_clicks_distribution={"review_tab": 8},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="hidden-winner",
+                    stat_date=date(2026, 4, 27),
+                    views=40,
+                    add_to_carts=12,
+                    orders=6,
+                    impressions=80,
+                    clicks=24,
+                    component_clicks_distribution={"review_tab": 6},
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="benchmark",
+                    stat_date=date(2026, 4, 27),
+                    views=100,
+                    add_to_carts=12,
+                    orders=5,
+                    impressions=180,
+                    clicks=42,
+                    component_clicks_distribution={"review_tab": 5},
+                ),
+            ]
+        )
+        await session.commit()
+
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
+    async with db_session_context(session_factory):
+        priorities = await analysis_service.get_product_priorities(
+            shop_id="shop-1",
+            window=TimeWindow.HOURS_24,
+        )
+
+    hidden_winner = next(priority for priority in priorities if priority.product_id == "hidden-winner")
+    assert hidden_winner.trend_state is PriorityTrendState.WORSENING
+    assert hidden_winner.trend_reason == "Opportunity gap is growing versus the previous 24h window."
+
+
+def test_low_data_priority_copy_avoids_confident_friction_claims() -> None:
+    service = ProductAnalysisService()
+    card = service._priority_card(
+        board=PriorityBoardType.LEAKER,
+        entry=LeaderboardEntry(
+            product_id="product-1",
+            views=4,
+            add_to_carts=0,
+            orders=0,
+            impressions=12,
+            clicks=2,
+            score=0.0,
+        ),
+        snapshot=ProductSnapshot(
+            views=4,
+            add_to_carts=0,
+            orders=0,
+            impressions=12,
+            clicks=2,
+        ),
+        previous_entry=None,
+        window=TimeWindow.HOURS_24,
+    )
+
+    assert card.signal_state is PrioritySignalState.INSUFFICIENT_DATA
+    assert "friction" not in card.suspected_friction.lower()
+    assert "PDP sessions" in card.suspected_friction
+    assert "traffic test" in card.first_fix
+
+
+def test_tracking_issue_priority_copy_points_to_event_coverage() -> None:
+    service = ProductAnalysisService()
+    card = service._priority_card(
+        board=PriorityBoardType.LEAKER,
+        entry=LeaderboardEntry(
+            product_id="product-1",
+            views=80,
+            add_to_carts=4,
+            orders=1,
+            impressions=0,
+            clicks=0,
+            score=2.0,
+        ),
+        snapshot=ProductSnapshot(
+            views=80,
+            add_to_carts=4,
+            orders=1,
+        ),
+        previous_entry=None,
+        window=TimeWindow.HOURS_24,
+    )
+
+    assert card.signal_state is PrioritySignalState.TRACKING_ISSUE
+    assert "event coverage" in card.suspected_friction
+    assert "before changing product content" in card.first_fix
 
 
 @pytest.mark.asyncio

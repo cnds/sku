@@ -22,8 +22,10 @@ async def trigger_product_diagnosis(
     snapshot: ProductSnapshot,
     shop_id: str,
     window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.HOURS_24,
+    force: bool = False,
 ) -> DiagnosisResult:
     prepared = await ProductDiagnosisService().prepare_report(
+        force=force,
         product_id=product_id,
         shop_id=shop_id,
         snapshot=snapshot,

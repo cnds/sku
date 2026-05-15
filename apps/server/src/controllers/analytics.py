@@ -4,8 +4,16 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query, Request
 
-from schemas import LeaderboardEntry, LeaderboardType, PriorityCard, ProductAnalysisResult, TimeWindow
+from schemas import (
+    IntegrationHealthResponse,
+    LeaderboardEntry,
+    LeaderboardType,
+    PriorityCard,
+    ProductAnalysisResult,
+    TimeWindow,
+)
 from services.analysis import ProductAnalysisService
+from services.integration_health import IntegrationHealthService
 
 router = APIRouter()
 
@@ -32,6 +40,17 @@ async def get_priorities(
     window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.HOURS_24,
 ) -> list[PriorityCard]:
     return await ProductAnalysisService().get_product_priorities(
+        shop_id=shop_id,
+        window=window,
+    )
+
+
+@router.get("/api/integration/health")
+async def get_integration_health(
+    shop_id: str,
+    window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.HOURS_24,
+) -> IntegrationHealthResponse:
+    return await IntegrationHealthService().get_health(
         shop_id=shop_id,
         window=window,
     )

@@ -135,10 +135,23 @@
     ".product-media",
     ".product__description",
     ".product__accordion",
+    ".product__details",
+    ".product__info-container",
+    ".product-recommendations",
+    ".related-products",
+    "product-recommendations",
     "[data-media-id]",
     "[id*='shopify-product-reviews']",
     "[class*='review']",
     "[class*='size']",
+    "[class*='fit']",
+    "[class*='description']",
+    "[class*='shipping']",
+    "[class*='return']",
+    "[class*='policy']",
+    "[class*='detail']",
+    "[class*='spec']",
+    "[class*='recommend']",
   ].join(",");
 
   // ---------------------------------------------------------------------------
@@ -224,6 +237,20 @@
     return null;
   }
 
+  function classHint(element) {
+    var value = element.className || "";
+    return typeof value === "string" ? value.slice(0, 160) : "";
+  }
+
+  function componentDebugContext(element, action) {
+    return {
+      action: action,
+      page_type: "pdp",
+      section_hint: findSectionName(element),
+      class_hint: classHint(element),
+    };
+  }
+
   function resolvePdpComponentId(element) {
     if (!element || !element.closest) return "pdp_component";
 
@@ -244,14 +271,25 @@
 
     var text = [
       element.id || "",
-      element.className || "",
+      classHint(element),
       element.getAttribute("aria-label") || "",
+      findSectionName(element) || "",
       element.textContent || "",
     ].join(" ").toLowerCase();
     if (text.indexOf("review") >= 0) return "review_tab";
     if (text.indexOf("size") >= 0 || text.indexOf("fit") >= 0) return "size_chart";
+    if (text.indexOf("shipping") >= 0 || text.indexOf("return") >= 0 || text.indexOf("refund") >= 0) return "shipping_returns";
+    if (text.indexOf("recommend") >= 0 || text.indexOf("related") >= 0) return "recommendations";
+    if (text.indexOf("description") >= 0) return "product_description";
+    if (
+      text.indexOf("detail") >= 0 ||
+      text.indexOf("spec") >= 0 ||
+      text.indexOf("material") >= 0 ||
+      text.indexOf("care") >= 0 ||
+      element.closest(".product__accordion")
+    ) return "product_details";
 
-    return findSectionName(element) || "pdp_component";
+    return "pdp_component";
   }
 
   // ---------------------------------------------------------------------------
@@ -464,10 +502,7 @@
         track("component_click", {
           productId: productId,
           componentId: resolvePdpComponentId(component),
-          context: {
-            action: "click",
-            page_type: "pdp",
-          },
+          context: componentDebugContext(component, "click"),
         });
       },
       true
@@ -492,9 +527,7 @@
           track("impression", {
             productId: productId,
             componentId: resolvePdpComponentId(entry.target),
-            context: {
-              page_type: "pdp",
-            },
+            context: componentDebugContext(entry.target, "impression"),
           });
         }
       },

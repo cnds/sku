@@ -3,6 +3,7 @@ import { messages } from "@/lib/messages";
 
 export function createFailedDiagnosis(message: string): DiagnosisResult {
   return {
+    generated_at: null,
     report_markdown: message,
     snapshot_hash: "",
     status: "failed",
@@ -12,11 +13,37 @@ export function createFailedDiagnosis(message: string): DiagnosisResult {
 
 export function createPendingDiagnosis(): DiagnosisResult {
   return {
+    generated_at: null,
     report_markdown: null,
     snapshot_hash: "",
     status: "pending",
     summary_json: {},
   };
+}
+
+export function diagnosisFreshnessText(diagnosis: DiagnosisResult): string {
+  if (diagnosis.status === "pending") {
+    return "Generating new diagnosis";
+  }
+  if (diagnosis.status === "failed") {
+    return "Last diagnosis failed";
+  }
+  if (!diagnosis.generated_at) {
+    return "No generated diagnosis yet";
+  }
+
+  return `Generated ${new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(diagnosis.generated_at))}`;
+}
+
+export function diagnosisRerunPath(diagnosisPath: string): string {
+  const [path, query = ""] = diagnosisPath.split("?");
+  const params = new URLSearchParams(query);
+  params.set("force", "true");
+  return `${path}?${params}`;
 }
 
 export function snapshotFromAnalysis(analysis: ProductAnalysisResult): ProductSnapshot {
