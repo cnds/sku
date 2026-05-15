@@ -138,7 +138,9 @@ async def test_product_analysis_service_fetches_leaderboard_entries(
         )
         await session.commit()
 
-    analysis_service = ProductAnalysisService()
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
     async with db_session_context(session_factory):
         leaderboard = await analysis_service.get_leaderboard(
             shop_id="shop-1",

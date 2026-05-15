@@ -34,7 +34,7 @@ windows, and generate diagnosis cards from funnel plus component engagement sign
 
 ## Containerized Development
 
-1. Copy `.env.example` to `.env` and fill in Shopify and Gemini credentials.
+1. Copy `.env.example` to `.env` and fill in Shopify credentials plus OpenAI-compatible AI credentials when needed.
 2. Sanity-check the stack definition with `docker compose --env-file .env.example config`.
 3. Build and start the full development stack with `docker compose up --build`.
 4. On the first boot, allow the `web` container time to finish `pnpm install` inside its Docker volumes before checking `localhost:3000`.
@@ -68,13 +68,13 @@ The `server` and `web` services use source mounts for live development. The work
 1. Start infrastructure with `docker compose up -d mysql redis`.
 2. Install Python deps with `uv sync --directory apps/server --extra dev`.
 3. Install frontend deps with `pnpm install`.
-4. Copy `.env.example` to `.env` and fill in Shopify and Gemini credentials.
+4. Copy `.env.example` to `.env` and fill in Shopify credentials plus OpenAI-compatible AI credentials when needed.
 5. Run the API with `uv run --directory apps/server sku-lens-server`.
 6. Run the worker with `uv run --directory apps/server sku-lens-worker`.
 7. Seed repeatable demo data with `uv run --directory apps/server sku-lens-seed-demo`.
 8. Run the admin app with `pnpm dev`.
 
-`SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook verification, and `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs.
+`SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook verification, and `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for generated diagnosis reports; without a real `AI_API_KEY`, diagnosis generation uses the local fallback report. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs.
 
 The demo seed command upserts `demo.myshopify.com`, replaces the repo's `demo-*` products for that shop, and pre-generates diagnosis cards so `http://localhost:3000/?shop=demo.myshopify.com&window=24h` renders real dashboard and product data immediately.
 

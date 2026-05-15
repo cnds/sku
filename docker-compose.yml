@@ -48,8 +48,9 @@ services:
       SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:?set SHOPIFY_SCOPES in .env}
       SHOPIFY_APP_URL: ${SHOPIFY_APP_URL:?set SHOPIFY_APP_URL in .env}
       SHOPIFY_WEBHOOK_BASE_URL: ${SHOPIFY_WEBHOOK_BASE_URL:?set SHOPIFY_WEBHOOK_BASE_URL in .env}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:?set GEMINI_API_KEY in .env}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      AI_API_KEY: ${AI_API_KEY:-replace-me}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
       INGEST_TOKEN_TTL_SECONDS: ${INGEST_TOKEN_TTL_SECONDS:-300}
     command: ["sh", "/workspace/scripts/dev-server.sh"]
@@ -88,8 +89,9 @@ services:
       SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:?set SHOPIFY_SCOPES in .env}
       SHOPIFY_APP_URL: ${SHOPIFY_APP_URL:?set SHOPIFY_APP_URL in .env}
       SHOPIFY_WEBHOOK_BASE_URL: ${SHOPIFY_WEBHOOK_BASE_URL:?set SHOPIFY_WEBHOOK_BASE_URL in .env}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:?set GEMINI_API_KEY in .env}
-      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      AI_API_KEY: ${AI_API_KEY:-replace-me}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
       INGEST_TOKEN_TTL_SECONDS: ${INGEST_TOKEN_TTL_SECONDS:-300}
     command: ["sh", "/workspace/scripts/dev-worker.sh"]

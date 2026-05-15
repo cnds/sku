@@ -14,8 +14,9 @@ class Settings(BaseSettings):
     shopify_app_url: str
     shopify_scopes: str
     shopify_webhook_base_url: str
-    gemini_api_key: str
-    gemini_model: str = "gemini-1.5-flash"
+    ai_api_key: str = ""
+    ai_model: str = "gpt-4o-mini"
+    ai_base_url: str = "https://api.openai.com/v1"
     ingest_shared_secret: str
     ingest_token_ttl_seconds: int = 300
     benchmark_min_views: int = 50

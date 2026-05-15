@@ -58,11 +58,13 @@ async def test_leaderboard_query_returns_expected_black_and_red_rankings(
             shop_id="shop-1",
             board=LeaderboardType.BLACK,
             window=TimeWindow.DAYS_7,
+            reference_date=date(2026, 4, 29),
         )
         red = await repository.fetch_leaderboard(
             shop_id="shop-1",
             board=LeaderboardType.RED,
             window=TimeWindow.DAYS_7,
+            reference_date=date(2026, 4, 29),
         )
 
     assert black[0].product_id == "product-underperformer"

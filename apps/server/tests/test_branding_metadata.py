@@ -11,7 +11,7 @@ def test_fastapi_metadata_exposes_current_brand(
     app = create_app(
         Settings(
             database_url=sqlite_database_url,
-            gemini_api_key="test-key",
+            ai_api_key="test-key",
             ingest_shared_secret="ingest-secret",
             redis_url=redis_url,
             shopify_api_key="test-key",

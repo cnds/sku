@@ -20,8 +20,8 @@ from job_queue import (
 from logging_utils import configure_logging
 from repositories.installations import InstallationRepository
 from schemas import ProductSnapshot, TimeWindow
+from services.ai import AIDiagnosisService
 from services.diagnosis import ProductDiagnosisService
-from services.gemini import GeminiDiagnosisService
 from services.rollups import DailyRollupService
 from services.shop_time import (
     ensure_utc_datetime,
@@ -135,7 +135,7 @@ async def process_diagnosis_job(
     snapshot_payload = cast(dict[str, object], job["snapshot"])
     snapshot = ProductSnapshot.model_validate(snapshot_payload)
     runtime = get_worker_runtime()
-    report_markdown, summary = await GeminiDiagnosisService(runtime.settings).generate_report(
+    report_markdown, summary = await AIDiagnosisService(runtime.settings).generate_report(
         snapshot=snapshot
     )
 

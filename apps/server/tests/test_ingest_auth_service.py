@@ -16,7 +16,7 @@ from services.ingest_auth import (
 def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
     return Settings(
         database_url=sqlite_database_url,
-        gemini_api_key="test-key",
+        ai_api_key="test-key",
         ingest_shared_secret="ingest-secret",
         redis_url=redis_url,
         shopify_api_key="test-key",

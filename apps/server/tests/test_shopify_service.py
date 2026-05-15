@@ -17,7 +17,7 @@ from services.shopify import (
 def _settings() -> Settings:
     return Settings(
         database_url="sqlite+aiosqlite:////tmp/sku_lens.db",
-        gemini_api_key="test-key",
+        ai_api_key="test-key",
         ingest_shared_secret="ingest-secret",
         redis_url="redis://localhost:6379/0",
         shopify_api_key="shopify-key",

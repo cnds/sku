@@ -8,7 +8,7 @@ from config import Settings
 from schemas import ProductSnapshot
 
 
-class GeminiDiagnosisService:
+class AIDiagnosisService:
     def __init__(
         self,
         settings: Settings,
@@ -19,30 +19,29 @@ class GeminiDiagnosisService:
         self._http_client = http_client
 
     async def generate_report(self, *, snapshot: ProductSnapshot) -> tuple[str, dict[str, str]]:
-        if not self._settings.gemini_api_key or self._settings.gemini_api_key == "replace-me":
+        if not self._settings.ai_api_key or self._settings.ai_api_key == "replace-me":
             return self._fallback_report(snapshot=snapshot)
 
         payload = {
-            "contents": [
+            "model": self._settings.ai_model,
+            "messages": [
                 {
-                    "parts": [
-                        {
-                            "text": self._build_prompt(snapshot=snapshot),
-                        }
-                    ]
-                }
-            ]
+                    "role": "system",
+                    "content": "You are diagnosing a Shopify product detail page.",
+                },
+                {
+                    "role": "user",
+                    "content": self._build_prompt(snapshot=snapshot),
+                },
+            ],
         }
 
         client = self._http_client or httpx.AsyncClient(timeout=20.0)
         should_close = self._http_client is None
         try:
             response = await client.post(
-                (
-                    "https://generativelanguage.googleapis.com/v1beta/models/"
-                    f"{self._settings.gemini_model}:generateContent"
-                ),
-                params={"key": self._settings.gemini_api_key},
+                f"{self._settings.ai_base_url.rstrip('/')}/chat/completions",
+                headers={"Authorization": f"Bearer {self._settings.ai_api_key}"},
                 json=payload,
             )
             response.raise_for_status()
@@ -50,17 +49,13 @@ class GeminiDiagnosisService:
             if not report_markdown:
                 return self._fallback_report(snapshot=snapshot)
 
-            primary_issue = (
-                report_markdown.splitlines()[0].lstrip("# ").strip() or "Gemini diagnosis"
-            )
+            primary_issue = report_markdown.splitlines()[0].lstrip("# ").strip() or "AI diagnosis"
             return report_markdown, {
                 "primary_issue": primary_issue,
-                "recommended_action": (
-                    "Review the markdown report and prioritize the first action item."
-                ),
-                "source": "gemini",
+                "recommended_action": "Review the markdown report and prioritize the first action item.",
+                "source": "openai-compatible",
             }
-        except httpx.HTTPError:
+        except (httpx.HTTPError, ValueError):
             return self._fallback_report(snapshot=snapshot)
         finally:
             if should_close:
@@ -75,7 +70,6 @@ class GeminiDiagnosisService:
         )
         return "\n".join(
             [
-                "You are diagnosing a Shopify product detail page.",
                 "Use the following aggregated metrics to produce a concise markdown report.",
                 "",
                 "Structure the report with EXACTLY these three sections using ## headings:",
@@ -103,12 +97,20 @@ class GeminiDiagnosisService:
 
     @staticmethod
     def _extract_text(payload: dict[str, Any]) -> str:
-        candidates = payload.get("candidates", [])
-        if not candidates:
+        choices = payload.get("choices", [])
+        if not isinstance(choices, list) or not choices:
             return ""
 
-        parts = candidates[0].get("content", {}).get("parts", [])
-        return "\n".join(part.get("text", "").strip() for part in parts if part.get("text")).strip()
+        first_choice = choices[0]
+        if not isinstance(first_choice, dict):
+            return ""
+
+        message = first_choice.get("message", {})
+        if not isinstance(message, dict):
+            return ""
+
+        content = message.get("content", "")
+        return content.strip() if isinstance(content, str) else ""
 
     @staticmethod
     def _fallback_report(*, snapshot: ProductSnapshot) -> tuple[str, dict[str, str]]:

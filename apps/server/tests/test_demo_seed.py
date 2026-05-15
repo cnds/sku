@@ -16,7 +16,7 @@ from seed_demo import seed_demo_data
 def _settings(sqlite_database_url: str) -> Settings:
     return Settings(
         database_url=sqlite_database_url,
-        gemini_api_key="test-key",
+        ai_api_key="test-key",
         ingest_shared_secret="ingest-secret",
         redis_url="redis://localhost:6379/15",
         shopify_api_key="test-key",
@@ -32,10 +32,11 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
     sqlite_database_url: str,
 ) -> None:
     settings = _settings(sqlite_database_url)
+    now_utc = datetime.now(UTC)
 
     await seed_demo_data(
         settings=settings,
-        now_utc=datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+        now_utc=now_utc,
     )
 
     app = create_app(settings)

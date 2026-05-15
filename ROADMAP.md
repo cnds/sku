@@ -75,7 +75,7 @@ The core product promise is:
 - [x] The frontend can show a failed diagnosis state when a diagnosis request fails.
 - [x] Diagnosis responses are stored and returned as markdown plus summary metadata.
 - [x] Diagnosis results are reused when the same product snapshot has already been analyzed.
-- [x] A fallback diagnosis path exists when Gemini output is unavailable.
+- [x] A fallback diagnosis path exists when OpenAI-compatible AI output is unavailable.
 - [ ] The product page does not yet present a step-by-step shopper journey with the primary drop-off step highlighted.
 - [ ] The diagnosis prompt and UI do not yet reliably connect a drop-off step to a merchant-controlled PDP cause.
 - [ ] The web-triggered diagnosis payload does not yet include every behavior field that the backend snapshot model supports.
