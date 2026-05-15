@@ -1,0 +1,62 @@
+apps/server/src/config.py
+  s_f6f50995afbe68::t_c24e8dbb12b583 18-19
+  s_f6f50995afbe68::t_ee47a63d85632a 17
+apps/server/tests/test_product_analysis.py
+  s_f6f50995afbe68::t_93797699fc7bfa 141-143
+apps/server/tests/test_ai_service.py
+  s_f6f50995afbe68::t_06a546b143ea9f 3,97
+  s_f6f50995afbe68::t_47ada17e5f44ca 4-5
+  s_f6f50995afbe68::t_17fe275aa889f2 1-2,6-33,49-77,82-96,98-117,133-167
+  s_f6f50995afbe68::t_b3b00c48d45d13 78-81
+  s_f6f50995afbe68::t_be948e2d322264 34-48,118-132
+apps/server/tests/test_shopify_service.py
+  s_f6f50995afbe68::t_1b028291d9c483 20
+README.md
+  s_f6f50995afbe68::t_04629124fdf0b7 37,71,77
+apps/server/tests/test_request_context.py
+  s_f6f50995afbe68::t_1b028291d9c483 31
+AGENTS.md
+  s_f6f50995afbe68::t_913e224715cb4f 86
+apps/server/tests/test_hmac_webhook.py
+  s_f6f50995afbe68::t_1b028291d9c483 22,63,140
+apps/server/tests/test_demo_seed.py
+  s_f6f50995afbe68::t_1b028291d9c483 19
+  s_f6f50995afbe68::t_93797699fc7bfa 35,39
+apps/server/tests/test_controller_modules.py
+  s_f6f50995afbe68::t_1b028291d9c483 30
+apps/server/tests/test_leaderboard.py
+  s_f6f50995afbe68::t_93797699fc7bfa 61,67
+apps/server/tests/test_worker_module.py
+  s_f6f50995afbe68::t_1b028291d9c483 30
+apps/server/tests/test_ingestion_and_rollups.py
+  s_f6f50995afbe68::t_1b028291d9c483 23
+apps/server/src/services/ai.py
+  s_f6f50995afbe68::t_c24e8dbb12b583 11,22,26-27,29-36,43-44,52,55-56,58,100-109,112-113
+.env.example
+  s_f6f50995afbe68::t_9da5f701ac7e61 11-13
+apps/server/tests/test_ingest_auth_service.py
+  s_f6f50995afbe68::t_1b028291d9c483 19
+apps/server/src/worker.py
+  s_f6f50995afbe68::t_c24e8dbb12b583 23,138
+apps/server/tests/test_branding_metadata.py
+  s_f6f50995afbe68::t_1b028291d9c483 14
+docker-compose.yml
+  s_f6f50995afbe68::t_9da5f701ac7e61 52-53,93-94
+  s_f6f50995afbe68::t_ee47a63d85632a 51,92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a62063685c112b10527c26f23dfac0597a0e1f89",
+  "prompts": {},
+  "sessions": {
+    "s_f6f50995afbe68": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e241c-c264-7100-822c-78801a16d6f5",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
