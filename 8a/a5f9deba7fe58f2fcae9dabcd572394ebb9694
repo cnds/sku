@@ -1,0 +1,99 @@
+AGENTS.md
+  s_734d2575744d49::t_87574f8e012e8e 7-8,25
+apps/web/tests/storefront-tracker.test.ts
+  s_734d2575744d49::t_11a544ed5ea6cb 18-26
+apps/web/app/components/AnalysisPanel.tsx
+  s_734d2575744d49::t_f2eb516d601b82 7,15,21-22,229-264,269-270,284-285,330-333,368,375,379,414-422,461,466-472
+  s_734d2575744d49::t_d497cdaefa7c8b 373,411-413
+apps/extension/assets/sku-lens-tracker.js
+  s_734d2575744d49::t_f2eb516d601b82 138-142,147-154,240-253,274,276,281-292,505,530
+apps/server/tests/test_product_analysis.py
+  s_734d2575744d49::t_8f07dfd29e92cd 11
+  s_734d2575744d49::t_43366c37b7bbea 9,12-17,253-254,314-552,562-582,592-603
+  s_734d2575744d49::t_d52852e5133d76 10,553-561,583-591
+apps/server/tests/test_diagnosis.py
+  s_734d2575744d49::t_43366c37b7bbea 60,148-162,164-168,170-171,174,176-188,190-191
+  s_734d2575744d49::t_685b63f5b06ba9 163,169,172-173,175,189
+apps/server/src/services/analysis.py
+  s_734d2575744d49::t_a60038b5f924b7 4,18,132-151,175,177,194,196,254,256,260-265,270-271,337,344,368,370,372,419-505
+README.md
+  s_734d2575744d49::t_167d361ae2fa8e 82
+  s_734d2575744d49::t_9fbd8b06957b8d 12-14,35
+apps/web/app/lib/diagnosis.ts
+  s_734d2575744d49::t_f2eb516d601b82 6,16,24-46
+apps/server/src/repositories/analytics.py
+  s_734d2575744d49::t_a60038b5f924b7 87-88,90,93-97,100-108
+apps/server/src/services/integration_health.py
+  s_734d2575744d49::t_a60038b5f924b7 1-2,4-7,9-16,18-19,21-39,42-44,46,57-119,123-142,175,177-180,185-200
+  s_53669a64867753::t_aa284b13a28b06 3,8,20,40-41,45,47-56,121-122,143-174,176
+  s_734d2575744d49::t_c44b3b45accfab 17,120
+  s_734d2575744d49::t_685b63f5b06ba9 181-184
+apps/web/tests/diagnosis-contract.test.ts
+  s_734d2575744d49::t_11a544ed5ea6cb 3-10,91-130
+apps/web/app/routes/resources.products.$productId.diagnosis.ts
+  s_734d2575744d49::t_f2eb516d601b82 31,35-42
+apps/web/tests/routes.resources.products.$productId.diagnosis.test.ts
+  s_734d2575744d49::t_11a544ed5ea6cb 102-149
+apps/server/tests/test_integration_health.py
+  s_53669a64867753::t_4af840f61c2747 8-9,127-172,174-263
+  s_734d2575744d49::t_43366c37b7bbea 1-2,4-7,10-70,72-89,91-96,98-117,119-126,264-272,279-297,299-307,309,325-330,332-336,338-365
+  s_53669a64867753::t_ffd3b99be055d4 274-278,310-324,337
+  s_734d2575744d49::t_c56f80cdcead1a 71,90,97,118,273,298,308,331
+  s_53669a64867753::t_53ed6699333a7a 3,173
+apps/web/app/lib/api.server.ts
+  s_734d2575744d49::t_f2eb516d601b82 3,64-77,148,155-157,159
+apps/server/src/services/diagnosis.py
+  s_734d2575744d49::t_a60038b5f924b7 39,52
+apps/web/tests/api.server.test.ts
+  s_734d2575744d49::t_11a544ed5ea6cb 3-10,133-205
+apps/web/app/routes/_index.tsx
+  s_734d2575744d49::t_f2eb516d601b82 20-21,31-32,38,65-105,130-133,145,194,211-215
+apps/server/src/controllers/diagnosis.py
+  s_734d2575744d49::t_bba680b414997f 25
+  s_734d2575744d49::t_a60038b5f924b7 28
+apps/server/src/repositories/diagnosis.py
+  s_734d2575744d49::t_685b63f5b06ba9 33-35,41
+apps/server/src/seed_demo.py
+  s_734d2575744d49::t_fba568f5a857af 73,75,80,82,100,102,107,109,127,133,152-153,155,160-161,163
+apps/server/tests/test_controller_modules.py
+  s_734d2575744d49::t_b568c36fb15eeb 23,120,212-213
+apps/web/tests/routes._index.test.ts
+  s_734d2575744d49::t_11a544ed5ea6cb 4,9,16,30-42,59-63,66-68
+apps/server/src/schemas.py
+  s_734d2575744d49::t_a60038b5f924b7 52-69,166-167,186-209
+ROADMAP.md
+  s_734d2575744d49::t_17060920729f23 60,75,86,88-89,104,114
+  s_734d2575744d49::t_05398cce98e106 122,130-134,154-158
+apps/server/src/controllers/analytics.py
+  s_734d2575744d49::t_a60038b5f924b7 7-14,16,48-53
+apps/web/tests/board-copy.test.ts
+  s_734d2575744d49::t_11a544ed5ea6cb 5,42-99
+apps/server/tests/test_demo_seed.py
+  s_734d2575744d49::t_eeeb372455d1a4 96-110
+apps/web/app/lib/contracts.ts
+  s_734d2575744d49::t_f2eb516d601b82 5,7-8,74-75,94-117
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "8aa5f9deba7fe58f2fcae9dabcd572394ebb9694",
+  "prompts": {},
+  "sessions": {
+    "s_53669a64867753": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2ae1-bb62-7cf2-ba52-12db25fa3f2e",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    },
+    "s_734d2575744d49": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e2ac9-3830-71b3-9745-8ced7c6fae0c",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
