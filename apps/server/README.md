@@ -1,4 +1,4 @@
 # SKU Lens Server
 
-AI Winner & Loser Analysis backend for FastAPI, SQLModel persistence, Redis queues,
+Shopify product daily decision board backend for FastAPI, SQLModel persistence, Redis queues,
 and Shopify auth/webhook handling.

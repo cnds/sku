@@ -317,11 +317,11 @@ class ProductAnalysisService:
         if signal_state is PrioritySignalState.TRACKING_ISSUE:
             return "Tracker coverage is incomplete"
         if signal_state is PrioritySignalState.INSUFFICIENT_DATA:
-            return "Not enough sessions to call a winner or leaker"
+            return "Not enough sessions to call a Winner or Leaker"
         if signal_state is PrioritySignalState.WEAK_SIGNAL:
             return "Early signal; validate with more traffic"
         if board is PriorityBoardType.HIDDEN_WINNER:
-            return "Strong buying intent with limited traffic"
+            return "High intent, underexposed"
         return "Orders lag similar traffic"
 
     @classmethod

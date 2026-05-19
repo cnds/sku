@@ -254,7 +254,7 @@ async def test_product_priorities_returns_two_leakers_and_one_hidden_winner(
     assert priorities[0].trend_reason == "No previous 7d comparison window yet."
     assert priorities[0].primary_step == "pdp_add_to_cart"
     assert "size_chart" in priorities[0].suspected_friction
-    assert priorities[2].flag_reason == "Strong buying intent with limited traffic"
+    assert priorities[2].flag_reason == "High intent, underexposed"
 
 
 @pytest.mark.asyncio
@@ -571,9 +571,38 @@ def test_low_data_priority_copy_avoids_confident_friction_claims() -> None:
     )
 
     assert card.signal_state is PrioritySignalState.INSUFFICIENT_DATA
+    assert card.flag_reason == "Not enough sessions to call a Winner or Leaker"
     assert "friction" not in card.suspected_friction.lower()
     assert "PDP sessions" in card.suspected_friction
     assert "traffic test" in card.first_fix
+
+
+def test_hidden_winner_priority_copy_matches_roadmap_framing() -> None:
+    service = ProductAnalysisService()
+    card = service._priority_card(
+        board=PriorityBoardType.HIDDEN_WINNER,
+        entry=LeaderboardEntry(
+            product_id="product-1",
+            views=80,
+            add_to_carts=12,
+            orders=6,
+            impressions=20,
+            clicks=4,
+            score=10.0,
+        ),
+        snapshot=ProductSnapshot(
+            views=80,
+            add_to_carts=12,
+            orders=6,
+            impressions=20,
+            clicks=4,
+        ),
+        previous_entry=None,
+        window=TimeWindow.HOURS_24,
+    )
+
+    assert card.signal_state is PrioritySignalState.READY
+    assert card.flag_reason == "High intent, underexposed"
 
 
 def test_tracking_issue_priority_copy_points_to_event_coverage() -> None:

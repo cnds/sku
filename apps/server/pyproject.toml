@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "sku-lens-server"
 version = "0.1.0"
-description = "SKU Lens backend for AI Winner & Loser Analysis"
+description = "SKU Lens backend for a Shopify product daily decision board"
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 dependencies = [

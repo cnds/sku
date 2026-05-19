@@ -1,6 +1,6 @@
 {
   "name": "sku-lens",
-  "description": "SKU Lens monorepo for AI Winner & Loser Analysis.",
+  "description": "SKU Lens monorepo for a Shopify product daily decision board.",
   "private": true,
   "packageManager": "pnpm@10.10.0",
   "scripts": {
