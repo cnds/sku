@@ -1,0 +1,20 @@
+apps/server/src/tasks/runtime.py
+  s_22efc57b1cfa5b::t_3485d0b1b03848 78
+  s_22efc57b1cfa5b::t_31f3c884757858 4,7,89
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "34f5b4e35ffab258063ab37645a565b801fe3e2a",
+  "prompts": {},
+  "sessions": {
+    "s_22efc57b1cfa5b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e3f5d-b586-7bb0-bc10-5134925b4857",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
