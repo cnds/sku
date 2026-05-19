@@ -1,0 +1,30 @@
+apps/server/tests/test_product_analysis.py
+  s_22efc57b1cfa5b::t_f442f769f1fbb9 257
+  s_22efc57b1cfa5b::t_fc3f19c899f881 574,580-605
+apps/server/tests/test_branding_metadata.py
+  s_22efc57b1cfa5b::t_7da1d92ec62601 3-6,10-11,35-47
+apps/server/src/services/analysis.py
+  s_22efc57b1cfa5b::t_ac513cd8c4ab92 320,324
+apps/server/README.md
+  s_22efc57b1cfa5b::t_5483f65665fc89 3
+package.json
+  s_22efc57b1cfa5b::t_a51202f4c77315 3
+apps/server/pyproject.toml
+  s_22efc57b1cfa5b::t_59ee647910d9f1 8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "9915f2d70a0f04a6e6ccb3dd73b904c409a31bbe",
+  "prompts": {},
+  "sessions": {
+    "s_22efc57b1cfa5b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e3f5d-b586-7bb0-bc10-5134925b4857",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
