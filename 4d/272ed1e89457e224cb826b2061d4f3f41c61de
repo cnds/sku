@@ -1,0 +1,24 @@
+apps/server/src/main.py
+  s_22efc57b1cfa5b::t_d1cf83f6d3a4fd 4,43
+AGENTS.md
+  s_22efc57b1cfa5b::t_a762e2d096a041 61
+  s_22efc57b1cfa5b::t_9485e794a03754 62
+apps/server/src/db.py
+  s_22efc57b1cfa5b::t_1a8e698e016604 3,43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.9",
+  "base_commit_sha": "4d272ed1e89457e224cb826b2061d4f3f41c61de",
+  "prompts": {},
+  "sessions": {
+    "s_22efc57b1cfa5b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e3f5d-b586-7bb0-bc10-5134925b4857",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
