@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -40,7 +40,7 @@ def get_db_session() -> AsyncSession:
 
 
 @asynccontextmanager
-async def db_session_context(session_factory: DatabaseSessionFactory) -> AsyncIterator[AsyncSession]:
+async def db_session_context(session_factory: DatabaseSessionFactory) -> AsyncGenerator[AsyncSession]:
     async with session_factory() as session:
         token = _current_db_session.set(session)
         try:

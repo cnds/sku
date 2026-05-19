@@ -58,6 +58,8 @@ Avoid committing generated output such as `build/`, `dist/`, `coverage/`, `node_
 
 Use 4-space indentation in Python and standard TypeScript formatting in web code. Python files and functions use `snake_case`; React components use `PascalCase`; Remix route files follow Remix naming. The backend targets Python 3.14. Ruff enforces `ANN`, `I`, `N`, and `S` with a 120-character line limit. Do not reintroduce a nested Python package under `apps/server/src`.
 
+Keep backend lint output clean, including deprecated cases reported by Ruff or static-analysis checks.
+
 When changing web code, assume the app runs with the enabled Remix v3 future flags in `apps/web/vite.config.ts` (`v3_fetcherPersist`, `v3_lazyRouteDiscovery`, `v3_relativeSplatPath`, `v3_singleFetch`, `v3_throwAbortReason`). Do not remove them just to silence warnings.
 
 ## Testing Guidelines

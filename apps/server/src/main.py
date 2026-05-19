@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncGenerator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from time import perf_counter
 from uuid import uuid4
@@ -40,7 +40,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     session_factory = create_session_factory(resolved_settings.database_url)
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         app.state.settings = resolved_settings
         app.state.session_factory = session_factory
         await init_db(session_factory.engine)
