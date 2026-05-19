@@ -6,6 +6,5 @@ uv sync --directory apps/server --extra dev
 
 exec ./apps/server/.venv/bin/celery \
   --app celery_app:celery_app \
-  worker \
-  --loglevel "${SKU_LENS_LOG_LEVEL:-INFO}" \
-  --queues "sku-lens:rollups,sku-lens:diagnoses"
+  beat \
+  --loglevel "${SKU_LENS_LOG_LEVEL:-INFO}"

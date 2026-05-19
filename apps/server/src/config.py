@@ -8,6 +8,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     database_url: str
     redis_url: str
+    celery_broker_url: str | None = None
     sku_lens_log_level: str = "INFO"
     shopify_api_key: str
     shopify_api_secret: str

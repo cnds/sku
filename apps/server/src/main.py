@@ -10,6 +10,7 @@ import uvicorn
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 
+from celery_app import configure_celery
 from config import Settings, get_settings
 from controllers.router import api_router
 from db import (
@@ -17,7 +18,6 @@ from db import (
     db_session_context,
     init_db,
 )
-from job_queue import close_redis_client, init_redis_client
 from logging_utils import configure_logging
 from services.diagnosis import DiagnosisNotFoundError
 from services.ingest_auth import (
@@ -36,8 +36,8 @@ LOGGER = logging.getLogger(__name__)
 def create_app(settings: Settings | None = None) -> FastAPI:
     resolved_settings = settings or get_settings()
     configure_logging(resolved_settings.sku_lens_log_level)
+    configure_celery(resolved_settings)
     session_factory = create_session_factory(resolved_settings.database_url)
-    init_redis_client(resolved_settings.redis_url)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -48,7 +48,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             yield
         finally:
-            await close_redis_client()
             await session_factory.engine.dispose()
 
     app = FastAPI(

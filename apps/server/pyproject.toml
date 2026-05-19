@@ -11,6 +11,7 @@ requires-python = ">=3.14,<3.15"
 dependencies = [
   "aiomysql>=0.2.0",
   "aiosqlite>=0.20.0",
+  "celery[redis]>=5.6,<6",
   "cryptography>=44.0.0",
   "fastapi>=0.115.0",
   "httpx>=0.28.0",
@@ -35,13 +36,12 @@ dev = [
 [project.scripts]
 sku-lens-server = "main:run"
 sku-lens-seed-demo = "seed_demo:main"
-sku-lens-worker = "worker:main"
 
 [tool.hatch.build.targets.wheel]
 only-include = [
+  "src/celery_app.py",
   "src/config.py",
   "src/db.py",
-  "src/job_queue.py",
   "src/logging_utils.py",
   "src/main.py",
   "src/models.py",
@@ -50,7 +50,7 @@ only-include = [
   "src/seed_demo.py",
   "src/security",
   "src/services",
-  "src/worker.py"
+  "src/tasks"
 ]
 sources = ["src"]
 

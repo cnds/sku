@@ -101,6 +101,35 @@ services:
       - worker-venv:/workspace/apps/server/.venv
       - uv-cache:/root/.cache/uv
 
+  worker-beat:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile.dev
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+aiomysql://sku:sku@mysql:3306/sku_lens
+      REDIS_URL: redis://redis:6379/0
+      SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:?set SHOPIFY_API_KEY in .env}
+      SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:?set SHOPIFY_API_SECRET in .env}
+      SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:?set SHOPIFY_SCOPES in .env}
+      SHOPIFY_APP_URL: ${SHOPIFY_APP_URL:?set SHOPIFY_APP_URL in .env}
+      SHOPIFY_WEBHOOK_BASE_URL: ${SHOPIFY_WEBHOOK_BASE_URL:?set SHOPIFY_WEBHOOK_BASE_URL in .env}
+      AI_API_KEY: ${AI_API_KEY:-replace-me}
+      AI_MODEL: ${AI_MODEL:-gpt-4o-mini}
+      AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
+      INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
+      INGEST_TOKEN_TTL_SECONDS: ${INGEST_TOKEN_TTL_SECONDS:-300}
+    command: ["sh", "/workspace/scripts/dev-worker-beat.sh"]
+    init: true
+    volumes:
+      - .:/workspace
+      - worker-beat-venv:/workspace/apps/server/.venv
+      - uv-cache:/root/.cache/uv
+
   web:
     build:
       context: .
@@ -130,4 +159,5 @@ volumes:
   server-venv:
   uv-cache:
   web-node-modules:
+  worker-beat-venv:
   worker-venv:

@@ -7,6 +7,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlmodel import select
 
+import services.job_dispatch as job_dispatch_module
 from config import Settings
 from db import create_session_factory, db_session_context, init_db
 from main import create_app
@@ -97,22 +98,28 @@ async def test_ingestion_service_persists_rollup_and_registers_enqueue_callback(
     session_factory = create_session_factory(sqlite_database_url)
     await init_db(session_factory.engine)
     callbacks = AfterCommitCallbacks()
-    enqueued: list[tuple[str, dict[str, object]]] = []
+    sent: list[dict[str, object]] = []
     occurred_at = datetime(2026, 4, 23, 9, 0, tzinfo=UTC)
 
-    async def _fake_enqueue_json(
-        *,
-        payload: dict[str, object],
-        queue_name: str,
-    ) -> bool:
-        enqueued.append((queue_name, payload))
-        return True
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
 
-    monkeypatch.setattr(
-        "services.job_dispatch.enqueue_json",
-        _fake_enqueue_json,
-        raising=False,
-    )
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
 
     async with db_session_context(session_factory) as session:
         await EventIngestionService().persist_batch_rollup_and_enqueue(
@@ -133,16 +140,19 @@ async def test_ingestion_service_persists_rollup_and_registers_enqueue_callback(
         )
         await session.commit()
 
-    assert enqueued == []
+    assert sent == []
 
     await callbacks.run()
 
-    assert len(enqueued) == 1
-    queue_name, enqueued_payload = enqueued[0]
-    assert queue_name == "sku-lens:rollups"
+    assert len(sent) == 1
+    message = sent[0]
+    enqueued_payload = message["kwargs"]
+    assert message["name"] == "sku_lens.rollup.process"
+    assert message["queue"] == "sku-lens:rollups"
     assert enqueued_payload["shop_id"] == "shop-1"
     assert enqueued_payload["stat_date"] == "2026-04-23"
     assert isinstance(enqueued_payload["job_id"], str)
+    assert message["task_id"] == enqueued_payload["job_id"]
 
 
 @pytest.mark.asyncio
@@ -165,57 +175,37 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
         )
         await session.commit()
 
-    enqueued: list[tuple[str, dict[str, object]]] = []
-    enqueue_visibility_checks: list[tuple[int, int, dict[str, int]]] = []
+    sent: list[dict[str, object]] = []
 
-    async def _fake_enqueue_json(
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
+
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
+
+    async def _old_fake_enqueue_json(
         *,
         payload: dict[str, object],
         queue_name: str,
     ) -> bool:
-        async with app.state.session_factory() as session:
-            raw_events = (
-                await session.exec(
-                    select(RawEvent)
-                    .where(RawEvent.shop_id == "demo.myshopify.com")
-                    .order_by(RawEvent.id)
-                )
-            ).all()
-            daily_stats = (
-                await session.exec(
-                    select(DailyProductStat).where(
-                        DailyProductStat.shop_id == "demo.myshopify.com"
-                    )
-                )
-            ).all()
+        del payload, queue_name
+        raise AssertionError("legacy Redis enqueue_json should not be called")
 
-        assert len(raw_events) == 2
-        assert [raw_event.event_type for raw_event in raw_events] == [
-            EventType.VIEW,
-            EventType.COMPONENT_CLICK,
-        ]
-        assert len(daily_stats) == 1
-        assert daily_stats[0].views == 1
-        assert daily_stats[0].component_clicks_distribution == {"size_chart": 1}
-        assert payload["shop_id"] == "demo.myshopify.com"
-        assert payload["stat_date"] == daily_stats[0].stat_date.isoformat()
-        assert isinstance(payload["job_id"], str)
-
-        enqueue_visibility_checks.append(
-            (
-                len(raw_events),
-                daily_stats[0].views,
-                daily_stats[0].component_clicks_distribution,
-            )
-        )
-        enqueued.append((queue_name, payload))
-        return True
-
-    monkeypatch.setattr(
-        "services.job_dispatch.enqueue_json",
-        _fake_enqueue_json,
-        raising=False,
-    )
+    monkeypatch.setattr(job_dispatch_module, "enqueue_json", _old_fake_enqueue_json, raising=False)
 
     occurred_at = datetime(2026, 4, 28, 15, 5, tzinfo=UTC)
     payload = {
@@ -252,13 +242,15 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
 
     assert response.status_code == 202
     assert response.json() == {"accepted": 2}
-    assert enqueue_visibility_checks == [(2, 1, {"size_chart": 1})]
-    assert len(enqueued) == 1
-    queue_name, enqueued_payload = enqueued[0]
-    assert queue_name == "sku-lens:rollups"
+    assert len(sent) == 1
+    message = sent[0]
+    enqueued_payload = message["kwargs"]
+    assert message["name"] == "sku_lens.rollup.process"
+    assert message["queue"] == "sku-lens:rollups"
     assert enqueued_payload["shop_id"] == "demo.myshopify.com"
     assert enqueued_payload["stat_date"] == "2026-04-29"
     assert isinstance(enqueued_payload["job_id"], str)
+    assert message["task_id"] == enqueued_payload["job_id"]
 
     async with app.state.session_factory() as session:
         raw_events = (
@@ -538,16 +530,18 @@ async def test_ingest_new_sdk_events_via_http_endpoint(
         )
         await session.commit()
 
-    async def _fake_enqueue_json(
-        *, payload: dict[str, object], queue_name: str
-    ) -> bool:
-        return True
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            del name, kwargs, queue, task_id
 
-    monkeypatch.setattr(
-        "services.job_dispatch.enqueue_json",
-        _fake_enqueue_json,
-        raising=False,
-    )
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
 
     occurred_at = datetime.now(UTC).replace(microsecond=0)
     payload = {

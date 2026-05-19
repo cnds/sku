@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import inspect
+from pathlib import Path
 
 
 def test_server_mvc_modules_are_importable_directly_from_src_root() -> None:
@@ -24,7 +26,11 @@ def test_server_mvc_modules_are_importable_directly_from_src_root() -> None:
     rollups_service = importlib.import_module("services.rollups")
     shop_installations = importlib.import_module("services.shop_installations")
     shopify_service = importlib.import_module("services.shopify")
-    worker = importlib.import_module("worker")
+    diagnosis_tasks = importlib.import_module("tasks.diagnosis")
+    task_handlers = importlib.import_module("tasks.handlers")
+    rollup_tasks = importlib.import_module("tasks.rollups")
+    task_runtime = importlib.import_module("tasks.runtime")
+    task_scheduler = importlib.import_module("tasks.scheduler")
 
     assert config.Settings.__name__ == "Settings"
     assert callable(main.create_app)
@@ -47,7 +53,19 @@ def test_server_mvc_modules_are_importable_directly_from_src_root() -> None:
     assert rollups_service.DailyRollupService.__name__ == "DailyRollupService"
     assert shop_installations.ShopInstallationService.__name__ == "ShopInstallationService"
     assert shopify_service.ShopifyOAuthService.__name__ == "ShopifyOAuthService"
-    assert callable(worker.main)
+    assert callable(diagnosis_tasks.process_diagnosis_task)
+    assert callable(rollup_tasks.process_rollup_task)
+    assert callable(rollup_tasks.run_due_shop_rollups_task)
+    assert callable(task_handlers.process_rollup_job)
+    assert callable(task_runtime.init_task_runtime)
+    assert callable(task_scheduler.run_due_shop_rollups)
+
+
+def test_celery_runtime_logic_lives_under_tasks_package() -> None:
+    src_root = Path(__file__).resolve().parents[1] / "src"
+
+    assert not (src_root / "worker.py").exists()
+    assert importlib.util.find_spec("worker") is None
 
 
 def test_main_module_only_exposes_assembly_helpers() -> None:

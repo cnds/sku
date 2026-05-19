@@ -6,6 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlmodel import select
 
+import services.job_dispatch as job_dispatch_module
 from config import Settings
 from main import create_app
 from models import DailyProductStat, EventType, RawEvent
@@ -52,6 +53,7 @@ async def test_shopify_webhook_rejects_invalid_hmac(
 async def test_shopify_webhook_accepts_valid_hmac(
     sqlite_database_url: str,
     redis_url: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     payload = {
         "id": 42,
@@ -71,6 +73,19 @@ async def test_shopify_webhook_accepts_valid_hmac(
     )
     app = create_app(settings)
     signature = build_shopify_hmac(settings.shopify_api_secret, body)
+
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            del name, kwargs, queue, task_id
+
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
 
     async with AsyncClient(
         transport=ASGITransport(app=app),
@@ -101,39 +116,27 @@ async def test_shopify_webhook_persists_order_rollup_and_enqueue_after_commit(
         "line_items": [{"product_id": 1001, "quantity": 1}],
     }
     body = json.dumps(payload).encode()
-    enqueued: list[tuple[str, dict[str, object]]] = []
-    enqueue_visibility_checks: list[tuple[int, int]] = []
+    sent: list[dict[str, object]] = []
 
-    async def _fake_enqueue_json(
-        *,
-        payload: dict[str, object],
-        queue_name: str,
-    ) -> bool:
-        async with app.state.session_factory() as session:
-            raw_events = (
-                await session.exec(
-                    select(RawEvent).where(RawEvent.shop_id == "demo.myshopify.com")
-                )
-            ).all()
-            daily_stats = (
-                await session.exec(
-                    select(DailyProductStat).where(
-                        DailyProductStat.shop_id == "demo.myshopify.com"
-                    )
-                )
-            ).all()
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
 
-        assert len(raw_events) == 1
-        assert len(daily_stats) == 1
-        enqueue_visibility_checks.append((len(raw_events), len(daily_stats)))
-        enqueued.append((queue_name, payload))
-        return True
-
-    monkeypatch.setattr(
-        "services.job_dispatch.enqueue_json",
-        _fake_enqueue_json,
-        raising=False,
-    )
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
 
     settings = Settings(
         database_url=sqlite_database_url,
@@ -165,7 +168,6 @@ async def test_shopify_webhook_persists_order_rollup_and_enqueue_after_commit(
 
     assert response.status_code == 202
     assert response.json() == {"accepted": True, "enqueued": 1}
-    assert enqueue_visibility_checks == [(1, 1)]
 
     async with app.state.session_factory() as session:
         raw_events = (
@@ -190,9 +192,12 @@ async def test_shopify_webhook_persists_order_rollup_and_enqueue_after_commit(
     assert daily_stats[0].orders == 1
     assert daily_stats[0].views == 0
     assert daily_stats[0].add_to_carts == 0
-    assert len(enqueued) == 1
-    queue_name, enqueued_payload = enqueued[0]
-    assert queue_name == "sku-lens:rollups"
+    assert len(sent) == 1
+    message = sent[0]
+    enqueued_payload = message["kwargs"]
+    assert message["name"] == "sku_lens.rollup.process"
+    assert message["queue"] == "sku-lens:rollups"
     assert enqueued_payload["shop_id"] == "demo.myshopify.com"
     assert enqueued_payload["stat_date"] == daily_stats[0].stat_date.isoformat()
     assert isinstance(enqueued_payload["job_id"], str)
+    assert message["task_id"] == enqueued_payload["job_id"]

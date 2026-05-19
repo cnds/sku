@@ -114,3 +114,40 @@ class DiagnosisRepository:
             return self.to_result(existing)
 
         return self.to_result(existing)
+
+    async def store_failed_report(
+        self,
+        *,
+        product_id: str,
+        shop_id: str,
+        snapshot_hash: str,
+        summary_json: dict[str, Any],
+        window: TimeWindow,
+    ) -> DiagnosisResult:
+        existing = await self.get_record(
+            product_id=product_id,
+            shop_id=shop_id,
+            window=window,
+        )
+
+        if existing is None:
+            existing = ProductDiagnosis(
+                product_id=product_id,
+                shop_id=shop_id,
+                snapshot_hash=snapshot_hash,
+                status=DiagnosisStatus.FAILED,
+                window=window.value,
+                report_markdown=None,
+                summary_json=summary_json,
+                generated_at=datetime.now(UTC),
+            )
+            get_db_session().add(existing)
+        elif existing.snapshot_hash == snapshot_hash:
+            existing.status = DiagnosisStatus.FAILED
+            existing.report_markdown = None
+            existing.summary_json = summary_json
+            existing.generated_at = datetime.now(UTC)
+        else:
+            return self.to_result(existing)
+
+        return self.to_result(existing)

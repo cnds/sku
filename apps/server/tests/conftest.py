@@ -8,7 +8,6 @@ import pytest_asyncio
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 import db
-import job_queue
 
 
 @pytest.fixture
@@ -43,8 +42,5 @@ async def dispose_test_engines(
 
 
 @pytest_asyncio.fixture(autouse=True)
-async def close_test_redis_clients() -> AsyncIterator[None]:
-    try:
-        yield
-    finally:
-        await job_queue.close_redis_client()
+async def clear_celery_runtime_settings() -> AsyncIterator[None]:
+    yield

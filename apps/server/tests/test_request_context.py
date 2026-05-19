@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import date
 
 import pytest
@@ -8,8 +7,8 @@ from fastapi import HTTPException, Request
 from httpx import ASGITransport, AsyncClient
 from sqlmodel import select
 
-import job_queue
 import main
+import services.job_dispatch as job_dispatch_module
 from config import Settings
 from db import get_db_session, init_db
 from main import create_app
@@ -39,21 +38,24 @@ def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
     )
 
 
-def test_create_app_initializes_redis_client(
+def test_create_app_does_not_initialize_redis_list_client(
     sqlite_database_url: str,
     redis_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    seen: dict[str, str] = {}
+    called = False
 
     def _fake_init_redis_client(url: str) -> None:
-        seen["url"] = url
+        nonlocal called
+        del url
+        called = True
 
     monkeypatch.setattr(main, "init_redis_client", _fake_init_redis_client, raising=False)
 
     create_app(_settings(sqlite_database_url, redis_url))
 
-    assert seen == {"url": redis_url}
+    assert called is False
+    assert job_dispatch_module.celery_app.conf.broker_url == redis_url
 
 
 @pytest.mark.asyncio
@@ -165,46 +167,31 @@ async def test_db_session_middleware_propagates_request_id_and_logs_completed_re
 
 
 @pytest.mark.asyncio
-async def test_enqueue_json_uses_initialized_redis_client(
+async def test_job_dispatch_service_publishes_rollups_after_commit_with_job_id_as_task_id(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    pushed: list[tuple[str, dict[str, str]]] = []
-
-    class FakeRedis:
-        async def lpush(self, queue_name: str, payload: str) -> None:
-            pushed.append((queue_name, json.loads(payload)))
-
-    monkeypatch.setattr(job_queue, "get_redis_client", lambda: FakeRedis(), raising=False)
-
-    result = await job_queue.enqueue_json(
-        payload={"shop_id": "shop-1"},
-        queue_name="sku-lens:rollups",
-    )
-
-    assert result is True
-    assert pushed == [("sku-lens:rollups", {"shop_id": "shop-1"})]
-
-
-@pytest.mark.asyncio
-async def test_job_dispatch_service_uses_plain_after_commit_callbacks(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    enqueued: list[tuple[str, dict[str, object]]] = []
+    sent: list[dict[str, object]] = []
     callbacks = AfterCommitCallbacks()
 
-    async def _fake_enqueue_json(
-        *,
-        payload: dict[str, object],
-        queue_name: str,
-    ) -> bool:
-        enqueued.append((queue_name, payload))
-        return True
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
 
-    monkeypatch.setattr(
-        "services.job_dispatch.enqueue_json",
-        _fake_enqueue_json,
-        raising=False,
-    )
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
 
     job_ids = JobDispatchService().enqueue_rollup(
         after_commit_callbacks=callbacks,
@@ -213,15 +200,17 @@ async def test_job_dispatch_service_uses_plain_after_commit_callbacks(
     )
 
     assert len(job_ids) == 1
-    assert enqueued == []
+    assert sent == []
 
     await callbacks.run()
 
-    assert enqueued == [
-        (
-            "sku-lens:rollups",
-            {"job_id": job_ids[0], "shop_id": "shop-1", "stat_date": "2026-04-27"},
-        )
+    assert sent == [
+        {
+            "name": "sku_lens.rollup.process",
+            "kwargs": {"job_id": job_ids[0], "shop_id": "shop-1", "stat_date": "2026-04-27"},
+            "queue": "sku-lens:rollups",
+            "task_id": job_ids[0],
+        }
     ]
 
 
@@ -356,21 +345,27 @@ async def test_diagnosis_jobs_enqueue_after_commit_via_dispatch_service(
     redis_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    enqueued: list[tuple[str, dict[str, object]]] = []
+    sent: list[dict[str, object]] = []
 
-    async def _fake_enqueue_json(
-        *,
-        payload: dict[str, object],
-        queue_name: str,
-    ) -> bool:
-        enqueued.append((queue_name, payload))
-        return True
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
 
-    monkeypatch.setattr(
-        "services.job_dispatch.enqueue_json",
-        _fake_enqueue_json,
-        raising=False,
-    )
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
 
     app = create_app(_settings(sqlite_database_url, redis_url))
     await init_db(app.state.session_factory.engine)
@@ -392,10 +387,13 @@ async def test_diagnosis_jobs_enqueue_after_commit_via_dispatch_service(
         )
 
     assert response.status_code == 200
-    assert len(enqueued) == 1
-    queue_name, payload = enqueued[0]
-    assert queue_name == "sku-lens:diagnoses"
+    assert len(sent) == 1
+    message = sent[0]
+    payload = message["kwargs"]
+    assert message["name"] == "sku_lens.diagnosis.process"
+    assert message["queue"] == "sku-lens:diagnoses"
     assert isinstance(payload["job_id"], str)
+    assert message["task_id"] == payload["job_id"]
     assert payload["product_id"] == "product-1"
     assert payload["shop_id"] == "shop-1"
     assert payload["snapshot"]["views"] == snapshot["views"]
@@ -410,21 +408,27 @@ async def test_diagnosis_endpoint_persists_pending_report_and_avoids_duplicate_e
     redis_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    enqueued: list[tuple[str, dict[str, object]]] = []
+    sent: list[dict[str, object]] = []
 
-    async def _fake_enqueue_json(
-        *,
-        payload: dict[str, object],
-        queue_name: str,
-    ) -> bool:
-        enqueued.append((queue_name, payload))
-        return True
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
 
-    monkeypatch.setattr(
-        "services.job_dispatch.enqueue_json",
-        _fake_enqueue_json,
-        raising=False,
-    )
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
 
     app = create_app(_settings(sqlite_database_url, redis_url))
     await init_db(app.state.session_factory.engine)
@@ -461,10 +465,13 @@ async def test_diagnosis_endpoint_persists_pending_report_and_avoids_duplicate_e
     assert second.json()["status"] == "pending"
     assert fetched.json()["status"] == "pending"
     assert fetched.json()["snapshot_hash"] == first.json()["snapshot_hash"]
-    assert len(enqueued) == 1
-    queue_name, payload = enqueued[0]
-    assert queue_name == "sku-lens:diagnoses"
+    assert len(sent) == 1
+    message = sent[0]
+    payload = message["kwargs"]
+    assert message["name"] == "sku_lens.diagnosis.process"
+    assert message["queue"] == "sku-lens:diagnoses"
     assert isinstance(payload["job_id"], str)
+    assert message["task_id"] == payload["job_id"]
     assert payload["product_id"] == "product-1"
     assert payload["snapshot"]["views"] == snapshot["views"]
     assert payload["snapshot"]["orders"] == snapshot["orders"]
@@ -477,21 +484,27 @@ async def test_diagnosis_jobs_do_not_enqueue_when_request_rolls_back(
     redis_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    enqueued: list[tuple[str, dict[str, object]]] = []
+    sent: list[dict[str, object]] = []
 
-    async def _fake_enqueue_json(
-        *,
-        payload: dict[str, object],
-        queue_name: str,
-    ) -> bool:
-        enqueued.append((queue_name, payload))
-        return True
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
 
-    monkeypatch.setattr(
-        "services.job_dispatch.enqueue_json",
-        _fake_enqueue_json,
-        raising=False,
-    )
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
 
     app = create_app(_settings(sqlite_database_url, redis_url))
     await init_db(app.state.session_factory.engine)
@@ -520,4 +533,4 @@ async def test_diagnosis_jobs_do_not_enqueue_when_request_rolls_back(
         response = await client.post("/test/context/diagnosis-rollback")
 
     assert response.status_code == 400
-    assert enqueued == []
+    assert sent == []

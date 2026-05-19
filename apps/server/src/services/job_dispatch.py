@@ -6,11 +6,9 @@ from datetime import date
 from typing import Any
 from uuid import uuid4
 
-from job_queue import enqueue_json
+from celery_app import DIAGNOSIS_QUEUE, DIAGNOSIS_TASK_NAME, ROLLUP_QUEUE, ROLLUP_TASK_NAME, celery_app
 
 AfterCommitCallback = Callable[[], Awaitable[object]]
-ROLLUP_QUEUE_NAME = "sku-lens:rollups"
-DIAGNOSIS_QUEUE_NAME = "sku-lens:diagnoses"
 LOGGER = logging.getLogger(__name__)
 
 
@@ -45,16 +43,18 @@ class JobDispatchService:
                     "shop_id": shop_id,
                     "stat_date": stat_date.isoformat(),
                 }
-                success = await enqueue_json(
-                    payload=payload,
-                    queue_name=ROLLUP_QUEUE_NAME,
+                success = _send_task(
+                    task_name=ROLLUP_TASK_NAME,
+                    kwargs=payload,
+                    queue_name=ROLLUP_QUEUE,
+                    task_id=job_id,
                 )
                 LOGGER.log(
                     logging.INFO if success else logging.ERROR,
                     "job %s job_id=%s queue_name=%s shop_id=%s stat_date=%s",
                     "enqueued" if success else "enqueue failed",
                     job_id,
-                    ROLLUP_QUEUE_NAME,
+                    ROLLUP_QUEUE,
                     shop_id,
                     stat_date,
                 )
@@ -98,9 +98,11 @@ class JobDispatchService:
                 "snapshot_hash": snapshot_hash,
                 "window": window,
             }
-            success = await enqueue_json(
-                payload=payload,
-                queue_name=DIAGNOSIS_QUEUE_NAME,
+            success = _send_task(
+                task_name=DIAGNOSIS_TASK_NAME,
+                kwargs=payload,
+                queue_name=DIAGNOSIS_QUEUE,
+                task_id=job_id,
             )
             LOGGER.log(
                 logging.INFO if success else logging.ERROR,
@@ -108,7 +110,7 @@ class JobDispatchService:
                 "enqueued" if success else "enqueue failed",
                 job_id,
                 product_id,
-                DIAGNOSIS_QUEUE_NAME,
+                DIAGNOSIS_QUEUE,
                 shop_id,
                 window,
             )
@@ -117,3 +119,31 @@ class JobDispatchService:
             _enqueue_diagnosis_job,
         )
         return job_id
+
+
+def _send_task(
+    *,
+    kwargs: dict[str, object],
+    queue_name: str,
+    task_id: str,
+    task_name: str,
+) -> bool:
+    try:
+        celery_app.send_task(
+            task_name,
+            kwargs=kwargs,
+            queue=queue_name,
+            task_id=task_id,
+        )
+        return True
+    except Exception as exc:
+        LOGGER.exception(
+            "task publish failed task_name=%s queue_name=%s job_id=%s product_id=%s shop_id=%s error=%s",
+            task_name,
+            queue_name,
+            task_id,
+            kwargs.get("product_id"),
+            kwargs.get("shop_id"),
+            exc,
+        )
+        return False

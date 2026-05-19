@@ -9,16 +9,18 @@
 
 Backend runtime boundaries:
 
-- Redis is process-scoped. Initialize it at app/worker startup and use `job_queue.enqueue_json(...)` instead of passing `redis_url` down call chains.
+- Celery publishes background work to Redis through `celery_app.celery_app`; keep dispatch in `services.job_dispatch` and do not reintroduce direct Redis-list queue helpers.
 - FastAPI database access is request-scoped through `db.get_db_session()`. The HTTP middleware owns session creation, automatic commit on successful responses, and rollback on errors.
 - HTTP routes that enqueue follow-up work should use `request.state.after_commit_callbacks` and pass that callback collection down instead of passing FastAPI `Request` objects into services.
-- Worker jobs should establish `db_session_context(session_factory)` at the job boundary and let lower layers consume `get_db_session()`.
+- Worker jobs should establish `tasks.runtime.task_session_context()` at the job boundary and let lower layers consume `get_db_session()`.
+- Celery task definitions, task runtime state, async job handlers, and due-shop scheduling live under `apps/server/src/tasks`; keep `celery_app.py` focused on Celery app configuration, routes, queues, and beat schedule.
 - A single ingest batch may resolve to multiple shop-local `stat_date` values; keep the deduplicated `stat_dates` set through persist, rollup, and enqueue rather than collapsing cross-midnight traffic to one server-date job.
-- Redis jobs are claimed into `:processing` queues and acknowledged or requeued explicitly; keep the `claim_json(...)` / `acknowledge_claimed_json(...)` / `restore_claimed_json(...)` flow instead of switching back to one-pop consumers.
+- Worker execution uses native Celery tasks with `acks_late`, `reject_on_worker_lost`, and `worker_prefetch_multiplier=1`. Keep `job_id` as the Celery `task_id` for enqueue/worker log correlation.
+- Legacy Redis-list payloads under `sku-lens:rollups` or `sku-lens:diagnoses` are not consumed by the Celery worker.
 - Persist event timestamps in UTC, but store each shop's IANA timezone on `shop_installations` and derive `stat_date` from the shop-local calendar day for ingestion, rollups, and analytics windows.
 - Shopify OAuth installations should normalize and persist Shopify's `iana_timezone`; if the timezone changes, recompute `last_completed_local_date` and `next_rollup_at_utc` instead of leaving the old schedule in place.
 - `init_db()` is allowed to reconcile additive `shop_installations` columns and widen `product_diagnoses.report_markdown` for legacy local databases so older dev volumes can pick up timezone, rollup metadata, and diagnosis text storage on startup. If the schema drift is larger than those compatibility fixes, prefer an explicit reset such as `docker compose down -v`.
-- Daily shop rollups are driven by `next_rollup_at_utc` plus `last_completed_local_date`; do not key worker scheduling off the process start time or an assumed global `00:00`.
+- Daily shop rollups are driven by the Celery Beat due-shop scanner plus `next_rollup_at_utc` and `last_completed_local_date`; do not key worker scheduling off the process start time or an assumed global `00:00`.
 - Application logs use standard Python `logging` configured through `logging.basicConfig(...)`, and Uvicorn access logs stay disabled in the Python dev entrypoints. Prefer `logging.getLogger(__name__)` plus ordinary `.info()`, `.warning()`, and `.exception()` calls over bespoke wrappers, `print(...)`, or raw `console.*`.
 - Preserve `X-SKU-Lens-Request-Id` propagation across FastAPI, Remix server fetches, and the storefront tracker when touching request flows. Queue payloads should keep `job_id` so enqueue and worker logs can be correlated.
 - Keep the supported analytics window values aligned end-to-end: `24h`, `7d`, and `30d`. The Remix loaders/resource routes now default to `24h` when `window` is missing or invalid, so do not silently reintroduce a `7d` fallback.
@@ -32,16 +34,17 @@ Avoid committing generated output such as `build/`, `dist/`, `coverage/`, `node_
 ## Build, Test, and Development Commands
 
 - `docker compose --env-file .env.example config`: render and validate the full dev stack before booting it.
-- `docker compose up --build`: start the full containerized development stack (`mysql`, `redis`, `server`, `worker`, `web`).
+- `docker compose up --build`: start the full containerized development stack (`mysql`, `redis`, `server`, `worker`, `worker-beat`, `web`).
 - `docker compose ps --all`: inspect containerized service status.
 - `docker compose up -d mysql redis`: start only MySQL and Redis for bare-metal development.
-- `docker compose logs -f web server worker`: follow containerized app logs.
-- `docker compose restart worker`: restart the worker after Python changes in containerized development.
+- `docker compose logs -f web server worker worker-beat`: follow containerized app logs.
+- `docker compose restart worker worker-beat`: restart Celery worker processes after Python task or schedule changes in containerized development.
 - `docker compose down`: stop the containerized stack.
 - `uv sync --directory apps/server --extra dev`: install Python 3.14 backend dependencies for bare-metal workflows.
 - `uv run --directory apps/server sku-lens-server`: run the backend outside Docker.
 - `uv run --directory apps/server sku-lens-seed-demo`: seed repeatable `demo.myshopify.com` board data and ready-made diagnosis cards for local UI testing.
-- `uv run --directory apps/server sku-lens-worker`: run the worker outside Docker.
+- `uv run --directory apps/server celery --app celery_app:celery_app worker --loglevel INFO --queues sku-lens:rollups,sku-lens:diagnoses`: run the Celery worker outside Docker.
+- `uv run --directory apps/server celery --app celery_app:celery_app beat --loglevel INFO`: run the single Celery Beat scheduler outside Docker.
 - `pnpm install`: install frontend dependencies for bare-metal workflows.
 - `pnpm dev`: run the admin app outside Docker.
 - `npm --prefix apps/web run test`: run web Vitest tests.
@@ -84,4 +87,4 @@ Keep subjects short, imperative, and scoped after the label, for example `feat: 
 
 ## Security & Configuration Tips
 
-Keep secrets in `.env` files only. `SHOPIFY_API_KEY` must be available so the admin shell can publish the App Bridge meta tag. `SHOPIFY_API_SECRET` backs Shopify OAuth callback and webhook HMAC verification; do not bypass those signature checks. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for generated diagnosis reports, and missing or placeholder AI keys should keep using the local fallback report. `INGEST_SHARED_SECRET` is required for the backend and worker to start, and `INGEST_TOKEN_TTL_SECONDS` bounds accepted ingest timestamps. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls API plus worker application logs. In local `.env`, keep host-facing URLs and connection strings on `localhost`; Docker Compose overrides container-internal service addresses. Do not store PII. Internal slugs such as `sku-lens`, queue names, and tracking headers are protocol identifiers; change them with cross-app updates.
+Keep secrets in `.env` files only. `SHOPIFY_API_KEY` must be available so the admin shell can publish the App Bridge meta tag. `SHOPIFY_API_SECRET` backs Shopify OAuth callback and webhook HMAC verification; do not bypass those signature checks. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for generated diagnosis reports, and missing or placeholder AI keys should keep using the local fallback report. `INGEST_SHARED_SECRET` is required for the backend and worker to start, and `INGEST_TOKEN_TTL_SECONDS` bounds accepted ingest timestamps. `REDIS_URL` is the default Celery broker URL; use `CELERY_BROKER_URL` only when the broker must intentionally differ. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls API plus worker application logs. In local `.env`, keep host-facing URLs and connection strings on `localhost`; Docker Compose overrides container-internal service addresses. Do not store PII. Internal slugs such as `sku-lens`, queue names, task names, and tracking headers are protocol identifiers; change them with cross-app updates.

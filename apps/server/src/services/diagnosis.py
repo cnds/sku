@@ -144,3 +144,20 @@ class ProductDiagnosisService:
             summary_json=cast(dict[str, str], summary_json),
             window=window,
         )
+
+    async def store_failed_report(
+        self,
+        *,
+        product_id: str,
+        shop_id: str,
+        snapshot_hash: str,
+        summary_json: dict[str, Any],
+        window: TimeWindow,
+    ) -> DiagnosisResult:
+        return await self._repository.store_failed_report(
+            product_id=product_id,
+            shop_id=shop_id,
+            snapshot_hash=snapshot_hash,
+            summary_json=summary_json,
+            window=window,
+        )
