@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Awaitable
+from collections.abc import AsyncGenerator, Coroutine
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 from sqlmodel.ext.asyncio.session import AsyncSession
 
@@ -74,7 +75,7 @@ async def close_task_runtime() -> None:
 
 
 @asynccontextmanager
-async def task_session_context() -> AsyncIterator[AsyncSession]:
+async def task_session_context() -> AsyncGenerator[AsyncSession]:
     runtime = get_task_runtime()
     async with db_session_context(runtime.session_factory) as session:
         try:
@@ -85,5 +86,5 @@ async def task_session_context() -> AsyncIterator[AsyncSession]:
             raise
 
 
-def run_coroutine[T](coroutine: Awaitable[T]) -> T:
+def run_coroutine[T](coroutine: Coroutine[Any, Any, T]) -> T:
     return asyncio.run(coroutine)
