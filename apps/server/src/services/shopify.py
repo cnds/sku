@@ -37,6 +37,11 @@ class InvalidShopifyOAuthCallbackError(Exception):
         super().__init__("Invalid Shopify OAuth callback signature.")
 
 
+class MissingShopifyOAuthCodeError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Missing Shopify OAuth authorization code.")
+
+
 class InvalidShopifyOAuthStateError(Exception):
     def __init__(self) -> None:
         super().__init__("Invalid Shopify OAuth state.")
@@ -72,8 +77,17 @@ def build_oauth_authorization_url(
     return f"https://{normalized_shop_domain}/admin/oauth/authorize?{query}"
 
 
-def build_onboarding_url(*, settings: Settings, shop_domain: str, window: str = "24h") -> str:
-    query = urlencode({"shop": normalize_shop_domain(shop_domain), "window": window})
+def build_onboarding_url(
+    *,
+    settings: Settings,
+    shop_domain: str,
+    window: str = "24h",
+    host: str | None = None,
+) -> str:
+    query_params = {"shop": normalize_shop_domain(shop_domain), "window": window}
+    if host:
+        query_params["host"] = host
+    query = urlencode(query_params)
     return f"{settings.shopify_app_url.rstrip('/')}/onboarding?{query}"
 
 
@@ -210,7 +224,7 @@ class ShopifyOAuthService:
         try:
             response = await client.post(
                 f"https://{shop_domain}/admin/oauth/access_token",
-                json={
+                data={
                     "client_id": self._settings.shopify_api_key,
                     "client_secret": self._settings.shopify_api_secret,
                     "code": code,

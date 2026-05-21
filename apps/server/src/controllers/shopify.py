@@ -11,6 +11,7 @@ from services.ingestion import EventIngestionService
 from services.shop_installations import ShopInstallationService
 from services.shopify import (
     SHOPIFY_OAUTH_STATE_COOKIE,
+    MissingShopifyOAuthCodeError,
     ShopifyInstallationCallbackService,
     ShopifyOrderWebhookService,
     build_oauth_authorization_url,
@@ -55,6 +56,8 @@ async def shopify_oauth_callback_browser(
     state: str | None = None,
 ) -> RedirectResponse:
     shop_domain = normalize_shop_domain(shop)
+    if not code:
+        raise MissingShopifyOAuthCodeError()
     verify_oauth_state(
         cookie_state=request.cookies.get(SHOPIFY_OAUTH_STATE_COOKIE),
         returned_state=state,
@@ -74,6 +77,7 @@ async def shopify_oauth_callback_browser(
         build_onboarding_url(
             settings=request.app.state.settings,
             shop_domain=installation.shop_domain,
+            host=request.query_params.get("host"),
         ),
         status_code=status.HTTP_307_TEMPORARY_REDIRECT,
     )

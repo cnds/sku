@@ -47,7 +47,8 @@ describe("product analysis route loader", () => {
     const payload = await loader({
       params: { productId: "product-1" },
       request: new Request(
-        "https://example.test/products/product-1?shop=test-shop.myshopify.com&window=7d",
+        "https://example.test/products/product-1?"
+        + "shop=test-shop.myshopify.com&window=7d&host=admin.shopify.com%2Fstore%2Ftest",
       ),
     } as never);
 
@@ -64,7 +65,9 @@ describe("product analysis route loader", () => {
         product_id: "product-1",
       },
       diagnosisPath:
-        "/resources/products/product-1/diagnosis?shop=test-shop.myshopify.com&window=7d",
+        "/resources/products/product-1/diagnosis?"
+        + "shop=test-shop.myshopify.com&window=7d&host=admin.shopify.com%2Fstore%2Ftest",
+      host: "admin.shopify.com/store/test",
       productId: "product-1",
       shopId: "test-shop.myshopify.com",
       window: "7d",

@@ -25,7 +25,7 @@ from services.shop_time import ensure_utc_datetime, local_date_for_shop
 LOGGER = logging.getLogger(__name__)
 
 DEFAULT_PUBLIC_TOKEN = "demo-public-token"  # noqa: S105 - demo seed uses a local public token value.
-DEFAULT_SHOP_DOMAIN = "demo.myshopify.com"
+DEFAULT_SHOP_DOMAIN = "sku-dev-uaop8pff.myshopify.com"
 DEFAULT_TIMEZONE = "UTC"
 DEFAULT_WEB_BASE_URL = "http://localhost:3000"
 

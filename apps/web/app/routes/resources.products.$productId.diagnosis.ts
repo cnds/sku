@@ -3,11 +3,12 @@ import type { ActionFunctionArgs, LoaderFunctionArgs } from "@remix-run/node";
 import { ApiError, createDiagnosis, fetchDiagnosis, parseTimeWindow } from "@/lib/api.server";
 import type { ProductSnapshot } from "@/lib/contracts";
 import { requestIdFromHeaders } from "@/lib/logging";
+import { shopIdFromUrl } from "@/lib/shop";
 
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const requestId = requestIdFromHeaders(request.headers);
-  const shopId = url.searchParams.get("shop") ?? "demo.myshopify.com";
+  const shopId = shopIdFromUrl(url);
   const window = parseTimeWindow(url.searchParams.get("window"));
   const productId = params.productId ?? "";
 
@@ -26,7 +27,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 export async function action({ params, request }: ActionFunctionArgs) {
   const url = new URL(request.url);
   const requestId = requestIdFromHeaders(request.headers);
-  const shopId = url.searchParams.get("shop") ?? "demo.myshopify.com";
+  const shopId = shopIdFromUrl(url);
   const window = parseTimeWindow(url.searchParams.get("window"));
   const force = url.searchParams.get("force") === "true";
   const productId = params.productId ?? "";

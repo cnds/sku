@@ -154,6 +154,7 @@ async def test_oauth_callback_installs_shop_and_redirects_to_onboarding(
 
     params = {
         "code": "oauth-code",
+        "host": "admin.shopify.com/store/demo",
         "shop": "demo.myshopify.com",
         "state": "state-1",
         "timestamp": "1700000000",
@@ -173,7 +174,8 @@ async def test_oauth_callback_installs_shop_and_redirects_to_onboarding(
 
     assert response.status_code == 307
     assert response.headers["location"] == (
-        "https://app.example.test/onboarding?shop=demo.myshopify.com&window=24h"
+        "https://app.example.test/onboarding?"
+        "shop=demo.myshopify.com&window=24h&host=admin.shopify.com%2Fstore%2Fdemo"
     )
     assert response.cookies.get("sku_lens_oauth_state") is None
 
@@ -188,6 +190,35 @@ async def test_oauth_callback_installs_shop_and_redirects_to_onboarding(
 
     assert installation.access_token == expected_oauth_value
     assert installation.timezone_name == "America/New_York"
+
+
+@pytest.mark.asyncio
+async def test_oauth_callback_requires_authorization_code(
+    sqlite_database_url: str,
+    redis_url: str,
+) -> None:
+    settings = _settings(sqlite_database_url, redis_url)
+    app = create_app(settings)
+    params = {
+        "shop": "demo.myshopify.com",
+        "state": "state-1",
+        "timestamp": "1700000000",
+    }
+    params["hmac"] = build_shopify_oauth_hmac(settings.shopify_api_secret, params)
+
+    async with AsyncClient(
+        follow_redirects=False,
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        client.cookies.set("sku_lens_oauth_state", "state-1")
+        response = await client.get(
+            "/shopify/oauth/callback",
+            params=params,
+        )
+
+    assert response.status_code == 400
+    assert response.json() == {"detail": "Missing Shopify OAuth authorization code."}
 
 
 @pytest.mark.asyncio

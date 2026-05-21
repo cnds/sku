@@ -22,12 +22,14 @@ import { fetchIntegrationHealth, fetchLeaderboard, fetchPriorities, parseTimeWin
 import type { IntegrationHealthResponse, PriorityCard, PriorityTrendState, TimeWindow } from "@/lib/contracts";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
+import { hostFromUrl, shopIdFromUrl } from "@/lib/shop";
 import { dashboardPath, productPath } from "@/lib/url";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const requestId = requestIdFromHeaders(request.headers);
-  const shopId = url.searchParams.get("shop") ?? "demo.myshopify.com";
+  const shopId = shopIdFromUrl(url);
+  const host = hostFromUrl(url);
   const window = parseTimeWindow(url.searchParams.get("window"));
   const [health, priorities, blackboard, redboard] = await Promise.all([
     fetchIntegrationHealth({ requestId, shopId, window }),
@@ -36,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     fetchLeaderboard({ board: "red", requestId, shopId, window }),
   ]);
 
-  return { blackboard, health, priorities, redboard, shopId, window };
+  return { blackboard, health, host, priorities, redboard, shopId, window };
 }
 
 function priorityBoardLabel(board: PriorityCard["board"]): string {
@@ -156,10 +158,12 @@ export function readinessBannerContent(
 
 function PriorityCards({
   cards,
+  host,
   shopId,
   window,
 }: {
   cards: PriorityCard[];
+  host?: string;
   shopId: string;
   window: TimeWindow;
 }) {
@@ -186,7 +190,7 @@ function PriorityCards({
             <BlockStack gap="100">
               <Text as="h3" variant="headingMd">
                 <a
-                  href={productPath(card.product_id, shopId, window)}
+                  href={productPath(card.product_id, shopId, window, host)}
                   style={{ color: "var(--p-color-text)", textDecoration: "none" }}
                 >
                   {card.product_id}
@@ -240,10 +244,10 @@ export default function DashboardRoute() {
     (index: number) => {
       const tab = tabs[index];
       if (tab) {
-        void navigate(dashboardPath(data.shopId, tab.id));
+        void navigate(dashboardPath(data.shopId, tab.id, data.host));
       }
     },
-    [data.shopId, navigate, tabs],
+    [data.host, data.shopId, navigate, tabs],
   );
 
   const totalTracked = data.blackboard.length + data.redboard.length;
@@ -257,7 +261,7 @@ export default function DashboardRoute() {
       primaryAction={{
         content: messages.dashboard.viewTopProduct,
         url: primaryProductId
-          ? productPath(primaryProductId, data.shopId, data.window)
+          ? productPath(primaryProductId, data.shopId, data.window, data.host)
           : undefined,
         disabled: !primaryProductId,
       }}
@@ -285,11 +289,17 @@ export default function DashboardRoute() {
                       {messages.dashboard.prioritiesSubtitle}
                     </Text>
                   </BlockStack>
-                  <PriorityCards cards={data.priorities} shopId={data.shopId} window={data.window} />
+                  <PriorityCards
+                    cards={data.priorities}
+                    host={data.host}
+                    shopId={data.shopId}
+                    window={data.window}
+                  />
                   <BlockStack gap="300">
                     <Text as="h2" variant="headingMd">{messages.dashboard.viewMoreProducts}</Text>
                     <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
                       <LeaderboardTable
+                        host={data.host}
                         rows={data.redboard}
                         shopId={data.shopId}
                         title={messages.dashboard.redboardTitle}
@@ -298,6 +308,7 @@ export default function DashboardRoute() {
                         window={data.window}
                       />
                       <LeaderboardTable
+                        host={data.host}
                         rows={data.blackboard}
                         shopId={data.shopId}
                         title={messages.dashboard.blackboardTitle}

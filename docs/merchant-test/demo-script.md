@@ -2,7 +2,7 @@
 
 ## Setup
 
-Use `demo.myshopify.com` or a real test shop with the theme app embed enabled. Start on `/onboarding?shop=<shop>&window=24h`, then open the board.
+Use `sku-dev-uaop8pff.myshopify.com` or a real test shop with the theme app embed enabled. Start on `/onboarding?shop=<shop>&window=24h`, then open the board.
 
 ## Walkthrough
 

@@ -45,7 +45,7 @@ Avoid committing generated output such as `build/`, `dist/`, `coverage/`, `node_
 - `docker compose down`: stop the containerized stack.
 - `uv sync --directory apps/server --extra dev`: install Python 3.14 backend dependencies for bare-metal workflows.
 - `uv run --directory apps/server sku-lens-server`: run the backend outside Docker.
-- `uv run --directory apps/server sku-lens-seed-demo`: seed repeatable `demo.myshopify.com` board data and ready-made diagnosis cards for local UI testing.
+- `uv run --directory apps/server sku-lens-seed-demo`: seed repeatable `sku-dev-uaop8pff.myshopify.com` board data and ready-made diagnosis cards for local UI testing.
 - `uv run --directory apps/server celery --app celery_app:celery_app worker --loglevel INFO --queues sku-lens:rollups,sku-lens:diagnoses`: run the Celery worker outside Docker.
 - `uv run --directory apps/server celery --app celery_app:celery_app beat --loglevel INFO`: run the single Celery Beat scheduler outside Docker.
 - `pnpm install`: install frontend dependencies for bare-metal workflows.
@@ -87,8 +87,6 @@ Keep subjects short, imperative, and scoped after the label, for example `feat: 
 
 - a brief summary of user-visible changes
 - affected apps (`server`, `web`, `extension`)
-- exact verification commands run
-- screenshots for UI changes
 
 ## Security & Configuration Tips
 

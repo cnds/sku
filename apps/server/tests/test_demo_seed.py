@@ -10,7 +10,7 @@ from config import Settings
 from db import create_session_factory
 from main import create_app
 from models import DailyProductStat, ProductDiagnosis, RawEvent
-from seed_demo import seed_demo_data
+from seed_demo import DEFAULT_SHOP_DOMAIN, seed_demo_data
 
 
 def _settings(sqlite_database_url: str) -> Settings:
@@ -39,6 +39,8 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
         now_utc=now_utc,
     )
 
+    assert DEFAULT_SHOP_DOMAIN == "sku-dev-uaop8pff.myshopify.com"
+
     app = create_app(settings)
 
     async with AsyncClient(
@@ -49,7 +51,7 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
             "/api/leaderboard",
             params={
                 "board": "black",
-                "shop_id": "demo.myshopify.com",
+                "shop_id": DEFAULT_SHOP_DOMAIN,
                 "window": "24h",
             },
         )
@@ -57,21 +59,21 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
             "/api/leaderboard",
             params={
                 "board": "red",
-                "shop_id": "demo.myshopify.com",
+                "shop_id": DEFAULT_SHOP_DOMAIN,
                 "window": "24h",
             },
         )
         priorities = await client.get(
             "/api/priorities",
-            params={"shop_id": "demo.myshopify.com", "window": "24h"},
+            params={"shop_id": DEFAULT_SHOP_DOMAIN, "window": "24h"},
         )
         analysis = await client.get(
             "/api/products/demo-size-confidence-leaker/analysis",
-            params={"shop_id": "demo.myshopify.com", "window": "24h"},
+            params={"shop_id": DEFAULT_SHOP_DOMAIN, "window": "24h"},
         )
         diagnosis = await client.get(
             "/api/products/demo-size-confidence-leaker/diagnosis",
-            params={"shop_id": "demo.myshopify.com", "window": "24h"},
+            params={"shop_id": DEFAULT_SHOP_DOMAIN, "window": "24h"},
         )
 
     assert blackboard.status_code == 200
@@ -97,7 +99,7 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
         daily_stats = (
             await session.exec(
                 select(DailyProductStat).where(
-                    DailyProductStat.shop_id == "demo.myshopify.com"
+                    DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN
                 )
             )
         ).all()
@@ -124,18 +126,18 @@ async def test_seed_demo_data_is_idempotent_for_demo_products(
     async with session_factory() as session:
         first_raw_events = (
             await session.exec(
-                select(RawEvent).where(RawEvent.shop_id == "demo.myshopify.com")
+                select(RawEvent).where(RawEvent.shop_id == DEFAULT_SHOP_DOMAIN)
             )
         ).all()
         first_daily_stats = (
             await session.exec(
-                select(DailyProductStat).where(DailyProductStat.shop_id == "demo.myshopify.com")
+                select(DailyProductStat).where(DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN)
             )
         ).all()
         first_diagnoses = (
             await session.exec(
                 select(ProductDiagnosis).where(
-                    ProductDiagnosis.shop_id == "demo.myshopify.com"
+                    ProductDiagnosis.shop_id == DEFAULT_SHOP_DOMAIN
                 )
             )
         ).all()
@@ -148,18 +150,18 @@ async def test_seed_demo_data_is_idempotent_for_demo_products(
     async with session_factory() as session:
         second_raw_events = (
             await session.exec(
-                select(RawEvent).where(RawEvent.shop_id == "demo.myshopify.com")
+                select(RawEvent).where(RawEvent.shop_id == DEFAULT_SHOP_DOMAIN)
             )
         ).all()
         second_daily_stats = (
             await session.exec(
-                select(DailyProductStat).where(DailyProductStat.shop_id == "demo.myshopify.com")
+                select(DailyProductStat).where(DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN)
             )
         ).all()
         second_diagnoses = (
             await session.exec(
                 select(ProductDiagnosis).where(
-                    ProductDiagnosis.shop_id == "demo.myshopify.com"
+                    ProductDiagnosis.shop_id == DEFAULT_SHOP_DOMAIN
                 )
             )
         ).all()

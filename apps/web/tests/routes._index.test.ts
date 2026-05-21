@@ -47,7 +47,7 @@ describe("dashboard route loader", () => {
   it("loads today's priority cards from the backend priority API", async () => {
     const payload = await loader({
       request: new Request(
-        "https://example.test/?shop=test-shop.myshopify.com&window=24h",
+        "https://example.test/?shop=test-shop.myshopify.com&window=24h&host=admin.shopify.com%2Fstore%2Ftest",
       ),
     } as never);
 
@@ -66,8 +66,21 @@ describe("dashboard route loader", () => {
       health: {
         status: "not_connected",
       },
+      host: "admin.shopify.com/store/test",
       priorities: [],
       shopId: "test-shop.myshopify.com",
+      window: "24h",
+    });
+  });
+
+  it("defaults local board requests to the configured test shop", async () => {
+    await loader({
+      request: new Request("https://example.test/?window=24h"),
+    } as never);
+
+    expect(fetchPrioritiesMock).toHaveBeenCalledWith({
+      requestId: expect.any(String),
+      shopId: "sku-dev-uaop8pff.myshopify.com",
       window: "24h",
     });
   });

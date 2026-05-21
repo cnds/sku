@@ -3,6 +3,7 @@ import type { ActionFunctionArgs } from "@remix-run/node";
 import { parseTimeWindow, postRecommendationFeedback } from "@/lib/api.server";
 import type { RecommendationFeedbackAction } from "@/lib/contracts";
 import { requestIdFromHeaders } from "@/lib/logging";
+import { shopIdFromForm } from "@/lib/shop";
 
 const ACTIONS = new Set<RecommendationFeedbackAction>([
   "will_try",
@@ -23,7 +24,7 @@ export async function action({ request }: ActionFunctionArgs) {
     board: nullableString(form.get("board")),
     productId: String(form.get("product_id") ?? ""),
     requestId: requestIdFromHeaders(request.headers),
-    shopId: String(form.get("shop_id") ?? "demo.myshopify.com"),
+    shopId: shopIdFromForm(form.get("shop_id")),
     window: parseTimeWindow(nullableString(form.get("window"))),
   });
   return Response.json(response);

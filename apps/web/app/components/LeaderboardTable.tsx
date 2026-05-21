@@ -14,6 +14,7 @@ import { productPath } from "@/lib/url";
 type ActivityRow = Pick<LeaderboardEntry, "add_to_carts" | "orders" | "views">;
 
 interface LeaderboardTableProps {
+  host?: string;
   rows: LeaderboardEntry[];
   shopId: string;
   title: string;
@@ -35,6 +36,7 @@ export function formatLeaderboardActivity(row: ActivityRow): string {
 }
 
 export function LeaderboardTable({
+  host,
   rows,
   shopId,
   title,
@@ -96,7 +98,7 @@ export function LeaderboardTable({
             <IndexTable.Cell>
               <Text as="span" variant="bodyMd" fontWeight="semibold">
                 <a
-                  href={productPath(row.product_id, shopId, window)}
+                  href={productPath(row.product_id, shopId, window, host)}
                   style={{ color: "var(--p-color-text-link)", textDecoration: "none" }}
                 >
                   {row.product_id}

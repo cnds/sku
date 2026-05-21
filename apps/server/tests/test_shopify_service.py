@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+import httpx
 import pytest
 
 from config import Settings
@@ -10,6 +11,7 @@ from security.shopify import build_shopify_oauth_hmac
 from services.shopify import (
     InvalidShopifyOAuthCallbackError,
     ShopifyInstallationCallbackService,
+    ShopifyOAuthService,
     ShopifyOrderWebhookService,
 )
 
@@ -141,3 +143,30 @@ async def test_shopify_installation_callback_service_rejects_unsigned_callback()
         )
 
     assert str(exc_info.value) == "Invalid Shopify OAuth callback signature."
+
+
+@pytest.mark.asyncio
+async def test_shopify_oauth_service_exchanges_access_token_with_form_encoded_body() -> None:
+    captured_request: httpx.Request | None = None
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal captured_request
+        captured_request = request
+        return httpx.Response(200, json={"access_token": "access-1"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        received = await ShopifyOAuthService(
+            _settings(),
+            http_client=client,
+        ).exchange_access_token(
+            code="oauth-code",
+            shop_domain="demo.myshopify.com",
+        )
+
+    assert received == "access-1"
+    assert captured_request is not None
+    assert str(captured_request.url) == "https://demo.myshopify.com/admin/oauth/access_token"
+    assert captured_request.headers["content-type"] == "application/x-www-form-urlencoded"
+    assert captured_request.content == (
+        b"client_id=shopify-key&client_secret=shopify-secret&code=oauth-code"
+    )

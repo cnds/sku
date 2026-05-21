@@ -8,6 +8,7 @@ import { formatTimeWindowLabel } from "@/lib/analytics";
 import { fetchProductAnalysis, parseTimeWindow } from "@/lib/api.server";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
+import { hostFromUrl, shopIdFromUrl } from "@/lib/shop";
 import { dashboardPath, diagnosisResourcePath } from "@/lib/url";
 
 export function boardLabelForGap(gapValue: number): { label: string; tone: "critical" | "success" } {
@@ -44,14 +45,16 @@ export function ErrorBoundary() {
 export async function loader({ params, request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const requestId = requestIdFromHeaders(request.headers);
-  const shopId = url.searchParams.get("shop") ?? "demo.myshopify.com";
+  const shopId = shopIdFromUrl(url);
+  const host = hostFromUrl(url);
   const window = parseTimeWindow(url.searchParams.get("window"));
   const productId = params.productId ?? "";
   const analysis = await fetchProductAnalysis({ productId, requestId, shopId, window });
 
   return {
     analysis,
-    diagnosisPath: diagnosisResourcePath(productId, shopId, window),
+    diagnosisPath: diagnosisResourcePath(productId, shopId, window, host),
+    host,
     productId,
     shopId,
     window,
@@ -65,7 +68,7 @@ export default function ProductAnalysisRoute() {
   return (
     <Page
       title={data.productId}
-      backAction={{ content: messages.product.backAction, url: dashboardPath(data.shopId, data.window) }}
+      backAction={{ content: messages.product.backAction, url: dashboardPath(data.shopId, data.window, data.host) }}
       titleMetadata={
         <InlineStack gap="200">
           <Badge tone={board.tone}>{board.label}</Badge>

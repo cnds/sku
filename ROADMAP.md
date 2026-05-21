@@ -119,7 +119,7 @@ The core product promise is:
 
 ### 5. Demo And Delivery Readiness
 
-- [x] The repo can seed a repeatable demo shop at `demo.myshopify.com`.
+- [x] The repo can seed a repeatable demo shop at `sku-dev-uaop8pff.myshopify.com`.
 - [x] Demo seed data includes product behavior, priority-board inputs, product analysis inputs, and ready-made diagnosis cards.
 - [x] The demo tells three fixed stories: a size-confidence Leaker, a media/trust Leaker, and a Hidden Winner.
 - [x] Demo component data includes stable PDP labels for description, shipping/returns, and recommendations.

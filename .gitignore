@@ -17,6 +17,7 @@ __pycache__/
 *.log
 *.pyc
 *.sqlite
+celerybeat-schedule*
 build/
 coverage/
 dist/

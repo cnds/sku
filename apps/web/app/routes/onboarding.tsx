@@ -18,15 +18,17 @@ import { fetchOnboardingStatus, parseTimeWindow } from "@/lib/api.server";
 import type { OnboardingChecklistItem } from "@/lib/contracts";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
+import { hostFromUrl, shopIdFromUrl } from "@/lib/shop";
 import { dashboardPath } from "@/lib/url";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const requestId = requestIdFromHeaders(request.headers);
-  const shopId = url.searchParams.get("shop") ?? "demo.myshopify.com";
+  const shopId = shopIdFromUrl(url);
+  const host = hostFromUrl(url);
   const window = parseTimeWindow(url.searchParams.get("window"));
   const status = await fetchOnboardingStatus({ requestId, shopId, window });
-  return { shopId, status, window };
+  return { host, shopId, status, window };
 }
 
 function checklistTone(item: OnboardingChecklistItem): "attention" | "info" | "success" {
@@ -49,10 +51,10 @@ export default function OnboardingRoute() {
     <Page
       title="SKU Lens setup"
       subtitle={`${data.shopId} · ${formatTimeWindowLabel(data.window)}`}
-      backAction={{ content: messages.product.backAction, url: dashboardPath(data.shopId, data.window) }}
+      backAction={{ content: messages.product.backAction, url: dashboardPath(data.shopId, data.window, data.host) }}
       primaryAction={{
         content: "Open board",
-        url: dashboardPath(data.shopId, data.window),
+        url: dashboardPath(data.shopId, data.window, data.host),
       }}
     >
       <Layout>
