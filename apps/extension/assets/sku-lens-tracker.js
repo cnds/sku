@@ -133,10 +133,19 @@
     ".product__media-list",
     ".product__media-wrapper",
     ".product-media",
+    ".product-single__media-wrapper",
+    ".product-single__media-group",
+    ".Product__Slideshow",
+    ".Product__SlideshowNav",
     ".product__description",
+    ".product-single__description",
+    ".ProductMeta__Description",
     ".product__accordion",
     ".product__details",
     ".product__info-container",
+    ".product-single__meta",
+    ".ProductForm",
+    ".ProductForm__Variants",
     ".product-recommendations",
     ".related-products",
     "product-recommendations",
@@ -266,6 +275,10 @@
       element.closest(".product__media-list") ||
       element.closest(".product__media-wrapper") ||
       element.closest(".product-media") ||
+      element.closest(".product-single__media-wrapper") ||
+      element.closest(".product-single__media-group") ||
+      element.closest(".Product__Slideshow") ||
+      element.closest(".Product__SlideshowNav") ||
       element.closest("[data-media-id]")
     ) return "product_media";
 

@@ -53,6 +53,8 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
       INGEST_TOKEN_TTL_SECONDS: ${INGEST_TOKEN_TTL_SECONDS:-300}
+      SKU_LENS_LOG_LEVEL: ${SKU_LENS_LOG_LEVEL:-INFO}
+      SKU_LENS_INTERNAL_REVIEW: ${SKU_LENS_INTERNAL_REVIEW:-0}
     command: ["sh", "/workspace/scripts/dev-server.sh"]
     healthcheck:
       test:
@@ -94,6 +96,8 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
       INGEST_TOKEN_TTL_SECONDS: ${INGEST_TOKEN_TTL_SECONDS:-300}
+      SKU_LENS_LOG_LEVEL: ${SKU_LENS_LOG_LEVEL:-INFO}
+      SKU_LENS_INTERNAL_REVIEW: ${SKU_LENS_INTERNAL_REVIEW:-0}
     command: ["sh", "/workspace/scripts/dev-worker.sh"]
     init: true
     volumes:
@@ -123,6 +127,8 @@ services:
       AI_BASE_URL: ${AI_BASE_URL:-https://api.openai.com/v1}
       INGEST_SHARED_SECRET: ${INGEST_SHARED_SECRET:?set INGEST_SHARED_SECRET in .env}
       INGEST_TOKEN_TTL_SECONDS: ${INGEST_TOKEN_TTL_SECONDS:-300}
+      SKU_LENS_LOG_LEVEL: ${SKU_LENS_LOG_LEVEL:-INFO}
+      SKU_LENS_INTERNAL_REVIEW: ${SKU_LENS_INTERNAL_REVIEW:-0}
     command: ["sh", "/workspace/scripts/dev-worker-beat.sh"]
     init: true
     volumes:

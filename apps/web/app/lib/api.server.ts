@@ -1,11 +1,15 @@
 import type {
   DiagnosisResult,
+  InternalCardReviewResponse,
   IntegrationHealthResponse,
   LeaderboardEntry,
   LeaderboardType,
+  OnboardingStatusResponse,
   PriorityCard,
   ProductAnalysisResult,
   ProductSnapshot,
+  RecommendationFeedbackAction,
+  RecommendationFeedbackResponse,
   TimeWindow,
 } from "@/lib/contracts";
 import { snapshotFromAnalysis } from "@/lib/diagnosis";
@@ -71,6 +75,65 @@ export async function fetchIntegrationHealth(args: {
     {
       requestId: args.requestId,
       route: "integration_health",
+    },
+  );
+}
+
+export async function fetchOnboardingStatus(args: {
+  requestId: string;
+  shopId: string;
+  window: TimeWindow;
+}): Promise<OnboardingStatusResponse> {
+  return fetchJson<OnboardingStatusResponse>(
+    apiPath("/api/onboarding/status", shopParams(args.shopId, args.window)),
+    {
+      requestId: args.requestId,
+      route: "onboarding_status",
+    },
+  );
+}
+
+export async function postRecommendationFeedback(args: {
+  action: RecommendationFeedbackAction;
+  board?: string | null;
+  productId: string;
+  requestId: string;
+  shopId: string;
+  window: TimeWindow;
+}): Promise<RecommendationFeedbackResponse> {
+  const body: Record<string, string> = {
+    action: args.action,
+    product_id: args.productId,
+    shop_id: args.shopId,
+    window: args.window,
+  };
+  if (args.board) {
+    body.board = args.board;
+  }
+  return fetchJson<RecommendationFeedbackResponse>(
+    "/api/recommendation-feedback",
+    {
+      requestId: args.requestId,
+      route: "recommendation_feedback",
+    },
+    {
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
+  );
+}
+
+export async function fetchInternalCardReview(args: {
+  requestId: string;
+  shopId: string;
+  window: TimeWindow;
+}): Promise<InternalCardReviewResponse> {
+  return fetchJson<InternalCardReviewResponse>(
+    apiPath("/api/internal/card-review", shopParams(args.shopId, args.window)),
+    {
+      requestId: args.requestId,
+      route: "internal_card_review",
     },
   );
 }

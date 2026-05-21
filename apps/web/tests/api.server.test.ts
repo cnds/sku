@@ -4,9 +4,12 @@ import {
   ApiError,
   createDiagnosis,
   fetchDiagnosis,
+  fetchInternalCardReview,
   fetchIntegrationHealth,
+  fetchOnboardingStatus,
   fetchPriorities,
   fetchProductAnalysis,
+  postRecommendationFeedback,
 } from "../app/lib/api.server";
 
 describe("api.server logging", () => {
@@ -165,6 +168,124 @@ describe("api.server logging", () => {
 
     expect(String(url)).toBe("http://localhost:8000/api/integration/health?shop_id=shop-1&window=24h");
     expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-health");
+  });
+
+  it("fetches onboarding status from the backend onboarding endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          app_embed_deep_link: "https://demo.myshopify.com/admin/themes/current/editor?context=apps",
+          checklist: [],
+          ingest_endpoint: "https://api.example.test/ingest/events",
+          installed: false,
+          integration_health: {
+            checks: [],
+            coverage: {
+              add_to_carts: 0,
+              clicks: 0,
+              component_clicks: 0,
+              impressions: 0,
+              orders: 0,
+              views: 0,
+            },
+            last_event_at: null,
+            status: "not_connected",
+          },
+          last_raw_event_at: null,
+          public_token: null,
+          shop_id: "demo.myshopify.com",
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        },
+      ),
+    ) as typeof fetch;
+
+    await fetchOnboardingStatus({
+      requestId: "req-onboarding",
+      shopId: "demo.myshopify.com",
+      window: "24h",
+    });
+
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] ?? [];
+    const headers = new Headers(init?.headers);
+
+    expect(String(url)).toBe(
+      "http://localhost:8000/api/onboarding/status?shop_id=demo.myshopify.com&window=24h",
+    );
+    expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-onboarding");
+  });
+
+  it("posts lightweight recommendation feedback to the backend", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          accepted: true,
+          latest_action: "will_try",
+          product_id: "product-1",
+          shop_id: "demo.myshopify.com",
+          window: "24h",
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 201,
+        },
+      ),
+    ) as typeof fetch;
+
+    await postRecommendationFeedback({
+      action: "will_try",
+      board: "leaker",
+      productId: "product-1",
+      requestId: "req-feedback",
+      shopId: "demo.myshopify.com",
+      window: "24h",
+    });
+
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] ?? [];
+    const headers = new Headers(init?.headers);
+
+    expect(String(url)).toBe("http://localhost:8000/api/recommendation-feedback");
+    expect(init?.method).toBe("POST");
+    expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-feedback");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      action: "will_try",
+      board: "leaker",
+      product_id: "product-1",
+      shop_id: "demo.myshopify.com",
+      window: "24h",
+    });
+  });
+
+  it("fetches internal card review data from the gated review endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          cards: [],
+          shop_id: "demo.myshopify.com",
+          window: "24h",
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        },
+      ),
+    ) as typeof fetch;
+
+    await fetchInternalCardReview({
+      requestId: "req-review",
+      shopId: "demo.myshopify.com",
+      window: "24h",
+    });
+
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] ?? [];
+    const headers = new Headers(init?.headers);
+
+    expect(String(url)).toBe(
+      "http://localhost:8000/api/internal/card-review?shop_id=demo.myshopify.com&window=24h",
+    );
+    expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-review");
   });
 
   it("passes force=true when manually rerunning diagnosis", async () => {

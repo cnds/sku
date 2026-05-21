@@ -41,6 +41,7 @@ sku-lens-seed-demo = "seed_demo:main"
 only-include = [
   "src/celery_app.py",
   "src/config.py",
+  "src/controllers",
   "src/db.py",
   "src/logging_utils.py",
   "src/main.py",

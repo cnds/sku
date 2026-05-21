@@ -26,6 +26,13 @@ class DiagnosisStatus(StrEnum):
     FAILED = "failed"
 
 
+class RecommendationFeedbackAction(StrEnum):
+    WILL_TRY = "will_try"
+    NOT_USEFUL = "not_useful"
+    ALREADY_FIXED = "already_fixed"
+    REMIND_LATER = "remind_later"
+
+
 class RawEvent(SQLModel, table=True):
     __tablename__ = "raw_events"
 
@@ -108,3 +115,19 @@ class ShopInstallation(SQLModel, table=True):
     installed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     last_completed_local_date: date | None = Field(default=None, index=True)
     next_rollup_at_utc: datetime | None = Field(default=None, index=True)
+
+
+class RecommendationFeedback(SQLModel, table=True):
+    __tablename__ = "recommendation_feedback"
+
+    id: int | None = Field(default=None, primary_key=True)
+    shop_id: str = Field(index=True)
+    product_id: str = Field(index=True)
+    window: str = Field(index=True)
+    board: str | None = Field(default=None, index=True)
+    action: str = Field(index=True)
+    context_json: dict[str, Any] = Field(
+        default_factory=dict,
+        sa_column=Column(JSON, nullable=False),
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)

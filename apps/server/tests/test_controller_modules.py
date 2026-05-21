@@ -103,7 +103,11 @@ def test_shopify_routes_are_owned_by_shopify_controller(
 ) -> None:
     app = create_app(_settings(sqlite_database_url, redis_url))
 
+    assert _route_entries(app, "/shopify/oauth/start") == [
+        (("GET",), "controllers.shopify"),
+    ]
     assert _route_entries(app, "/shopify/oauth/callback") == [
+        (("GET",), "controllers.shopify"),
         (("POST",), "controllers.shopify"),
     ]
     assert _route_entries(app, "/shopify/webhooks/orders/create") == [
@@ -118,13 +122,18 @@ def test_all_business_routes_are_owned_by_controller_modules(
     app = create_app(_settings(sqlite_database_url, redis_url))
     expected = {
         ("/api/integration/health", ("GET",), "controllers.analytics"),
+        ("/api/internal/card-review", ("GET",), "controllers.merchant_readiness"),
         ("/api/leaderboard", ("GET",), "controllers.analytics"),
+        ("/api/onboarding/status", ("GET",), "controllers.merchant_readiness"),
         ("/api/priorities", ("GET",), "controllers.analytics"),
         ("/api/products/{product_id}/analysis", ("GET",), "controllers.analytics"),
         ("/api/products/{product_id}/diagnosis", ("GET",), "controllers.diagnosis"),
         ("/api/products/{product_id}/diagnosis", ("POST",), "controllers.diagnosis"),
+        ("/api/recommendation-feedback", ("POST",), "controllers.merchant_readiness"),
         ("/ingest/events", ("POST",), "controllers.ingestion"),
+        ("/shopify/oauth/callback", ("GET",), "controllers.shopify"),
         ("/shopify/oauth/callback", ("POST",), "controllers.shopify"),
+        ("/shopify/oauth/start", ("GET",), "controllers.shopify"),
         ("/shopify/webhooks/orders/create", ("POST",), "controllers.shopify"),
     }
     actual = {

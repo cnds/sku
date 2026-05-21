@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import re
 import secrets
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from typing import Any
+from urllib.parse import urlencode
 
 import httpx
 
@@ -14,6 +16,10 @@ from schemas import IngestEvent
 from security.shopify import verify_shopify_oauth_hmac
 from services.shop_installations import ShopInstallationService
 from services.shop_time import local_date_for_shop, normalize_shop_timezone
+
+SHOPIFY_OAUTH_STATE_COOKIE = "sku_lens_oauth_state"
+APP_EMBED_BLOCK_HANDLE = "sku-lens-tracker"
+SHOP_DOMAIN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
 
 
 @dataclass(slots=True)
@@ -29,6 +35,73 @@ class ShopifyOrderIngestionBatch:
 class InvalidShopifyOAuthCallbackError(Exception):
     def __init__(self) -> None:
         super().__init__("Invalid Shopify OAuth callback signature.")
+
+
+class InvalidShopifyOAuthStateError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Invalid Shopify OAuth state.")
+
+
+class InvalidShopifyShopDomainError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Invalid Shopify shop domain.")
+
+
+def normalize_shop_domain(shop_domain: str) -> str:
+    normalized = shop_domain.strip().lower()
+    if not SHOP_DOMAIN_PATTERN.fullmatch(normalized):
+        raise InvalidShopifyShopDomainError()
+    return normalized
+
+
+def build_oauth_authorization_url(
+    *,
+    settings: Settings,
+    shop_domain: str,
+    state: str,
+) -> str:
+    normalized_shop_domain = normalize_shop_domain(shop_domain)
+    query = urlencode(
+        {
+            "client_id": settings.shopify_api_key,
+            "scope": settings.shopify_scopes,
+            "redirect_uri": f"{settings.shopify_webhook_base_url.rstrip('/')}/shopify/oauth/callback",
+            "state": state,
+        }
+    )
+    return f"https://{normalized_shop_domain}/admin/oauth/authorize?{query}"
+
+
+def build_onboarding_url(*, settings: Settings, shop_domain: str, window: str = "24h") -> str:
+    query = urlencode({"shop": normalize_shop_domain(shop_domain), "window": window})
+    return f"{settings.shopify_app_url.rstrip('/')}/onboarding?{query}"
+
+
+def build_ingest_endpoint(settings: Settings) -> str:
+    return f"{settings.shopify_webhook_base_url.rstrip('/')}/ingest/events"
+
+
+def build_app_embed_deep_link(*, settings: Settings, shop_domain: str) -> str:
+    normalized_shop_domain = normalize_shop_domain(shop_domain)
+    query = urlencode(
+        {
+            "context": "apps",
+        }
+    )
+    activate_app_id = f"{settings.shopify_api_key}/{APP_EMBED_BLOCK_HANDLE}"
+    return (
+        f"https://{normalized_shop_domain}/admin/themes/current/editor?"
+        f"{query}&activateAppId={activate_app_id}"
+    )
+
+
+def new_oauth_state() -> str:
+    return secrets.token_urlsafe(24)
+
+
+def verify_oauth_state(*, cookie_state: str | None, returned_state: str | None) -> None:
+    if not cookie_state or not returned_state or not secrets.compare_digest(cookie_state, returned_state):
+        raise InvalidShopifyOAuthStateError()
 
 
 class ShopifyOrderWebhookService:
@@ -93,6 +166,7 @@ class ShopifyInstallationCallbackService:
         code: str | None = None,
         callback_params: Mapping[str, str] | None = None,
     ) -> ShopInstallation:
+        normalized_shop_domain = normalize_shop_domain(shop_domain)
         if callback_params is not None and not verify_shopify_oauth_hmac(
             self._settings.shopify_api_secret,
             callback_params,
@@ -105,15 +179,15 @@ class ShopifyInstallationCallbackService:
         if code:
             access_token = await self._oauth_service.exchange_access_token(
                 code=code,
-                shop_domain=shop_domain,
+                shop_domain=normalized_shop_domain,
             )
             timezone_name = await self._oauth_service.fetch_shop_timezone(
                 access_token=access_token,
-                shop_domain=shop_domain,
+                shop_domain=normalized_shop_domain,
             )
 
         return await self._installation_service.upsert_installation(
-            shop_domain=shop_domain,
+            shop_domain=normalized_shop_domain,
             public_token=public_token,
             access_token=access_token,
             timezone_name=timezone_name,

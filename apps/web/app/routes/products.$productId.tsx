@@ -1,8 +1,9 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { isRouteErrorResponse, useLoaderData, useRouteError } from "@remix-run/react";
-import { Badge, Banner, InlineStack, Layout, Page, Text } from "@shopify/polaris";
+import { Badge, Banner, BlockStack, Card, InlineStack, Layout, Page, Text } from "@shopify/polaris";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { formatTimeWindowLabel } from "@/lib/analytics";
 import { fetchProductAnalysis, parseTimeWindow } from "@/lib/api.server";
 import { requestIdFromHeaders } from "@/lib/logging";
@@ -75,7 +76,17 @@ export default function ProductAnalysisRoute() {
     >
       <Layout>
         <Layout.Section>
-          <AnalysisPanel analysis={data.analysis} diagnosisPath={data.diagnosisPath} />
+          <BlockStack gap="400">
+            <AnalysisPanel analysis={data.analysis} diagnosisPath={data.diagnosisPath} />
+            <Card>
+              <RecommendationFeedbackButtons
+                board={data.analysis.gap > 0 ? "leaker" : "hidden_winner"}
+                productId={data.productId}
+                shopId={data.shopId}
+                window={data.window}
+              />
+            </Card>
+          </BlockStack>
         </Layout.Section>
       </Layout>
     </Page>

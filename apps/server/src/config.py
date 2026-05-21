@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     ingest_shared_secret: str
     ingest_token_ttl_seconds: int = 300
     benchmark_min_views: int = 50
+    sku_lens_internal_review: bool = False
 
     model_config = SettingsConfigDict(
         env_file=".env",

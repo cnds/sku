@@ -19,7 +19,7 @@ vi.mock("../app/lib/api.server", () => ({
   parseTimeWindow: parseTimeWindowMock,
 }));
 
-import { loader } from "../app/routes/_index";
+import { loader, readinessBannerContent } from "../app/routes/_index";
 
 describe("dashboard route loader", () => {
   beforeEach(() => {
@@ -70,5 +70,71 @@ describe("dashboard route loader", () => {
       shopId: "test-shop.myshopify.com",
       window: "24h",
     });
+  });
+
+  it("separates missing install, missing raw events, low PDP traffic, and partial coverage states", () => {
+    expect(
+      readinessBannerContent({
+        checks: [],
+        coverage: {
+          add_to_carts: 0,
+          clicks: 0,
+          component_clicks: 0,
+          impressions: 0,
+          orders: 0,
+          views: 0,
+        },
+        last_event_at: null,
+        status: "not_connected",
+      }).message,
+    ).toContain("No installation record");
+
+    expect(
+      readinessBannerContent({
+        checks: [{ key: "installation", label: "Installation", message: "ok", status: "ok" }],
+        coverage: {
+          add_to_carts: 0,
+          clicks: 0,
+          component_clicks: 0,
+          impressions: 0,
+          orders: 0,
+          views: 0,
+        },
+        last_event_at: null,
+        status: "not_connected",
+      }).message,
+    ).toContain("No raw storefront events");
+
+    expect(
+      readinessBannerContent({
+        checks: [],
+        coverage: {
+          add_to_carts: 0,
+          clicks: 0,
+          component_clicks: 0,
+          impressions: 0,
+          orders: 0,
+          views: 4,
+        },
+        last_event_at: "2026-05-21T01:00:00Z",
+        status: "partial",
+      }).message,
+    ).toContain("Only 4 PDP views");
+
+    expect(
+      readinessBannerContent({
+        checks: [],
+        coverage: {
+          add_to_carts: 0,
+          clicks: 0,
+          component_clicks: 0,
+          impressions: 8,
+          orders: 0,
+          views: 24,
+        },
+        last_event_at: "2026-05-21T01:00:00Z",
+        status: "partial",
+      }).message,
+    ).toContain("Partial coverage");
   });
 });

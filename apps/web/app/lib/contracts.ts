@@ -6,6 +6,8 @@ export type PriorityTrendState = "New" | "Worsening" | "Improving" | "Stable";
 export type DiagnosisStatus = "pending" | "ready" | "failed";
 export type IntegrationHealthStatus = "healthy" | "partial" | "not_connected";
 export type IntegrationCheckStatus = "ok" | "missing";
+export type OnboardingChecklistStatus = "done" | "action" | "pending";
+export type RecommendationFeedbackAction = "will_try" | "not_useful" | "already_fixed" | "remind_later";
 
 export interface LeaderboardEntry {
   product_id: string;
@@ -115,4 +117,45 @@ export interface IntegrationHealthResponse {
   last_event_at: string | null;
   coverage: IntegrationHealthCoverage;
   checks: IntegrationHealthCheck[];
+}
+
+export interface OnboardingChecklistItem {
+  key: string;
+  label: string;
+  status: OnboardingChecklistStatus;
+  message: string;
+}
+
+export interface OnboardingStatusResponse {
+  shop_id: string;
+  installed: boolean;
+  public_token: string | null;
+  ingest_endpoint: string;
+  app_embed_deep_link: string;
+  integration_health: IntegrationHealthResponse;
+  last_raw_event_at: string | null;
+  checklist: OnboardingChecklistItem[];
+}
+
+export interface RecommendationFeedbackResponse {
+  accepted: boolean;
+  latest_action: RecommendationFeedbackAction;
+  product_id: string;
+  shop_id: string;
+  window: TimeWindow;
+}
+
+export interface InternalCardReviewItem {
+  priority_card: PriorityCard;
+  raw_event_counts: Record<string, number>;
+  aggregate_evidence: Record<string, unknown>;
+  derived_signal: Record<string, unknown>;
+  ai_summary: Record<string, unknown>;
+  merchant_copy: Record<string, unknown>;
+}
+
+export interface InternalCardReviewResponse {
+  shop_id: string;
+  window: TimeWindow;
+  cards: InternalCardReviewItem[];
 }

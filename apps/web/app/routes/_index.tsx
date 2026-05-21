@@ -16,9 +16,10 @@ import {
 } from "@shopify/polaris";
 
 import { LeaderboardTable } from "@/components/LeaderboardTable";
+import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { TIME_WINDOWS, formatTimeWindowLabel } from "@/lib/analytics";
 import { fetchIntegrationHealth, fetchLeaderboard, fetchPriorities, parseTimeWindow } from "@/lib/api.server";
-import type { IntegrationHealthResponse, PriorityCard, PriorityTrendState } from "@/lib/contracts";
+import type { IntegrationHealthResponse, PriorityCard, PriorityTrendState, TimeWindow } from "@/lib/contracts";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
 import { dashboardPath, productPath } from "@/lib/url";
@@ -103,6 +104,56 @@ export function healthBannerContent(
   };
 }
 
+export function readinessBannerContent(
+  health: IntegrationHealthResponse,
+): { message: string; tone: "critical" | "info" | "success" | "warning" } {
+  const installationOk = health.checks.some(
+    (check) => check.key === "installation" && check.status === "ok",
+  );
+  if (!installationOk && health.status === "not_connected") {
+    return {
+      message: "No installation record: install SKU Lens before enabling storefront tracking.",
+      tone: "critical",
+    };
+  }
+
+  if (!health.last_event_at) {
+    return {
+      message: "No raw storefront events yet: enable the theme app embed, then open a product page.",
+      tone: "warning",
+    };
+  }
+
+  if (health.coverage.views === 0) {
+    return {
+      message: `Raw events are arriving, but no PDP views are present yet. Last raw event: ${health.last_event_at}.`,
+      tone: "warning",
+    };
+  }
+
+  if (health.coverage.views < 10) {
+    return {
+      message: `Only ${health.coverage.views} PDP views in this window. Priority cards may stay low-confidence until more traffic arrives.`,
+      tone: "info",
+    };
+  }
+
+  if (health.status === "partial") {
+    const missing = health.checks
+      .filter((check) => check.status === "missing")
+      .map((check) => check.label);
+    return {
+      message: `Partial coverage: ${missing.join(", ") || "some events"} still missing. Last raw event: ${health.last_event_at}.`,
+      tone: "warning",
+    };
+  }
+
+  return {
+    message: `Tracking is healthy. Last raw event: ${health.last_event_at}.`,
+    tone: "success",
+  };
+}
+
 function PriorityCards({
   cards,
   shopId,
@@ -110,7 +161,7 @@ function PriorityCards({
 }: {
   cards: PriorityCard[];
   shopId: string;
-  window: string;
+  window: TimeWindow;
 }) {
   if (cards.length === 0) {
     return (
@@ -156,6 +207,12 @@ function PriorityCards({
               <Text as="p" variant="bodyMd">{card.suspected_friction}</Text>
               <Text as="p" variant="bodyMd" fontWeight="semibold">{card.first_fix}</Text>
             </BlockStack>
+            <RecommendationFeedbackButtons
+              board={card.board}
+              productId={card.product_id}
+              shopId={shopId}
+              window={window}
+            />
           </BlockStack>
         </Card>
       ))}
@@ -191,7 +248,7 @@ export default function DashboardRoute() {
 
   const totalTracked = data.blackboard.length + data.redboard.length;
   const primaryProductId = data.priorities[0]?.product_id ?? data.blackboard[0]?.product_id;
-  const integrationHealth = healthBannerContent(data.health);
+  const integrationHealth = readinessBannerContent(data.health);
 
   return (
     <Page

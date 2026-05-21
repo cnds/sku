@@ -27,7 +27,11 @@ from services.ingest_auth import (
     ShopInstallationNotFoundError,
 )
 from services.job_dispatch import AfterCommitCallbacks
-from services.shopify import InvalidShopifyOAuthCallbackError
+from services.shopify import (
+    InvalidShopifyOAuthCallbackError,
+    InvalidShopifyOAuthStateError,
+    InvalidShopifyShopDomainError,
+)
 
 REQUEST_ID_HEADER = "X-SKU-Lens-Request-Id"
 LOGGER = logging.getLogger(__name__)
@@ -96,6 +100,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> JSONResponse:
         del request
         return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidShopifyOAuthStateError)
+    async def shopify_oauth_state_error_handler(
+        request: Request,
+        exc: InvalidShopifyOAuthStateError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(status_code=401, content={"detail": str(exc)})
+
+    @app.exception_handler(InvalidShopifyShopDomainError)
+    async def shopify_shop_domain_error_handler(
+        request: Request,
+        exc: InvalidShopifyShopDomainError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(status_code=400, content={"detail": str(exc)})
 
     @app.middleware("http")
     async def db_session_middleware(

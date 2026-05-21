@@ -9,8 +9,8 @@ and one Hidden Winner with high intent but limited exposure.
 
 ## Apps
 
-- `apps/server`: FastAPI + SQLModel APIs, ingest pipeline, integration health, Shopify validation, diagnosis, and Celery worker runtime.
-- `apps/web`: Embedded Shopify admin app built with Remix + Vite + Polaris. The shell publishes Shopify App Bridge metadata, defaults missing or invalid `window` params to `24h`, loads integration health on the board, and loads product diagnosis asynchronously after first paint with freshness and manual re-run controls.
+- `apps/server`: FastAPI + SQLModel APIs, browser Shopify install/OAuth callback, onboarding status, ingest pipeline, integration health, recommendation feedback, internal card review, diagnosis, and Celery worker runtime.
+- `apps/web`: Embedded Shopify admin app built with Remix + Vite + Polaris. The shell publishes Shopify App Bridge metadata, defaults missing or invalid `window` params to `24h`, loads onboarding and integration health, shows readiness-aware board states, and loads product diagnosis asynchronously after first paint with freshness, manual re-run controls, and lightweight recommendation feedback.
 - `apps/extension`: Theme App Extension assets for storefront tracking. The shipped tracker batches `impression`, `click`, `view`, `component_click`, `add_to_cart`, `media`, `variant`, and `engage` events, maps common PDP sections to stable component labels, then posts them to `/ingest/events` with per-visitor and per-session identifiers.
 
 ## Backend Runtime Conventions
@@ -29,7 +29,11 @@ and one Hidden Winner with high intent but limited exposure.
 - Shopify OAuth installation is also responsible for refreshing the persisted shop timezone. Normalize Shopify's `iana_timezone`, store it on `shop_installations`, and recompute rollup cursors when the timezone changes.
 - `init_db()` reconciles additive `shop_installations` columns and widens legacy `product_diagnoses.report_markdown` storage so older MySQL/SQLite dev volumes can pick up timezone, rollup metadata, and longer diagnosis text on startup. If your local schema drifts beyond those compatibility fixes, reset it explicitly with `docker compose down -v`.
 - Celery Beat schedules the due-shop scanner every 60 seconds. The scanner decides whether a shop has crossed into a new day from `next_rollup_at_utc`, then backfills each missing local day through yesterday instead of assuming the process started near `00:00`.
-- Domain errors such as diagnosis lookup failures, ingest auth failures, and invalid Shopify OAuth callbacks are translated to HTTP responses centrally in `main.py`.
+- Domain errors such as diagnosis lookup failures, ingest auth failures, invalid Shopify shop domains, invalid OAuth state, and invalid Shopify OAuth callbacks are translated to HTTP responses centrally in `main.py`.
+- Browser install starts at `GET /shopify/oauth/start?shop=<shop>.myshopify.com`, validates state in `GET /shopify/oauth/callback`, and redirects to `/onboarding` in the embedded web app. The older `POST /shopify/oauth/callback` remains a compatibility/test entrypoint.
+- Onboarding status lives at `GET /api/onboarding/status?shop_id=<shop>&window=24h` and returns the public token, ingest endpoint, App Embed deep link, integration health, last raw event, and setup checklist.
+- Recommendation feedback is append-only through `POST /api/recommendation-feedback` with `will_try`, `not_useful`, `already_fixed`, or `remind_later`.
+- Internal card review is gated by `SKU_LENS_INTERNAL_REVIEW=1` and exposed at `GET /api/internal/card-review`; keep it off for normal merchant-facing environments.
 - Application logs use standard Python `logging` configured through `logging.basicConfig(...)`. Keep server-side logs on ordinary `logger.info(...)`, `logger.warning(...)`, and `logger.exception(...)` calls instead of custom wrappers or ad hoc `print(...)`.
 - Uvicorn access logs are intentionally disabled in the Python dev entrypoints. Treat the application log lines keyed by `request_id` and `job_id` as the canonical request trace.
 - FastAPI, worker jobs, Remix server fetches, and the storefront tracker all propagate `X-SKU-Lens-Request-Id` when available. Celery dispatch uses `job_id` as `task_id` so server enqueue logs and worker processing logs can be correlated.
@@ -81,9 +85,11 @@ The `server` and `web` services use source mounts for live development. The Cele
 8. Seed repeatable demo data with `uv run --directory apps/server sku-lens-seed-demo`.
 9. Run the admin app with `pnpm dev`.
 
-`SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook verification, and `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for generated diagnosis reports; without a real `AI_API_KEY`, diagnosis generation uses the local fallback report. `REDIS_URL` is also the default Celery broker URL; set `CELERY_BROKER_URL` only if you need Celery to use a different Redis broker. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs.
+`SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag and build the App Embed activation link. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook verification. `SHOPIFY_WEBHOOK_BASE_URL` is the public backend base used for OAuth callback, webhook, and ingest URLs, while `SHOPIFY_APP_URL` is the embedded web app base used after install. `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for generated diagnosis reports; without a real `AI_API_KEY`, diagnosis generation uses the local fallback report. `REDIS_URL` is also the default Celery broker URL; set `CELERY_BROKER_URL` only if you need Celery to use a different Redis broker. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs. Set `SKU_LENS_INTERNAL_REVIEW=1` only when the gated card-review endpoint should be available.
 
 The demo seed command upserts `demo.myshopify.com`, replaces the repo's `demo-*` products for that shop, includes stable PDP component labels such as `product_description`, `shipping_returns`, and `recommendations`, and pre-generates diagnosis cards so `http://localhost:3000/?shop=demo.myshopify.com&window=24h` renders real board and product data immediately.
+
+Merchant-test copy, demo flow, App Store draft, competitor narrative, and theme validation notes live in `docs/merchant-test/`. Those files document repository-verified readiness; they do not mean a live merchant pilot or Shopify App Store review has already completed.
 
 ## Verification
 

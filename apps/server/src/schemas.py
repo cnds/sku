@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from models import DiagnosisStatus, EventType
+from models import DiagnosisStatus, EventType, RecommendationFeedbackAction
 
 
 class TimeWindow(StrEnum):
@@ -67,6 +67,12 @@ class IntegrationCheckStatus(StrEnum):
     MISSING = "missing"
 
 
+class OnboardingChecklistStatus(StrEnum):
+    DONE = "done"
+    ACTION = "action"
+    PENDING = "pending"
+
+
 class IngestEvent(BaseModel):
     event_type: EventType
     occurred_at: datetime
@@ -95,6 +101,41 @@ class ShopifyOAuthCallbackResponse(BaseModel):
 class ShopifyWebhookAcceptedResponse(BaseModel):
     accepted: bool
     enqueued: int
+
+
+class OnboardingChecklistItem(BaseModel):
+    key: str
+    label: str
+    status: OnboardingChecklistStatus
+    message: str
+
+
+class OnboardingStatusResponse(BaseModel):
+    shop_id: str
+    installed: bool
+    public_token: str | None
+    ingest_endpoint: str
+    app_embed_deep_link: str
+    integration_health: IntegrationHealthResponse
+    last_raw_event_at: datetime | None
+    checklist: list[OnboardingChecklistItem]
+
+
+class RecommendationFeedbackRequest(BaseModel):
+    shop_id: str
+    product_id: str
+    window: TimeWindow = TimeWindow.HOURS_24
+    action: RecommendationFeedbackAction
+    board: PriorityBoardType | None = None
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+class RecommendationFeedbackResponse(BaseModel):
+    accepted: bool
+    latest_action: RecommendationFeedbackAction
+    product_id: str
+    shop_id: str
+    window: TimeWindow
 
 
 class LeaderboardEntry(BaseModel):
@@ -207,3 +248,18 @@ class IntegrationHealthResponse(BaseModel):
     last_event_at: datetime | None
     coverage: IntegrationHealthCoverage
     checks: list[IntegrationHealthCheck]
+
+
+class InternalCardReviewItem(BaseModel):
+    priority_card: PriorityCard
+    raw_event_counts: dict[str, int]
+    aggregate_evidence: dict[str, Any]
+    derived_signal: dict[str, Any]
+    ai_summary: dict[str, Any]
+    merchant_copy: dict[str, Any]
+
+
+class InternalCardReviewResponse(BaseModel):
+    shop_id: str
+    window: TimeWindow
+    cards: list[InternalCardReviewItem]
