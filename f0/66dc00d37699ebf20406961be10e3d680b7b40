@@ -1,0 +1,75 @@
+apps/server/tests/test_merchant_readiness.py
+  s_c9b870aee993ff::t_29243d64231a0f 157,177-178,195-221
+apps/web/app/components/LeaderboardTable.tsx
+  s_c9b870aee993ff::t_5a0e7360816091 17,39,101
+docs/merchant-test/demo-script.md
+  s_c9b870aee993ff::t_d7d3780cd89862 5
+apps/web/tests/routes._index.test.ts
+  s_c9b870aee993ff::t_b405c452783410 76-87
+  s_c9b870aee993ff::t_bdaf840d56455c 50,69
+apps/web/app/lib/shop.ts
+  s_c9b870aee993ff::t_c13cf8b5aeec0c 2-3,18
+  s_c9b870aee993ff::t_66e99ca6b6121b 1,4-10,16-17
+  s_c9b870aee993ff::t_b92769911ee5f5 11-15
+apps/web/app/routes/_index.tsx
+  s_c9b870aee993ff::t_53960023af5d0b 25,32,41,161,166,193,247,250,264,292-297,302,311
+  s_c9b870aee993ff::t_7911c48808c321 31
+apps/web/app/routes/resources.products.$productId.diagnosis.ts
+  s_c9b870aee993ff::t_599f8886b0cbdd 6,11,30
+apps/server/src/controllers/shopify.py
+  s_c9b870aee993ff::t_72d33ab6e0d439 14
+  s_c9b870aee993ff::t_9af95ea67a96bb 59-60,80
+apps/web/tests/url.test.ts
+  s_c9b870aee993ff::t_5a8fbc109d2740 1-20
+apps/server/src/services/shopify.py
+  s_c9b870aee993ff::t_f103b04f825ddb 40-44,80-90,227
+apps/web/app/lib/url.ts
+  s_c9b870aee993ff::t_7b84811e1b9094 1,3-10,14-15,19-20
+apps/web/tests/routes.products.$productId.test.ts
+  s_c9b870aee993ff::t_49e74e9b16bc9b 50-51,68-70
+.gitignore
+  s_c9b870aee993ff::t_7583cbfbdc7f33 20
+apps/web/app/routes/products.$productId.tsx
+  s_c9b870aee993ff::t_aed94712f7d705 48
+  s_c9b870aee993ff::t_dedca57aa85ea2 11,49,56-57,71
+README.md
+  s_c9b870aee993ff::t_1e80111a3d7ea5 90
+apps/server/tests/test_demo_seed.py
+  s_c9b870aee993ff::t_a370cfdeb90c67 13,42-43,54,62,68,72,76,102,129,134,140,153,158,164
+ROADMAP.md
+  s_c9b870aee993ff::t_80db4539d8bb24 122
+apps/server/src/seed_demo.py
+  s_c9b870aee993ff::t_4b2eac967575e4 28
+apps/web/app/routes/internal.card-review.tsx
+  s_c9b870aee993ff::t_9e0c5edd990df4 14
+  s_c9b870aee993ff::t_1b4d5e41db5eb6 8,15,18,28
+apps/server/src/main.py
+  s_c9b870aee993ff::t_8432f3edf131a7 34,113-119
+AGENTS.md
+  s_c9b870aee993ff::t_249f382f492255 48
+apps/web/app/routes/resources.recommendation-feedback.ts
+  s_c9b870aee993ff::t_47a607e3c4764b 6,27
+apps/server/tests/test_shopify_service.py
+  s_c9b870aee993ff::t_c166838f01e63b 14
+  s_c9b870aee993ff::t_d18739a0c2c893 158,166
+  s_c9b870aee993ff::t_ebdd71bcf8aef8 5,146-157,159-165,167-172
+apps/web/app/routes/onboarding.tsx
+  s_c9b870aee993ff::t_56b1b96ea6097e 21,28,31,54,57
+  s_c9b870aee993ff::t_21e0145c8f611e 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.11",
+  "base_commit_sha": "f066dc00d37699ebf20406961be10e3d680b7b40",
+  "prompts": {},
+  "sessions": {
+    "s_c9b870aee993ff": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019e4836-2d4d-7f11-b650-e1e3e44f8323",
+        "model": "gpt-5.5"
+      },
+      "human_author": "丁松 <song.ding@idiaoyan.com>"
+    }
+  }
+}
