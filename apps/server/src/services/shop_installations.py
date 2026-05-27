@@ -47,8 +47,11 @@ class ShopInstallationService:
             or installation.next_rollup_at_utc is None
             or timezone_changed
         ):
+            installed_at = installation.installed_at
+            if installed_at.tzinfo is None:
+                installed_at = installed_at.replace(tzinfo=UTC)
             installation.last_completed_local_date = initial_last_completed_local_date(
-                installed_at=installation.installed_at,
+                installed_at=installed_at,
                 timezone_name=normalized_timezone,
             )
             installation.next_rollup_at_utc = rollup_due_at_utc(

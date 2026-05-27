@@ -1,8 +1,9 @@
-import type { FormEvent } from "react";
 import { useState } from "react";
 import { BlockStack, Button, InlineStack, Text } from "@shopify/polaris";
 
 import type { PriorityBoardType, RecommendationFeedbackAction, TimeWindow } from "@/lib/contracts";
+
+const RECOMMENDATION_FEEDBACK_ROUTE = "/resources/recommendation-feedback";
 
 export const RECOMMENDATION_FEEDBACK_ACTIONS: Array<{
   action: RecommendationFeedbackAction;
@@ -14,28 +15,94 @@ export const RECOMMENDATION_FEEDBACK_ACTIONS: Array<{
   { action: "remind_later", label: "Remind me later" },
 ];
 
-export function RecommendationFeedbackButtons({
-  board,
-  productId,
-  shopId,
-  window,
-}: {
+interface FeedbackFormActionSource {
+  action?: unknown;
+  getAttribute(name: string): string | null;
+}
+
+export function feedbackFormActionUrl(form: FeedbackFormActionSource): string {
+  return form.getAttribute("action") ?? RECOMMENDATION_FEEDBACK_ROUTE;
+}
+
+interface RecommendationFeedbackSubmission {
+  action: RecommendationFeedbackAction;
   board?: PriorityBoardType | "leaker" | "hidden_winner" | null;
+  boardDate?: string;
+  cardRank?: number;
+  context?: Record<string, unknown>;
   productId: string;
   shopId: string;
   window: TimeWindow;
+  windowEndDate?: string;
+  windowStartDate?: string;
+}
+
+export function recommendationFeedbackFormData(submission: RecommendationFeedbackSubmission): FormData {
+  const formData = new FormData();
+  formData.set("action", submission.action);
+  if (submission.board) {
+    formData.set("board", submission.board);
+  }
+  if (submission.boardDate) {
+    formData.set("board_date", submission.boardDate);
+  }
+  if (submission.windowStartDate) {
+    formData.set("window_start_date", submission.windowStartDate);
+  }
+  if (submission.windowEndDate) {
+    formData.set("window_end_date", submission.windowEndDate);
+  }
+  if (typeof submission.cardRank === "number") {
+    formData.set("card_rank", String(submission.cardRank));
+  }
+  if (submission.context && Object.keys(submission.context).length > 0) {
+    formData.set("context", JSON.stringify(submission.context));
+  }
+  formData.set("product_id", submission.productId);
+  formData.set("shop_id", submission.shopId);
+  formData.set("window", submission.window);
+  return formData;
+}
+
+export function RecommendationFeedbackButtons({
+  board,
+  boardDate,
+  cardRank,
+  context,
+  productId,
+  shopId,
+  window,
+  windowEndDate,
+  windowStartDate,
+}: {
+  board?: PriorityBoardType | "leaker" | "hidden_winner" | null;
+  boardDate?: string;
+  cardRank?: number;
+  context?: Record<string, unknown>;
+  productId: string;
+  shopId: string;
+  window: TimeWindow;
+  windowEndDate?: string;
+  windowStartDate?: string;
 }) {
   const [savedAction, setSavedAction] = useState<RecommendationFeedbackAction | null>(null);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const formData = new FormData(form);
-    const action = formData.get("action");
-    if (typeof action === "string") {
-      setSavedAction(action as RecommendationFeedbackAction);
-    }
-    await fetch(form.action, {
+  async function handleFeedback(action: RecommendationFeedbackAction) {
+    const formData = recommendationFeedbackFormData({
+      action,
+      board,
+      boardDate,
+      cardRank,
+      context,
+      productId,
+      shopId,
+      window,
+      windowEndDate,
+      windowStartDate,
+    });
+
+    setSavedAction(action);
+    await fetch(RECOMMENDATION_FEEDBACK_ROUTE, {
       body: formData,
       method: "POST",
     });
@@ -48,16 +115,9 @@ export function RecommendationFeedbackButtons({
       </Text>
       <InlineStack gap="100">
         {RECOMMENDATION_FEEDBACK_ACTIONS.map((item) => (
-          <form action="/resources/recommendation-feedback" key={item.action} method="post" onSubmit={handleSubmit}>
-            <input name="action" type="hidden" value={item.action} />
-            {board ? <input name="board" type="hidden" value={board} /> : null}
-            <input name="product_id" type="hidden" value={productId} />
-            <input name="shop_id" type="hidden" value={shopId} />
-            <input name="window" type="hidden" value={window} />
-            <Button size="slim" submit>
-              {item.label}
-            </Button>
-          </form>
+          <Button key={item.action} onClick={() => void handleFeedback(item.action)} size="slim">
+            {item.label}
+          </Button>
         ))}
       </InlineStack>
       {savedAction ? (

@@ -127,6 +127,10 @@ class RecommendationFeedbackRequest(BaseModel):
     window: TimeWindow = TimeWindow.HOURS_24
     action: RecommendationFeedbackAction
     board: PriorityBoardType | None = None
+    board_date: date | None = None
+    window_start_date: date | None = None
+    window_end_date: date | None = None
+    card_rank: int | None = None
     context: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -203,6 +207,10 @@ class ProductAnalysisResult(BaseModel):
 class PriorityCard(BaseModel):
     product_id: str
     board: PriorityBoardType
+    board_date: date
+    window_start_date: date
+    window_end_date: date
+    card_rank: int
     signal_state: PrioritySignalState
     trend_state: PriorityTrendState
     trend_reason: str

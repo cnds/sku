@@ -96,12 +96,17 @@ export async function fetchOnboardingStatus(args: {
 export async function postRecommendationFeedback(args: {
   action: RecommendationFeedbackAction;
   board?: string | null;
+  boardDate?: string | null;
+  cardRank?: number | null;
+  context?: Record<string, unknown> | null;
   productId: string;
   requestId: string;
   shopId: string;
   window: TimeWindow;
+  windowEndDate?: string | null;
+  windowStartDate?: string | null;
 }): Promise<RecommendationFeedbackResponse> {
-  const body: Record<string, string> = {
+  const body: Record<string, unknown> = {
     action: args.action,
     product_id: args.productId,
     shop_id: args.shopId,
@@ -109,6 +114,21 @@ export async function postRecommendationFeedback(args: {
   };
   if (args.board) {
     body.board = args.board;
+  }
+  if (args.boardDate) {
+    body.board_date = args.boardDate;
+  }
+  if (args.windowStartDate) {
+    body.window_start_date = args.windowStartDate;
+  }
+  if (args.windowEndDate) {
+    body.window_end_date = args.windowEndDate;
+  }
+  if (typeof args.cardRank === "number") {
+    body.card_rank = args.cardRank;
+  }
+  if (args.context && Object.keys(args.context).length > 0) {
+    body.context = args.context;
   }
   return fetchJson<RecommendationFeedbackResponse>(
     "/api/recommendation-feedback",

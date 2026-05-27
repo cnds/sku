@@ -125,6 +125,10 @@ class RecommendationFeedback(SQLModel, table=True):
     product_id: str = Field(index=True)
     window: str = Field(index=True)
     board: str | None = Field(default=None, index=True)
+    board_date: date | None = Field(default=None, index=True)
+    window_start_date: date | None = Field(default=None, index=True)
+    window_end_date: date | None = Field(default=None, index=True)
+    card_rank: int | None = Field(default=None)
     action: str = Field(index=True)
     context_json: dict[str, Any] = Field(
         default_factory=dict,

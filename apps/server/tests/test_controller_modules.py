@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 import pytest
 from fastapi import FastAPI
 from fastapi.routing import APIRoute
@@ -217,6 +219,10 @@ async def test_priorities_endpoint_smoke(
         PriorityCard(
             product_id="prod-1",
             board=PriorityBoardType.LEAKER,
+            board_date=date(2026, 5, 27),
+            window_start_date=date(2026, 5, 26),
+            window_end_date=date(2026, 5, 27),
+            card_rank=1,
             signal_state=PrioritySignalState.READY,
             trend_state=PriorityTrendState.NEW,
             trend_reason="No previous 24h comparison window yet.",

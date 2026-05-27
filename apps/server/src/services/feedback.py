@@ -19,10 +19,14 @@ class RecommendationFeedbackService:
         await self._repository.append(
             action=request.action,
             board=request.board,
+            board_date=request.board_date,
+            card_rank=request.card_rank,
             context=request.context,
             product_id=request.product_id,
             shop_id=request.shop_id,
             window=request.window,
+            window_end_date=request.window_end_date,
+            window_start_date=request.window_start_date,
         )
         latest = await self._repository.latest(
             product_id=request.product_id,

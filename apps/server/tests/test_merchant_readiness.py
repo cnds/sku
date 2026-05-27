@@ -11,7 +11,15 @@ from sqlmodel import select
 from config import Settings
 from db import create_session_factory, db_session_context, init_db
 from main import create_app
-from models import DailyProductStat, DiagnosisStatus, EventType, ProductDiagnosis, RawEvent, ShopInstallation
+from models import (
+    DailyProductStat,
+    DiagnosisStatus,
+    EventType,
+    ProductDiagnosis,
+    RawEvent,
+    RecommendationFeedback,
+    ShopInstallation,
+)
 from security.shopify import build_shopify_oauth_hmac
 from services.shopify import ShopifyOAuthService
 
@@ -367,6 +375,58 @@ async def test_recommendation_feedback_appends_rows_and_reports_latest_action(
         ).all()
 
     assert [row[0] for row in rows] == ["will_try", "already_fixed"]
+
+
+@pytest.mark.asyncio
+async def test_recommendation_feedback_persists_board_window_and_card_context(
+    sqlite_database_url: str,
+    redis_url: str,
+) -> None:
+    app = create_app(_settings(sqlite_database_url, redis_url))
+    await init_db(app.state.session_factory.engine)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
+            "/api/recommendation-feedback",
+            json={
+                "action": "will_try",
+                "board": "leaker",
+                "board_date": "2026-05-27",
+                "card_rank": 1,
+                "context": {
+                    "primary_step": "pdp_add_to_cart",
+                    "surface": "today_priorities",
+                },
+                "product_id": "product-1",
+                "shop_id": "demo.myshopify.com",
+                "window": "24h",
+                "window_end_date": "2026-05-27",
+                "window_start_date": "2026-05-26",
+            },
+        )
+
+    assert response.status_code == 201
+
+    async with app.state.session_factory() as session:
+        feedback = (
+            await session.exec(
+                select(RecommendationFeedback).where(
+                    RecommendationFeedback.product_id == "product-1"
+                )
+            )
+        ).one()
+
+    assert feedback.board_date == date(2026, 5, 27)
+    assert feedback.window_start_date == date(2026, 5, 26)
+    assert feedback.window_end_date == date(2026, 5, 27)
+    assert feedback.card_rank == 1
+    assert feedback.context_json == {
+        "primary_step": "pdp_add_to_cart",
+        "surface": "today_priorities",
+    }
 
 
 @pytest.mark.asyncio

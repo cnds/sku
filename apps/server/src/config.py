@@ -1,8 +1,19 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _settings_env_files() -> tuple[Path, Path, str]:
+    server_dir = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[3]
+    return (
+        repo_root / ".env",
+        server_dir / ".env",
+        ".env",
+    )
 
 
 class Settings(BaseSettings):
@@ -24,7 +35,7 @@ class Settings(BaseSettings):
     sku_lens_internal_review: bool = False
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_settings_env_files(),
         env_file_encoding="utf-8",
         extra="ignore",
     )

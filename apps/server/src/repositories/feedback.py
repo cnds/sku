@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date
+
 from sqlmodel import select
 
 from db import get_db_session
@@ -13,18 +15,26 @@ class RecommendationFeedbackRepository:
         *,
         action: RecommendationFeedbackAction,
         board: PriorityBoardType | None,
+        board_date: date | None,
+        card_rank: int | None,
         context: dict[str, object],
         product_id: str,
         shop_id: str,
         window: TimeWindow,
+        window_end_date: date | None,
+        window_start_date: date | None,
     ) -> RecommendationFeedback:
         feedback = RecommendationFeedback(
             action=action.value,
             board=board.value if board is not None else None,
+            board_date=board_date,
+            card_rank=card_rank,
             context_json=context,
             product_id=product_id,
             shop_id=shop_id,
             window=window.value,
+            window_end_date=window_end_date,
+            window_start_date=window_start_date,
         )
         get_db_session().add(feedback)
         return feedback

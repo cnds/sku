@@ -4,16 +4,16 @@ import argparse
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from urllib.parse import urlencode
 
-from sqlalchemy import delete
+from sqlalchemy import delete, desc
 from sqlmodel import select
 
 from config import Settings, get_settings
 from db import create_session_factory, db_session_context, get_db_session, init_db
 from logging_utils import configure_logging
-from models import DailyProductStat, EventType, ProductDiagnosis, RawEvent
+from models import DailyProductStat, EventType, ProductDiagnosis, RawEvent, ShopInstallation
 from repositories.analytics import AnalyticsRepository
 from schemas import IngestEvent, LeaderboardType, ProductSnapshot, TimeWindow
 from services.analysis import ProductAnalysisService
@@ -21,6 +21,7 @@ from services.diagnosis import ProductDiagnosisService
 from services.ingestion import EventIngestionService
 from services.shop_installations import ShopInstallationService
 from services.shop_time import ensure_utc_datetime, local_date_for_shop
+from services.shopify import normalize_shop_domain
 
 LOGGER = logging.getLogger(__name__)
 
@@ -31,7 +32,7 @@ DEFAULT_WEB_BASE_URL = "http://localhost:3000"
 
 
 @dataclass(frozen=True, slots=True)
-class DemoProductPlan:
+class DemoProductScenario:
     product_id: str
     impressions: int
     clicks: int
@@ -40,6 +41,8 @@ class DemoProductPlan:
     orders: int
     media_interactions: int
     variant_changes: int
+    dwell_ms: int
+    scroll_pct: int
     component_clicks: dict[str, int]
     component_impressions: dict[str, int]
     observed: str
@@ -58,8 +61,8 @@ class DemoSeedSummary:
     diagnosis_count: int
 
 
-DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
-    DemoProductPlan(
+SHOPIFY_ADMIN_SCENARIOS: tuple[DemoProductScenario, ...] = (
+    DemoProductScenario(
         product_id="demo-size-confidence-leaker",
         impressions=240,
         clicks=44,
@@ -68,6 +71,8 @@ DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
         orders=1,
         media_interactions=12,
         variant_changes=9,
+        dwell_ms=17000,
+        scroll_pct=58,
         component_clicks={
             "product_media": 8,
             "product_description": 3,
@@ -86,7 +91,7 @@ DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
         suspected_friction="Size confidence is weak because the size chart is visible but rarely opened.",
         first_fix="Move the size chart beside the variant selector and repeat fit guidance near the buy box.",
     ),
-    DemoProductPlan(
+    DemoProductScenario(
         product_id="demo-media-trust-leaker",
         impressions=210,
         clicks=39,
@@ -95,6 +100,8 @@ DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
         orders=2,
         media_interactions=1,
         variant_changes=5,
+        dwell_ms=13000,
+        scroll_pct=45,
         component_clicks={
             "product_media": 1,
             "product_description": 5,
@@ -113,7 +120,7 @@ DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
         suspected_friction="Media and reviews are not pulling enough attention to reduce hesitation.",
         first_fix="Bring one strong product video and the review summary above the fold.",
     ),
-    DemoProductPlan(
+    DemoProductScenario(
         product_id="demo-hidden-winner",
         impressions=65,
         clicks=28,
@@ -122,6 +129,8 @@ DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
         orders=7,
         media_interactions=10,
         variant_changes=8,
+        dwell_ms=24000,
+        scroll_pct=78,
         component_clicks={
             "product_media": 6,
             "recommendations": 4,
@@ -138,7 +147,7 @@ DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
         suspected_friction="Discovery is the constraint rather than PDP persuasion.",
         first_fix="Give this SKU a higher collection slot and one campaign placement for the next window.",
     ),
-    DemoProductPlan(
+    DemoProductScenario(
         product_id="demo-benchmark",
         impressions=260,
         clicks=58,
@@ -147,6 +156,8 @@ DEMO_PRODUCTS: tuple[DemoProductPlan, ...] = (
         orders=16,
         media_interactions=18,
         variant_changes=12,
+        dwell_ms=26000,
+        scroll_pct=82,
         component_clicks={
             "product_media": 14,
             "product_description": 12,
@@ -178,9 +189,9 @@ LEGACY_DEMO_PRODUCT_IDS = (
 async def seed_demo_data(
     *,
     settings: Settings,
-    shop_domain: str = DEFAULT_SHOP_DOMAIN,
-    public_token: str = DEFAULT_PUBLIC_TOKEN,
-    timezone_name: str = DEFAULT_TIMEZONE,
+    shop_domain: str | None = None,
+    public_token: str | None = None,
+    timezone_name: str | None = None,
     now_utc: datetime | None = None,
     web_base_url: str = DEFAULT_WEB_BASE_URL,
 ) -> DemoSeedSummary:
@@ -191,56 +202,38 @@ async def seed_demo_data(
 
     try:
         async with db_session_context(session_factory) as session:
-            installation = await ShopInstallationService().upsert_installation(
-                shop_domain=shop_domain,
+            target_shop_domain = await _target_shop_domain(shop_domain=shop_domain)
+            installation = await _ensure_seed_installation(
                 public_token=public_token,
-                access_token=None,
+                shop_domain=target_shop_domain,
                 timezone_name=timezone_name,
             )
-            normalized_timezone = installation.timezone_name
-            await _clear_existing_demo_records(shop_domain=shop_domain)
-
-            ingestion_service = EventIngestionService()
-            for index, plan in enumerate(DEMO_PRODUCTS):
-                occurred_at = resolved_now - timedelta(hours=index + 1)
-                events = _build_events(plan=plan, occurred_at=occurred_at)
-                await ingestion_service.persist_batch_and_rollup(
-                    channel="sdk",
-                    events=events,
-                    session_id=f"demo-seed-session-{plan.product_id}",
-                    shop_domain=shop_domain,
-                    shop_id=shop_domain,
-                    stat_dates={
-                        local_date_for_shop(
-                            instant=event.occurred_at,
-                            timezone_name=normalized_timezone,
-                        )
-                        for event in events
-                    },
-                    timezone_name=normalized_timezone,
-                    visitor_id=f"demo-seed-visitor-{plan.product_id}",
-                )
-
+            await _clear_existing_demo_records(shop_domain=target_shop_domain)
+            await _persist_scenarios(
+                now_utc=resolved_now,
+                shop_domain=target_shop_domain,
+                timezone_name=installation.timezone_name,
+            )
             await _seed_diagnoses(
                 now_utc=resolved_now,
                 settings=settings,
-                shop_domain=shop_domain,
-                timezone_name=normalized_timezone,
+                shop_domain=target_shop_domain,
+                timezone_name=installation.timezone_name,
             )
             await session.commit()
 
             blackboard, redboard = await _fetch_seeded_leaderboards(
                 now_utc=resolved_now,
                 settings=settings,
-                shop_domain=shop_domain,
+                shop_domain=target_shop_domain,
             )
-            raw_event_count = await _count_rows(RawEvent, shop_domain=shop_domain)
-            daily_stat_count = await _count_rows(DailyProductStat, shop_domain=shop_domain)
-            diagnosis_count = await _count_rows(ProductDiagnosis, shop_domain=shop_domain)
+            raw_event_count = await _count_rows(RawEvent, shop_domain=target_shop_domain)
+            daily_stat_count = await _count_rows(DailyProductStat, shop_domain=target_shop_domain)
+            diagnosis_count = await _count_rows(ProductDiagnosis, shop_domain=target_shop_domain)
 
             return DemoSeedSummary(
-                shop_domain=shop_domain,
-                dashboard_url=_dashboard_url(shop_domain=shop_domain, web_base_url=web_base_url),
+                shop_domain=target_shop_domain,
+                dashboard_url=_dashboard_url(shop_domain=target_shop_domain, web_base_url=web_base_url),
                 blackboard_top_product_id=blackboard[0].product_id,
                 redboard_top_product_id=redboard[0].product_id,
                 raw_event_count=raw_event_count,
@@ -253,11 +246,29 @@ async def seed_demo_data(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Seed repeatable demo data so the SKU Lens board has visible local content.",
+        description=(
+            "Seed Shopify-visible demo data for the most recently installed shop. "
+            "Pass --shop-domain to target a specific development store."
+        ),
     )
-    parser.add_argument("--shop-domain", default=DEFAULT_SHOP_DOMAIN)
-    parser.add_argument("--public-token", default=DEFAULT_PUBLIC_TOKEN)
-    parser.add_argument("--timezone", default=DEFAULT_TIMEZONE)
+    parser.add_argument(
+        "--shop-domain",
+        default=None,
+        help=(
+            "Shopify shop domain to seed. If omitted, the latest installed shop is used; "
+            f"if no installation exists, {DEFAULT_SHOP_DOMAIN} is used."
+        ),
+    )
+    parser.add_argument(
+        "--public-token",
+        default=None,
+        help="Override the shop public ingest token. Existing installed shops keep their token by default.",
+    )
+    parser.add_argument(
+        "--timezone",
+        default=None,
+        help="Override the shop IANA timezone. Existing installed shops keep their timezone by default.",
+    )
     parser.add_argument("--web-base-url", default=DEFAULT_WEB_BASE_URL)
     args = parser.parse_args()
 
@@ -275,7 +286,7 @@ def main() -> None:
 
     LOGGER.info(
         (
-            "demo data seeded shop_domain=%s raw_events=%s daily_stats=%s "
+            "shopify-visible demo data seeded shop_domain=%s raw_events=%s daily_stats=%s "
             "diagnoses=%s blackboard_top=%s redboard_top=%s dashboard_url=%s"
         ),
         summary.shop_domain,
@@ -288,72 +299,216 @@ def main() -> None:
     )
 
 
-def _build_events(*, plan: DemoProductPlan, occurred_at: datetime) -> list[IngestEvent]:
+async def _target_shop_domain(*, shop_domain: str | None) -> str:
+    if shop_domain is not None:
+        return normalize_shop_domain(shop_domain)
+
+    session = get_db_session()
+    latest_oauth_installation = (
+        await session.exec(
+            select(ShopInstallation)
+            .where(ShopInstallation.access_token.is_not(None))
+            .order_by(
+                desc(ShopInstallation.installed_at),
+                desc(ShopInstallation.id),
+            )
+        )
+    ).first()
+    if latest_oauth_installation is not None:
+        return normalize_shop_domain(latest_oauth_installation.shop_domain)
+
+    latest_installation = (
+        await session.exec(
+            select(ShopInstallation).order_by(
+                desc(ShopInstallation.installed_at),
+                desc(ShopInstallation.id),
+            )
+        )
+    ).first()
+    if latest_installation is None:
+        return DEFAULT_SHOP_DOMAIN
+    return normalize_shop_domain(latest_installation.shop_domain)
+
+
+async def _ensure_seed_installation(
+    *,
+    public_token: str | None,
+    shop_domain: str,
+    timezone_name: str | None,
+) -> ShopInstallation:
+    service = ShopInstallationService()
+    existing = await service.get_by_shop_domain(shop_domain)
+    return await service.upsert_installation(
+        shop_domain=shop_domain,
+        public_token=public_token or (existing.public_token if existing is not None else DEFAULT_PUBLIC_TOKEN),
+        access_token=existing.access_token if existing is not None else None,
+        timezone_name=timezone_name or (existing.timezone_name if existing is not None else DEFAULT_TIMEZONE),
+    )
+
+
+async def _persist_scenarios(
+    *,
+    now_utc: datetime,
+    shop_domain: str,
+    timezone_name: str,
+) -> None:
+    ingestion_service = EventIngestionService()
+    for index, scenario in enumerate(SHOPIFY_ADMIN_SCENARIOS):
+        occurred_at = now_utc - timedelta(hours=index + 1)
+        events = _events_for_scenario(scenario=scenario, occurred_at=occurred_at)
+        await ingestion_service.persist_batch_and_rollup(
+            channel="seed",
+            events=events,
+            session_id=f"seed-session-{scenario.product_id}",
+            shop_domain=shop_domain,
+            shop_id=shop_domain,
+            stat_dates={
+                local_date_for_shop(
+                    instant=event.occurred_at,
+                    timezone_name=timezone_name,
+                )
+                for event in events
+            },
+            timezone_name=timezone_name,
+            visitor_id=f"seed-visitor-{scenario.product_id}",
+        )
+    _persist_previous_seven_day_stats(
+        now_utc=now_utc,
+        shop_domain=shop_domain,
+        timezone_name=timezone_name,
+    )
+
+
+def _persist_previous_seven_day_stats(
+    *,
+    now_utc: datetime,
+    shop_domain: str,
+    timezone_name: str,
+) -> None:
+    reference_date = local_date_for_shop(instant=now_utc, timezone_name=timezone_name)
+    previous_stat_date = TimeWindow.DAYS_7.start_date_from_reference_date(reference_date=reference_date) - timedelta(
+        days=1
+    )
+    session = get_db_session()
+    session.add_all(
+        [
+            _previous_daily_stat(
+                scenario=scenario,
+                shop_domain=shop_domain,
+                stat_date=previous_stat_date,
+            )
+            for scenario in SHOPIFY_ADMIN_SCENARIOS
+        ]
+    )
+
+
+def _previous_daily_stat(
+    *,
+    scenario: DemoProductScenario,
+    shop_domain: str,
+    stat_date: date,
+) -> DailyProductStat:
+    scale = 0.33 if scenario.product_id == "demo-hidden-winner" else 1.0
+    return DailyProductStat(
+        add_to_carts=_scaled_previous_value(scenario.add_to_carts, scale=scale),
+        avg_scroll_pct=scenario.scroll_pct,
+        clicks=_scaled_previous_value(scenario.clicks, scale=scale),
+        component_clicks_distribution=_scaled_previous_distribution(scenario.component_clicks, scale=scale),
+        component_impressions_distribution=_scaled_previous_distribution(
+            scenario.component_impressions,
+            scale=scale,
+        ),
+        engage_count=1,
+        impressions=_scaled_previous_value(
+            scenario.impressions + sum(scenario.component_impressions.values()),
+            scale=scale,
+        ),
+        media_interactions=_scaled_previous_value(scenario.media_interactions, scale=scale),
+        orders=_scaled_previous_value(scenario.orders, scale=scale),
+        product_id=scenario.product_id,
+        shop_id=shop_domain,
+        stat_date=stat_date,
+        total_dwell_ms=_scaled_previous_value(scenario.dwell_ms, scale=scale),
+        variant_changes=_scaled_previous_value(scenario.variant_changes, scale=scale),
+        views=_scaled_previous_value(scenario.views, scale=scale),
+    )
+
+
+def _scaled_previous_distribution(values: dict[str, int], *, scale: float) -> dict[str, int]:
+    return {
+        key: _scaled_previous_value(value, scale=scale)
+        for key, value in values.items()
+    }
+
+
+def _scaled_previous_value(value: int, *, scale: float) -> int:
+    if value == 0:
+        return 0
+    return max(1, round(value * scale))
+
+
+def _events_for_scenario(
+    *,
+    scenario: DemoProductScenario,
+    occurred_at: datetime,
+) -> list[IngestEvent]:
     events: list[IngestEvent] = []
 
     events.extend(
-        IngestEvent(
-            event_type=EventType.IMPRESSION,
+        _event(
+            EventType.IMPRESSION,
             occurred_at=occurred_at - timedelta(minutes=2),
-            product_id=plan.product_id,
+            product_id=scenario.product_id,
             component_id="collection_card",
             context={"position": 0},
         )
-        for _ in range(plan.impressions)
+        for _ in range(scenario.impressions)
     )
     events.extend(
-        IngestEvent(
-            event_type=EventType.CLICK,
+        _event(
+            EventType.CLICK,
             occurred_at=occurred_at - timedelta(minutes=1),
-            product_id=plan.product_id,
+            product_id=scenario.product_id,
             component_id="collection_card",
-            context={"target_url": f"/products/{plan.product_id}"},
+            context={"target_url": f"/products/{scenario.product_id}"},
         )
-        for _ in range(plan.clicks)
+        for _ in range(scenario.clicks)
     )
     events.extend(
-        IngestEvent(
-            event_type=EventType.VIEW,
+        _event(
+            EventType.VIEW,
             occurred_at=occurred_at,
-            product_id=plan.product_id,
+            product_id=scenario.product_id,
             context={"page_type": "pdp"},
         )
-        for _ in range(plan.views)
+        for _ in range(scenario.views)
     )
     events.extend(
-        IngestEvent(
-            event_type=EventType.ADD_TO_CART,
-            occurred_at=occurred_at + timedelta(minutes=1),
-            product_id=plan.product_id,
-        )
-        for _ in range(plan.add_to_carts)
+        _event(EventType.ADD_TO_CART, occurred_at=occurred_at + timedelta(minutes=1), product_id=scenario.product_id)
+        for _ in range(scenario.add_to_carts)
     )
     events.extend(
-        IngestEvent(
-            event_type=EventType.ORDER,
-            occurred_at=occurred_at + timedelta(minutes=2),
-            product_id=plan.product_id,
-        )
-        for _ in range(plan.orders)
+        _event(EventType.ORDER, occurred_at=occurred_at + timedelta(minutes=2), product_id=scenario.product_id)
+        for _ in range(scenario.orders)
     )
 
-    for component_id, count in plan.component_clicks.items():
+    for component_id, count in scenario.component_clicks.items():
         events.extend(
-            IngestEvent(
-                event_type=EventType.COMPONENT_CLICK,
+            _event(
+                EventType.COMPONENT_CLICK,
                 occurred_at=occurred_at + timedelta(minutes=3),
-                product_id=plan.product_id,
+                product_id=scenario.product_id,
                 component_id=component_id,
             )
             for _ in range(count)
         )
 
-    for component_id, count in plan.component_impressions.items():
+    for component_id, count in scenario.component_impressions.items():
         events.extend(
-            IngestEvent(
-                event_type=EventType.IMPRESSION,
+            _event(
+                EventType.IMPRESSION,
                 occurred_at=occurred_at + timedelta(minutes=3),
-                product_id=plan.product_id,
+                product_id=scenario.product_id,
                 component_id=component_id,
                 context={"page_type": "pdp"},
             )
@@ -361,38 +516,59 @@ def _build_events(*, plan: DemoProductPlan, occurred_at: datetime) -> list[Inges
         )
 
     events.extend(
-        IngestEvent(
-            event_type=EventType.MEDIA,
+        _event(
+            EventType.MEDIA,
             occurred_at=occurred_at + timedelta(minutes=4),
-            product_id=plan.product_id,
+            product_id=scenario.product_id,
             context={"action": "gallery"},
         )
-        for _ in range(plan.media_interactions)
+        for _ in range(scenario.media_interactions)
     )
     events.extend(
-        IngestEvent(
-            event_type=EventType.VARIANT,
+        _event(
+            EventType.VARIANT,
             occurred_at=occurred_at + timedelta(minutes=5),
-            product_id=plan.product_id,
+            product_id=scenario.product_id,
             context={"options": {"Size": "M"}},
         )
-        for _ in range(plan.variant_changes)
+        for _ in range(scenario.variant_changes)
     )
     events.append(
-        IngestEvent(
-            event_type=EventType.ENGAGE,
+        _event(
+            EventType.ENGAGE,
             occurred_at=occurred_at + timedelta(minutes=6),
-            product_id=plan.product_id,
-            context={"dwell_ms": 18000, "max_scroll_pct": 65, "page_type": "pdp"},
+            product_id=scenario.product_id,
+            context={
+                "dwell_ms": scenario.dwell_ms,
+                "max_scroll_pct": scenario.scroll_pct,
+                "page_type": "pdp",
+            },
         )
     )
 
     return events
 
 
+def _event(
+    event_type: EventType,
+    *,
+    occurred_at: datetime,
+    product_id: str,
+    component_id: str | None = None,
+    context: dict[str, object] | None = None,
+) -> IngestEvent:
+    return IngestEvent(
+        component_id=component_id,
+        context=context or {},
+        event_type=event_type,
+        occurred_at=occurred_at,
+        product_id=product_id,
+    )
+
+
 async def _clear_existing_demo_records(*, shop_domain: str) -> None:
     session = get_db_session()
-    product_ids = tuple(plan.product_id for plan in DEMO_PRODUCTS) + LEGACY_DEMO_PRODUCT_IDS
+    product_ids = tuple(scenario.product_id for scenario in SHOPIFY_ADMIN_SCENARIOS) + LEGACY_DEMO_PRODUCT_IDS
 
     await session.exec(
         delete(ProductDiagnosis).where(
@@ -424,7 +600,7 @@ async def _seed_diagnoses(
     reference_date = local_date_for_shop(instant=now_utc, timezone_name=timezone_name)
     repository = AnalyticsRepository()
     diagnosis_service = ProductDiagnosisService()
-    plans_by_product_id = {plan.product_id: plan for plan in DEMO_PRODUCTS}
+    scenarios_by_product_id = {scenario.product_id: scenario for scenario in SHOPIFY_ADMIN_SCENARIOS}
 
     for window in TimeWindow:
         snapshots = await repository.fetch_product_snapshots(
@@ -439,11 +615,11 @@ async def _seed_diagnoses(
                 snapshot=snapshot,
                 window=window,
             )
-            plan = plans_by_product_id[product_id]
+            scenario = scenarios_by_product_id[product_id]
             await diagnosis_service.store_generated_report(
                 product_id=product_id,
                 report_markdown=_report_markdown(
-                    plan=plan,
+                    scenario=scenario,
                     snapshot=snapshot,
                     window=window,
                 ),
@@ -462,9 +638,9 @@ async def _seed_diagnoses(
         time_provider=lambda: now_utc,
     )
     for window in TimeWindow:
-        for plan in DEMO_PRODUCTS:
+        for scenario in SHOPIFY_ADMIN_SCENARIOS:
             await analysis_service.get_product_analysis(
-                product_id=plan.product_id,
+                product_id=scenario.product_id,
                 shop_id=shop_domain,
                 window=window,
             )
@@ -500,8 +676,7 @@ async def _count_rows(
     *,
     shop_domain: str,
 ) -> int:
-    session = get_db_session()
-    rows = (await session.exec(select(model).where(model.shop_id == shop_domain))).all()
+    rows = (await get_db_session().exec(select(model).where(model.shop_id == shop_domain))).all()
     return len(rows)
 
 
@@ -512,19 +687,19 @@ def _dashboard_url(*, shop_domain: str, web_base_url: str) -> str:
 
 def _report_markdown(
     *,
-    plan: DemoProductPlan,
+    scenario: DemoProductScenario,
     snapshot: ProductSnapshot,
     window: TimeWindow,
 ) -> str:
     return (
         "## Observed\n"
-        f"{plan.observed}\n\n"
+        f"{scenario.observed}\n\n"
         "## Evidence\n"
         f"Observed snapshot for {window.value}: {snapshot.views} views, "
         f"{snapshot.add_to_carts} add-to-carts, {snapshot.orders} orders, "
         f"{snapshot.clicks} clicks from {snapshot.impressions} impressions.\n\n"
         "## Suspected friction\n"
-        f"{plan.suspected_friction}\n\n"
+        f"{scenario.suspected_friction}\n\n"
         "## First fix to try\n"
-        f"{plan.first_fix}"
+        f"{scenario.first_fix}"
     )

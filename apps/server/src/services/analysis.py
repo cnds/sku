@@ -121,6 +121,8 @@ class ProductAnalysisService:
         window: TimeWindow,
     ) -> list[PriorityCard]:
         reference_date = await self._shop_reference_date(shop_id=shop_id)
+        window_start_date = window.start_date_from_reference_date(reference_date=reference_date)
+        window_end_date = reference_date
         snapshots = await self._repository.fetch_product_snapshots(
             shop_id=shop_id,
             window=window,
@@ -171,10 +173,14 @@ class ProductAnalysisService:
             selected.append(
                 self._priority_card(
                     board=PriorityBoardType.LEAKER,
+                    board_date=reference_date,
+                    card_rank=len(selected) + 1,
                     entry=entry,
                     previous_entry=previous_entries[PriorityBoardType.LEAKER].get(entry.product_id),
                     snapshot=snapshots[entry.product_id],
                     window=window,
+                    window_end_date=window_end_date,
+                    window_start_date=window_start_date,
                 )
             )
             selected_product_ids.add(entry.product_id)
@@ -190,10 +196,14 @@ class ProductAnalysisService:
             selected.append(
                 self._priority_card(
                     board=PriorityBoardType.HIDDEN_WINNER,
+                    board_date=reference_date,
+                    card_rank=len(selected) + 1,
                     entry=entry,
                     previous_entry=previous_entries[PriorityBoardType.HIDDEN_WINNER].get(entry.product_id),
                     snapshot=snapshots[entry.product_id],
                     window=window,
+                    window_end_date=window_end_date,
+                    window_start_date=window_start_date,
                 )
             )
             break
@@ -250,10 +260,14 @@ class ProductAnalysisService:
         self,
         *,
         board: PriorityBoardType,
+        board_date: date,
+        card_rank: int,
         entry: LeaderboardEntry,
         previous_entry: LeaderboardEntry | None,
         snapshot: ProductSnapshot,
         window: TimeWindow,
+        window_end_date: date,
+        window_start_date: date,
     ) -> PriorityCard:
         signal_state = self.derive_priority_signal_state(snapshot)
         primary_step = self._primary_step(board=board, signal_state=signal_state, snapshot=snapshot)
@@ -266,6 +280,10 @@ class ProductAnalysisService:
         return PriorityCard(
             product_id=entry.product_id,
             board=board,
+            board_date=board_date,
+            window_start_date=window_start_date,
+            window_end_date=window_end_date,
+            card_rank=card_rank,
             signal_state=signal_state,
             trend_state=trend_state,
             trend_reason=trend_reason,

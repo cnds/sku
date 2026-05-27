@@ -16,6 +16,11 @@ export default defineConfig(async () => {
   return {
     plugins: [remix({ future }), tsconfigPaths()],
     server: {
+      allowedHosts: [
+        ".ngrok-free.app",
+        ".ngrok-free.dev",
+        ".ngrok.io",
+      ],
       port: 3000,
     },
   };

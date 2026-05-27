@@ -84,6 +84,11 @@ export default function ProductAnalysisRoute() {
             <Card>
               <RecommendationFeedbackButtons
                 board={data.analysis.gap > 0 ? "leaker" : "hidden_winner"}
+                context={{
+                  benchmark_product_id: data.analysis.benchmark_product_id,
+                  gap: data.analysis.gap,
+                  surface: "product_detail",
+                }}
                 productId={data.productId}
                 shopId={data.shopId}
                 window={data.window}

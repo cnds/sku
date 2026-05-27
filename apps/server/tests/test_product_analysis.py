@@ -85,7 +85,9 @@ async def test_product_analysis_uses_top_twenty_percent_benchmark_and_component_
         )
         await session.commit()
 
-    analysis_service = ProductAnalysisService()
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
     async with db_session_context(session_factory):
         analysis = await analysis_service.get_product_analysis(
             product_id="product-target",
@@ -253,6 +255,10 @@ async def test_product_priorities_returns_two_leakers_and_one_hidden_winner(
     assert priorities[0].trend_state is PriorityTrendState.NEW
     assert priorities[0].trend_reason == "No previous 7d comparison window yet."
     assert priorities[0].primary_step == "pdp_add_to_cart"
+    assert [priority.card_rank for priority in priorities] == [1, 2, 3]
+    assert all(priority.board_date == date(2026, 4, 29) for priority in priorities)
+    assert all(priority.window_start_date == date(2026, 4, 22) for priority in priorities)
+    assert all(priority.window_end_date == date(2026, 4, 29) for priority in priorities)
     assert "size_chart" in priorities[0].suspected_friction
     assert priorities[2].flag_reason == "High intent, underexposed"
 
@@ -550,6 +556,8 @@ def test_low_data_priority_copy_avoids_confident_friction_claims() -> None:
     service = ProductAnalysisService()
     card = service._priority_card(
         board=PriorityBoardType.LEAKER,
+        board_date=date(2026, 5, 27),
+        card_rank=1,
         entry=LeaderboardEntry(
             product_id="product-1",
             views=4,
@@ -568,6 +576,8 @@ def test_low_data_priority_copy_avoids_confident_friction_claims() -> None:
         ),
         previous_entry=None,
         window=TimeWindow.HOURS_24,
+        window_end_date=date(2026, 5, 27),
+        window_start_date=date(2026, 5, 26),
     )
 
     assert card.signal_state is PrioritySignalState.INSUFFICIENT_DATA
@@ -581,6 +591,8 @@ def test_hidden_winner_priority_copy_matches_roadmap_framing() -> None:
     service = ProductAnalysisService()
     card = service._priority_card(
         board=PriorityBoardType.HIDDEN_WINNER,
+        board_date=date(2026, 5, 27),
+        card_rank=1,
         entry=LeaderboardEntry(
             product_id="product-1",
             views=80,
@@ -599,6 +611,8 @@ def test_hidden_winner_priority_copy_matches_roadmap_framing() -> None:
         ),
         previous_entry=None,
         window=TimeWindow.HOURS_24,
+        window_end_date=date(2026, 5, 27),
+        window_start_date=date(2026, 5, 26),
     )
 
     assert card.signal_state is PrioritySignalState.READY
@@ -609,6 +623,8 @@ def test_tracking_issue_priority_copy_points_to_event_coverage() -> None:
     service = ProductAnalysisService()
     card = service._priority_card(
         board=PriorityBoardType.LEAKER,
+        board_date=date(2026, 5, 27),
+        card_rank=1,
         entry=LeaderboardEntry(
             product_id="product-1",
             views=80,
@@ -625,6 +641,8 @@ def test_tracking_issue_priority_copy_points_to_event_coverage() -> None:
         ),
         previous_entry=None,
         window=TimeWindow.HOURS_24,
+        window_end_date=date(2026, 5, 27),
+        window_start_date=date(2026, 5, 26),
     )
 
     assert card.signal_state is PrioritySignalState.TRACKING_ISSUE
@@ -664,7 +682,9 @@ async def test_product_analysis_falls_back_to_low_volume_products_when_threshold
         )
         await session.commit()
 
-    analysis_service = ProductAnalysisService()
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
     async with db_session_context(session_factory):
         analysis = await analysis_service.get_product_analysis(
             product_id="product-target",

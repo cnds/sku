@@ -72,6 +72,10 @@ export interface ProductSnapshot {
 export interface PriorityCard {
   product_id: string;
   board: PriorityBoardType;
+  board_date: string;
+  window_start_date: string;
+  window_end_date: string;
+  card_rank: number;
   signal_state: PrioritySignalState;
   trend_state: PriorityTrendState;
   trend_reason: string;

@@ -54,6 +54,7 @@ async def init_db(engine: AsyncEngine) -> None:
         await connection.run_sync(SQLModel.metadata.create_all)
         await connection.run_sync(_upgrade_legacy_shop_installations_schema)
         await connection.run_sync(_upgrade_legacy_product_diagnoses_schema)
+        await connection.run_sync(_upgrade_legacy_recommendation_feedback_schema)
 
 
 def _upgrade_legacy_shop_installations_schema(connection: Connection) -> None:
@@ -107,6 +108,40 @@ def _upgrade_legacy_product_diagnoses_schema(connection: Connection) -> None:
     if statement is None:
         return
     connection.exec_driver_sql(statement)
+
+
+def _upgrade_legacy_recommendation_feedback_schema(connection: Connection) -> None:
+    inspector = inspect(connection)
+    if "recommendation_feedback" not in inspector.get_table_names():
+        return
+
+    existing_columns = {
+        column["name"] for column in inspector.get_columns("recommendation_feedback")
+    }
+    statements: list[str] = []
+    if "board_date" not in existing_columns:
+        statements.append(
+            "ALTER TABLE recommendation_feedback "
+            "ADD COLUMN board_date DATE NULL"
+        )
+    if "window_start_date" not in existing_columns:
+        statements.append(
+            "ALTER TABLE recommendation_feedback "
+            "ADD COLUMN window_start_date DATE NULL"
+        )
+    if "window_end_date" not in existing_columns:
+        statements.append(
+            "ALTER TABLE recommendation_feedback "
+            "ADD COLUMN window_end_date DATE NULL"
+        )
+    if "card_rank" not in existing_columns:
+        statements.append(
+            "ALTER TABLE recommendation_feedback "
+            "ADD COLUMN card_rank INTEGER NULL"
+        )
+
+    for statement in statements:
+        connection.exec_driver_sql(statement)
 
 
 def _product_diagnoses_report_markdown_upgrade_statement(

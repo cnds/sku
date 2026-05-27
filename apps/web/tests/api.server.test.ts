@@ -237,10 +237,18 @@ describe("api.server logging", () => {
     await postRecommendationFeedback({
       action: "will_try",
       board: "leaker",
+      boardDate: "2026-05-27",
+      cardRank: 1,
+      context: {
+        primary_step: "pdp_add_to_cart",
+        surface: "today_priorities",
+      },
       productId: "product-1",
       requestId: "req-feedback",
       shopId: "demo.myshopify.com",
       window: "24h",
+      windowEndDate: "2026-05-27",
+      windowStartDate: "2026-05-26",
     });
 
     const [url, init] = vi.mocked(global.fetch).mock.calls[0] ?? [];
@@ -252,9 +260,17 @@ describe("api.server logging", () => {
     expect(JSON.parse(String(init?.body))).toEqual({
       action: "will_try",
       board: "leaker",
+      board_date: "2026-05-27",
+      card_rank: 1,
+      context: {
+        primary_step: "pdp_add_to_cart",
+        surface: "today_priorities",
+      },
       product_id: "product-1",
       shop_id: "demo.myshopify.com",
       window: "24h",
+      window_end_date: "2026-05-27",
+      window_start_date: "2026-05-26",
     });
   });
 
