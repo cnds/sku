@@ -19,9 +19,13 @@ export const messages = {
     viewTopProduct: "View top priority",
     bannerText: (count: number, window: string) =>
       `Tracking ${count} products for ${window}. SKU Lens prioritizes Winners and Leakers for this window.`,
+    prioritiesKicker: "Decision queue",
     prioritiesTitle: "Today's product priorities",
     prioritiesSubtitle: "Two Leakers to fix first and one Hidden Winner to scale when the signal is ready.",
+    prioritiesActionCount: (count: number) => `${count} ${count === 1 ? "action" : "actions"}`,
     prioritiesEmpty: "Priority cards will appear once storefront and PDP events are collected.",
+    priorityRecommendedMove: "Recommended move",
+    priorityWhyNow: "Why now",
     viewMoreProducts: "View more products",
     errorMessage: "Failed to load the board. The analytics server may be unavailable.",
     blackboardTitle: "Leakers",

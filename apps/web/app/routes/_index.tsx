@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { useCallback, useMemo } from "react";
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { isRouteErrorResponse, useLoaderData, useNavigate, useRouteError } from "@remix-run/react";
@@ -65,12 +66,256 @@ function priorityTone(card: PriorityCard): "attention" | "critical" | "info" | "
   return card.board === "hidden_winner" ? "success" : "critical";
 }
 
+export function priorityActionLabel(card: Pick<PriorityCard, "board"> & { card_rank: number }): string {
+  if (card.board === "hidden_winner") return "Scale carefully";
+  return card.card_rank === 1 ? "Fix first" : "Fix next";
+}
+
+const PRIORITY_SECTION_STYLE: CSSProperties = {
+  background: "var(--p-color-bg-surface-secondary, #f7f7f7)",
+  border: "1px solid var(--p-color-border-secondary, #dcdcdc)",
+  borderRadius: "8px",
+};
+
+const PRIORITY_METRICS_STRIP_STYLE: CSSProperties = {
+  background: "var(--p-color-bg-surface-secondary, #f7f7f7)",
+  borderRadius: "8px",
+  padding: "0.75rem 0.875rem",
+};
+
+const PRIORITY_METRIC_LABEL_STYLE: CSSProperties = {
+  whiteSpace: "nowrap",
+};
+
+const PRIORITY_MUTED_ROW_STYLE: CSSProperties = {
+  color: "var(--p-color-text-subdued)",
+};
+
+const PRIORITY_PRODUCT_LINK_STYLE: CSSProperties = {
+  color: "var(--p-color-text-link)",
+  cursor: "pointer",
+  overflowWrap: "anywhere",
+  textDecoration: "underline",
+  textDecorationThickness: "1px",
+  textUnderlineOffset: "3px",
+};
+
+function priorityAccentColor(card: Pick<PriorityCard, "board">): string {
+  return card.board === "hidden_winner"
+    ? "var(--p-color-border-success, #008060)"
+    : "var(--p-color-border-critical, #d82c0d)";
+}
+
+function priorityActionBackground(): string {
+  return "var(--p-color-bg-surface-secondary, #f7f7f7)";
+}
+
+function priorityActionStyle(card: Pick<PriorityCard, "board">): CSSProperties {
+  return {
+    background: priorityActionBackground(),
+    borderLeft: `4px solid ${priorityAccentColor(card)}`,
+    borderRadius: "8px",
+    padding: "0.875rem",
+  };
+}
+
+const PRIORITY_FEEDBACK_STYLE: CSSProperties = {
+  borderTop: "1px solid var(--p-color-border-secondary, #e3e3e3)",
+  paddingTop: "0.75rem",
+};
+
+const PRIORITY_WHY_NOW_STYLE: CSSProperties = {
+  borderTop: "1px solid var(--p-color-border-secondary, #e3e3e3)",
+  paddingTop: "0.875rem",
+};
+
+function PriorityMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <BlockStack gap="050">
+      <Text as="p" variant="headingMd">
+        {value.toLocaleString("en-US")}
+      </Text>
+      <Text as="p" variant="bodySm" tone="subdued">
+        <span style={PRIORITY_METRIC_LABEL_STYLE}>{label}</span>
+      </Text>
+    </BlockStack>
+  );
+}
+
+function PriorityMetricsStrip({ card }: { card: PriorityCard }) {
+  return (
+    <div style={PRIORITY_METRICS_STRIP_STYLE}>
+      <InlineGrid columns={3} gap="300">
+        <PriorityMetric label="PDP views" value={card.views} />
+        <PriorityMetric label="Carts" value={card.add_to_carts} />
+        <PriorityMetric label="Orders" value={card.orders} />
+      </InlineGrid>
+    </div>
+  );
+}
+
+function PriorityStatusBadges({ card }: { card: PriorityCard }) {
+  return (
+    <InlineStack gap="100">
+      <Badge tone={priorityTrendTone(card.trend_state)}>{card.trend_state}</Badge>
+      {prioritySignalTone(card.signal_state) ? (
+        <Badge tone={prioritySignalTone(card.signal_state)}>{card.signal_state}</Badge>
+      ) : null}
+    </InlineStack>
+  );
+}
+
+function PriorityCardHeader({ card, rank }: { card: PriorityCard; rank: number }) {
+  return (
+    <BlockStack gap="300">
+      <div
+        aria-hidden="true"
+        style={{
+          background: priorityAccentColor(card),
+          borderRadius: "2px",
+          height: "4px",
+        }}
+      />
+      <InlineStack align="space-between" blockAlign="start" gap="200">
+        <InlineStack gap="200" blockAlign="center">
+          <Text as="span" variant="headingLg">
+            #{rank}
+          </Text>
+          <Badge tone={priorityTone(card)}>{priorityActionLabel({ board: card.board, card_rank: rank })}</Badge>
+        </InlineStack>
+        <PriorityStatusBadges card={card} />
+      </InlineStack>
+    </BlockStack>
+  );
+}
+
+function PriorityProductSummary({
+  card,
+  host,
+  shopId,
+  window,
+}: {
+  card: PriorityCard;
+  host?: string;
+  shopId: string;
+  window: TimeWindow;
+}) {
+  return (
+    <BlockStack gap="200">
+      <Text as="h3" variant="headingMd">
+        <a
+          aria-label={`View product details for ${card.product_id}`}
+          href={productPath(card.product_id, shopId, window, host)}
+          style={PRIORITY_PRODUCT_LINK_STYLE}
+        >
+          {card.product_id}
+        </a>
+      </Text>
+      <InlineStack gap="100" blockAlign="center">
+        <Badge tone={priorityTone(card)}>{priorityBoardLabel(card.board)}</Badge>
+        <Text as="span" variant="bodySm" tone="subdued">
+          {card.flag_reason}
+        </Text>
+      </InlineStack>
+      <Text as="p" variant="bodySm" tone="subdued">
+        <span style={PRIORITY_MUTED_ROW_STYLE}>{priorityStepLabel(card.primary_step)}</span>
+      </Text>
+      <Text as="p" variant="bodySm" tone="subdued">{card.trend_reason}</Text>
+    </BlockStack>
+  );
+}
+
+function PriorityRecommendation({ card }: { card: PriorityCard }) {
+  return (
+    <div style={priorityActionStyle(card)}>
+      <BlockStack gap="100">
+        <Text as="p" variant="bodySm" tone="subdued">
+          {messages.dashboard.priorityRecommendedMove}
+        </Text>
+        <Text as="p" variant="bodyMd" fontWeight="semibold">
+          {card.first_fix}
+        </Text>
+      </BlockStack>
+    </div>
+  );
+}
+
+function PriorityWhyNow({ card }: { card: PriorityCard }) {
+  return (
+    <div style={PRIORITY_WHY_NOW_STYLE}>
+      <BlockStack gap="150">
+        <Text as="p" variant="bodySm" tone="subdued">
+          {messages.dashboard.priorityWhyNow}
+        </Text>
+        <Text as="p" variant="bodyMd">{card.suspected_friction}</Text>
+        {card.evidence.slice(0, 2).map((item) => (
+          <Text as="p" key={item} variant="bodySm" tone="subdued">{item}</Text>
+        ))}
+      </BlockStack>
+    </div>
+  );
+}
+
+function PriorityFeedback({
+  card,
+  shopId,
+  window,
+}: {
+  card: PriorityCard;
+  shopId: string;
+  window: TimeWindow;
+}) {
+  return (
+    <div style={PRIORITY_FEEDBACK_STYLE}>
+      <RecommendationFeedbackButtons
+        board={card.board}
+        productId={card.product_id}
+        shopId={shopId}
+        window={window}
+      />
+    </div>
+  );
+}
+
+function PriorityCardContent({
+  card,
+  host,
+  rank,
+  shopId,
+  window,
+}: {
+  card: PriorityCard;
+  host?: string;
+  rank: number;
+  shopId: string;
+  window: TimeWindow;
+}) {
+  return (
+    <BlockStack gap="400">
+      <PriorityCardHeader card={card} rank={rank} />
+      <PriorityProductSummary card={card} host={host} shopId={shopId} window={window} />
+      <PriorityMetricsStrip card={card} />
+      <PriorityRecommendation card={card} />
+      <PriorityWhyNow card={card} />
+      <PriorityFeedback card={card} shopId={shopId} window={window} />
+    </BlockStack>
+  );
+}
+
 export function priorityTrendTone(
   trend: PriorityTrendState,
 ): "critical" | "success" | "info" | undefined {
   if (trend === "Worsening") return "critical";
   if (trend === "Improving") return "success";
   if (trend === "New") return "info";
+  return undefined;
+}
+
+export function prioritySignalTone(
+  signalState: PriorityCard["signal_state"],
+): "attention" | "info" | undefined {
+  if (signalState === "Tracking issue") return "attention";
+  if (signalState === "Insufficient data" || signalState === "Weak signal") return "info";
   return undefined;
 }
 
@@ -177,47 +422,9 @@ function PriorityCards({
 
   return (
     <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
-      {cards.map((card) => (
+      {cards.map((card, index) => (
         <Card key={`${card.board}-${card.product_id}`}>
-          <BlockStack gap="300">
-            <InlineStack align="space-between" blockAlign="center">
-              <Badge tone={priorityTone(card)}>{priorityBoardLabel(card.board)}</Badge>
-              <InlineStack gap="100">
-                <Badge tone={priorityTrendTone(card.trend_state)}>{card.trend_state}</Badge>
-                <Badge>{card.signal_state}</Badge>
-              </InlineStack>
-            </InlineStack>
-            <BlockStack gap="100">
-              <Text as="h3" variant="headingMd">
-                <a
-                  href={productPath(card.product_id, shopId, window, host)}
-                  style={{ color: "var(--p-color-text)", textDecoration: "none" }}
-                >
-                  {card.product_id}
-                </a>
-              </Text>
-              <Text as="p" variant="bodySm" tone="subdued">{card.flag_reason}</Text>
-              <Text as="p" variant="bodySm" tone="subdued">{card.trend_reason}</Text>
-              <InlineStack>
-                <Badge>{priorityStepLabel(card.primary_step)}</Badge>
-              </InlineStack>
-            </BlockStack>
-            <BlockStack gap="100">
-              {card.evidence.slice(0, 3).map((item) => (
-                <Text as="p" key={item} variant="bodySm">{item}</Text>
-              ))}
-            </BlockStack>
-            <BlockStack gap="100">
-              <Text as="p" variant="bodyMd">{card.suspected_friction}</Text>
-              <Text as="p" variant="bodyMd" fontWeight="semibold">{card.first_fix}</Text>
-            </BlockStack>
-            <RecommendationFeedbackButtons
-              board={card.board}
-              productId={card.product_id}
-              shopId={shopId}
-              window={window}
-            />
-          </BlockStack>
+          <PriorityCardContent card={card} host={host} rank={index + 1} shopId={shopId} window={window} />
         </Card>
       ))}
     </InlineGrid>
@@ -283,18 +490,30 @@ export default function DashboardRoute() {
             <Tabs tabs={tabs} selected={selectedTabIndex} onSelect={handleTabChange}>
               <Box paddingBlockStart="400">
                 <BlockStack gap="500">
-                  <BlockStack gap="200">
-                    <Text as="h2" variant="headingLg">{messages.dashboard.prioritiesTitle}</Text>
-                    <Text as="p" variant="bodyMd" tone="subdued">
-                      {messages.dashboard.prioritiesSubtitle}
-                    </Text>
-                  </BlockStack>
-                  <PriorityCards
-                    cards={data.priorities}
-                    host={data.host}
-                    shopId={data.shopId}
-                    window={data.window}
-                  />
+                  <div style={PRIORITY_SECTION_STYLE}>
+                    <Box padding="400">
+                      <BlockStack gap="400">
+                        <InlineStack align="space-between" blockAlign="start" gap="300">
+                          <BlockStack gap="200">
+                            <InlineStack gap="200" blockAlign="center">
+                              <Badge tone="info">{messages.dashboard.prioritiesKicker}</Badge>
+                            </InlineStack>
+                            <Text as="h2" variant="headingLg">{messages.dashboard.prioritiesTitle}</Text>
+                            <Text as="p" variant="bodyMd" tone="subdued">
+                              {messages.dashboard.prioritiesSubtitle}
+                            </Text>
+                          </BlockStack>
+                          <Badge>{messages.dashboard.prioritiesActionCount(data.priorities.length)}</Badge>
+                        </InlineStack>
+                        <PriorityCards
+                          cards={data.priorities}
+                          host={data.host}
+                          shopId={data.shopId}
+                          window={data.window}
+                        />
+                      </BlockStack>
+                    </Box>
+                  </div>
                   <BlockStack gap="300">
                     <Text as="h2" variant="headingMd">{messages.dashboard.viewMoreProducts}</Text>
                     <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">

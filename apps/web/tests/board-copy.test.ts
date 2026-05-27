@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { formatLeaderboardActivity } from "../app/components/LeaderboardTable";
 import { messages } from "../app/lib/messages";
-import { healthBannerContent, priorityStepLabel, priorityTrendTone } from "../app/routes/_index";
+import {
+  healthBannerContent,
+  priorityActionLabel,
+  prioritySignalTone,
+  priorityStepLabel,
+  priorityTrendTone,
+} from "../app/routes/_index";
 import { boardLabelForGap } from "../app/routes/products.$productId";
 
 describe("board copy", () => {
@@ -18,6 +24,9 @@ describe("board copy", () => {
   it("frames SKU Lens as a daily decision board instead of a scoring dashboard", () => {
     expect(messages.dashboard.subtitle).toBe("Daily decision board for product priorities");
     expect(messages.dashboard.errorMessage).toBe("Failed to load the board. The analytics server may be unavailable.");
+    expect(messages.dashboard.prioritiesKicker).toBe("Decision queue");
+    expect(messages.dashboard.prioritiesActionCount(3)).toBe("3 actions");
+    expect(messages.dashboard.priorityRecommendedMove).toBe("Recommended move");
     expect(messages.product.subtitle("benchmark-1")).toBe("Shopper journey and diagnosis · benchmark: benchmark-1");
     expect("scoringHeading" in messages.analysis).toBe(false);
   });
@@ -44,6 +53,19 @@ describe("board copy", () => {
     expect(priorityTrendTone("Improving")).toBe("success");
     expect(priorityTrendTone("New")).toBe("info");
     expect(priorityTrendTone("Stable")).toBeUndefined();
+  });
+
+  it("hides ready signal badges but keeps non-ready signal badges visible", () => {
+    expect(prioritySignalTone("Ready")).toBeUndefined();
+    expect(prioritySignalTone("Weak signal")).toBe("info");
+    expect(prioritySignalTone("Insufficient data")).toBe("info");
+    expect(prioritySignalTone("Tracking issue")).toBe("attention");
+  });
+
+  it("labels priority cards by the action merchants should take first", () => {
+    expect(priorityActionLabel({ board: "leaker", card_rank: 1 })).toBe("Fix first");
+    expect(priorityActionLabel({ board: "leaker", card_rank: 2 })).toBe("Fix next");
+    expect(priorityActionLabel({ board: "hidden_winner", card_rank: 3 })).toBe("Scale carefully");
   });
 
   it("summarizes integration health for the board banner", () => {
