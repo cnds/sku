@@ -5,9 +5,10 @@ import { Badge, Banner, BlockStack, Card, InlineStack, Layout, Page, Text } from
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { formatTimeWindowLabel } from "@/lib/analytics";
-import { fetchProductAnalysis, parseTimeWindow } from "@/lib/api.server";
+import { fetchPriorities, fetchProductAnalysis, parseTimeWindow } from "@/lib/api.server";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
+import { priorityActionLabel, priorityBoardLabel, priorityTone } from "@/lib/priorities";
 import { hostFromUrl, shopIdFromUrl } from "@/lib/shop";
 import { dashboardPath, diagnosisResourcePath } from "@/lib/url";
 
@@ -49,13 +50,18 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const host = hostFromUrl(url);
   const window = parseTimeWindow(url.searchParams.get("window"));
   const productId = params.productId ?? "";
-  const analysis = await fetchProductAnalysis({ productId, requestId, shopId, window });
+  const [analysis, priorities] = await Promise.all([
+    fetchProductAnalysis({ productId, requestId, shopId, window }),
+    fetchPriorities({ requestId, shopId, window }),
+  ]);
+  const priorityCard = priorities.find((card) => card.product_id === productId) ?? null;
 
   return {
     analysis,
     diagnosisPath: diagnosisResourcePath(productId, shopId, window, host),
     host,
     productId,
+    priorityCard,
     shopId,
     window,
   };
@@ -63,7 +69,21 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
 export default function ProductAnalysisRoute() {
   const data = useLoaderData<typeof loader>();
-  const board = boardLabelForGap(data.analysis.gap);
+  const board = data.priorityCard
+    ? { label: priorityBoardLabel(data.priorityCard.board), tone: priorityTone(data.priorityCard) }
+    : boardLabelForGap(data.analysis.gap);
+  const feedbackBoard = data.priorityCard?.board ?? (data.analysis.gap > 0 ? "leaker" : "hidden_winner");
+  const feedbackContext: Record<string, unknown> = data.priorityCard
+    ? {
+      primary_step: data.priorityCard.primary_step,
+      source_card_rank: data.priorityCard.card_rank,
+      surface: "product_detail",
+    }
+    : {
+      benchmark_product_id: data.analysis.benchmark_product_id,
+      gap: data.analysis.gap,
+      surface: "product_detail",
+    };
 
   return (
     <Page
@@ -72,6 +92,9 @@ export default function ProductAnalysisRoute() {
       titleMetadata={
         <InlineStack gap="200">
           <Badge tone={board.tone}>{board.label}</Badge>
+          {data.priorityCard ? (
+            <Badge tone={priorityTone(data.priorityCard)}>{priorityActionLabel(data.priorityCard)}</Badge>
+          ) : null}
           <Badge>{formatTimeWindowLabel(data.window)}</Badge>
         </InlineStack>
       }
@@ -80,18 +103,22 @@ export default function ProductAnalysisRoute() {
       <Layout>
         <Layout.Section>
           <BlockStack gap="400">
-            <AnalysisPanel analysis={data.analysis} diagnosisPath={data.diagnosisPath} />
+            <AnalysisPanel
+              analysis={data.analysis}
+              diagnosisPath={data.diagnosisPath}
+              priorityCard={data.priorityCard}
+            />
             <Card>
               <RecommendationFeedbackButtons
-                board={data.analysis.gap > 0 ? "leaker" : "hidden_winner"}
-                context={{
-                  benchmark_product_id: data.analysis.benchmark_product_id,
-                  gap: data.analysis.gap,
-                  surface: "product_detail",
-                }}
+                board={feedbackBoard}
+                boardDate={data.priorityCard?.board_date}
+                cardRank={data.priorityCard?.card_rank}
+                context={feedbackContext}
                 productId={data.productId}
                 shopId={data.shopId}
                 window={data.window}
+                windowEndDate={data.priorityCard?.window_end_date}
+                windowStartDate={data.priorityCard?.window_start_date}
               />
             </Card>
           </BlockStack>

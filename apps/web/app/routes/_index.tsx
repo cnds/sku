@@ -20,11 +20,28 @@ import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { TIME_WINDOWS, formatTimeWindowLabel } from "@/lib/analytics";
 import { fetchIntegrationHealth, fetchLeaderboard, fetchPriorities, parseTimeWindow } from "@/lib/api.server";
-import type { IntegrationHealthResponse, PriorityCard, PriorityTrendState, TimeWindow } from "@/lib/contracts";
+import type { IntegrationHealthResponse, PriorityCard, TimeWindow } from "@/lib/contracts";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
+import {
+  priorityAccentColor,
+  priorityActionBackground,
+  priorityActionLabel,
+  priorityBoardLabel,
+  prioritySignalTone,
+  priorityStepLabel,
+  priorityTone,
+  priorityTrendTone,
+} from "@/lib/priorities";
 import { hostFromUrl, shopIdFromUrl } from "@/lib/shop";
 import { dashboardPath, productPath } from "@/lib/url";
+
+export {
+  priorityActionLabel,
+  prioritySignalTone,
+  priorityStepLabel,
+  priorityTrendTone,
+} from "@/lib/priorities";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
@@ -40,35 +57,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   ]);
 
   return { blackboard, health, host, priorities, redboard, shopId, window };
-}
-
-function priorityBoardLabel(board: PriorityCard["board"]): string {
-  return board === "hidden_winner" ? "Hidden Winner" : messages.dashboard.blackboardTitle;
-}
-
-const PRIORITY_STEP_LABELS: Record<string, string> = {
-  cart_to_order: "Drop-off: add-to-cart to order",
-  collection_click: "Drop-off: collection impression to click",
-  data_volume: "Signal: data volume",
-  merchandising_reach: "Opportunity: merchandising reach",
-  pdp_add_to_cart: "Drop-off: PDP view to add-to-cart",
-  pdp_decision: "Drop-off: PDP decision",
-  tracking_coverage: "Tracking: event coverage",
-};
-
-export function priorityStepLabel(step: string): string {
-  return PRIORITY_STEP_LABELS[step] ?? `Signal: ${step.replaceAll("_", " ")}`;
-}
-
-function priorityTone(card: PriorityCard): "attention" | "critical" | "info" | "success" {
-  if (card.signal_state === "Tracking issue") return "attention";
-  if (card.signal_state === "Insufficient data" || card.signal_state === "Weak signal") return "info";
-  return card.board === "hidden_winner" ? "success" : "critical";
-}
-
-export function priorityActionLabel(card: Pick<PriorityCard, "board"> & { card_rank: number }): string {
-  if (card.board === "hidden_winner") return "Scale carefully";
-  return card.card_rank === 1 ? "Fix first" : "Fix next";
 }
 
 const PRIORITY_SECTION_STYLE: CSSProperties = {
@@ -100,18 +88,6 @@ const PRIORITY_PRODUCT_LINK_STYLE: CSSProperties = {
   textDecorationThickness: "1px",
   textUnderlineOffset: "3px",
 };
-
-function priorityAccentColor(card: Pick<PriorityCard, "board">): string {
-  return card.board === "hidden_winner"
-    ? "var(--p-color-border-success, #008060)"
-    : "var(--p-color-border-critical, #d82c0d)";
-}
-
-function priorityActionBackground(card: Pick<PriorityCard, "board">): string {
-  return card.board === "hidden_winner"
-    ? "rgba(0, 128, 96, 0.05)"
-    : "rgba(216, 44, 13, 0.05)";
-}
 
 function priorityActionStyle(card: Pick<PriorityCard, "board">): CSSProperties {
   return {
@@ -312,23 +288,6 @@ function PriorityCardContent({
       <PriorityFeedback card={card} shopId={shopId} window={window} />
     </BlockStack>
   );
-}
-
-export function priorityTrendTone(
-  trend: PriorityTrendState,
-): "critical" | "success" | "info" | undefined {
-  if (trend === "Worsening") return "critical";
-  if (trend === "Improving") return "success";
-  if (trend === "New") return "info";
-  return undefined;
-}
-
-export function prioritySignalTone(
-  signalState: PriorityCard["signal_state"],
-): "attention" | "info" | undefined {
-  if (signalState === "Tracking issue") return "attention";
-  if (signalState === "Insufficient data" || signalState === "Weak signal") return "info";
-  return undefined;
 }
 
 export function healthBannerContent(

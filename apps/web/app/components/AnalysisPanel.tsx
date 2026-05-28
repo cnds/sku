@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import { startTransition, useEffect, useState } from "react";
 import {
   Badge,
@@ -13,7 +14,7 @@ import {
   Text,
 } from "@shopify/polaris";
 import { RefreshIcon } from "@shopify/polaris-icons";
-import type { DiagnosisResult, ProductAnalysisResult } from "@/lib/contracts";
+import type { DiagnosisResult, PriorityCard, ProductAnalysisResult } from "@/lib/contracts";
 
 import {
   createFailedDiagnosis,
@@ -25,13 +26,52 @@ import {
 } from "@/lib/diagnosis";
 import { REQUEST_ID_HEADER, generateRequestId, logBrowserEvent } from "@/lib/logging";
 import { messages } from "@/lib/messages";
+import {
+  priorityAccentColor,
+  priorityActionBackground,
+  priorityActionLabel,
+  priorityBoardLabel,
+  prioritySignalTone,
+  priorityStepLabel,
+  priorityTone,
+  priorityTrendTone,
+} from "@/lib/priorities";
 
 interface AnalysisPanelProps {
   analysis: ProductAnalysisResult;
   diagnosisPath: string;
+  priorityCard?: PriorityCard | null;
 }
 
 const DIAGNOSIS_POLL_INTERVAL_MS = 3_000;
+
+const PRIORITY_DETAIL_STYLE: CSSProperties = {
+  borderRadius: 8,
+  overflow: "hidden",
+};
+
+const PRIORITY_DETAIL_BODY_STYLE: CSSProperties = {
+  padding: "1rem",
+};
+
+const PRIORITY_DETAIL_METRIC_STYLE: CSSProperties = {
+  background: "var(--p-color-bg-surface-secondary, #f9fafb)",
+  border: "1px solid var(--p-color-border-secondary, #e3e3e3)",
+  borderRadius: 8,
+  padding: "0.75rem",
+};
+
+const PRIORITY_DETAIL_LIST_STYLE: CSSProperties = {
+  margin: 0,
+  paddingLeft: "1.25rem",
+};
+
+const JOURNEY_STEP_STYLE: CSSProperties = {
+  background: "var(--p-color-bg-surface, #ffffff)",
+  border: "1px solid var(--p-color-border-secondary, #e3e3e3)",
+  borderRadius: 8,
+  padding: "0.75rem",
+};
 
 interface ShopperJourneyStep {
   id: string;
@@ -51,6 +91,137 @@ interface ShopperJourneyDropOff {
 interface ShopperJourney {
   steps: ShopperJourneyStep[];
   primaryDropOff: ShopperJourneyDropOff;
+}
+
+function priorityDetailStyle(card: Pick<PriorityCard, "board">): CSSProperties {
+  return {
+    ...PRIORITY_DETAIL_STYLE,
+    borderLeft: `6px solid ${priorityAccentColor(card)}`,
+  };
+}
+
+function priorityConclusionStyle(card: Pick<PriorityCard, "board">): CSSProperties {
+  return {
+    background: priorityActionBackground(card),
+    border: `1px solid ${priorityAccentColor(card)}`,
+    borderRadius: 8,
+    padding: "0.875rem",
+  };
+}
+
+function journeyStepIdForPriority(step: string): string | null {
+  if (step === "collection_click") return "click";
+  if (step === "data_volume" || step === "pdp_decision" || step === "tracking_coverage") return "pdp_view";
+  if (step === "merchandising_reach") return "exposure";
+  if (step === "pdp_add_to_cart") return "add_to_cart";
+  if (step === "cart_to_order") return "order";
+  return null;
+}
+
+function journeyStepStyle({
+  isActive,
+  priorityCard,
+}: {
+  isActive: boolean;
+  priorityCard?: PriorityCard | null;
+}): CSSProperties {
+  if (!isActive) {
+    return JOURNEY_STEP_STYLE;
+  }
+
+  if (priorityCard) {
+    return {
+      ...JOURNEY_STEP_STYLE,
+      background: priorityActionBackground(priorityCard),
+      border: `1px solid ${priorityAccentColor(priorityCard)}`,
+    };
+  }
+
+  return {
+    ...JOURNEY_STEP_STYLE,
+    background: "var(--p-color-bg-fill-critical-secondary, #fff4f4)",
+    border: "1px solid var(--p-color-border-critical, #d82c0d)",
+  };
+}
+
+function PriorityDetailMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div style={PRIORITY_DETAIL_METRIC_STYLE}>
+      <BlockStack gap="100">
+        <Text as="p" variant="bodySm" tone="subdued">{label}</Text>
+        <Text as="p" variant="headingMd">{value.toLocaleString("en-US")}</Text>
+      </BlockStack>
+    </div>
+  );
+}
+
+function PriorityDetailCard({ card }: { card: PriorityCard }) {
+  return (
+    <Card padding="0">
+      <div style={priorityDetailStyle(card)}>
+        <div style={PRIORITY_DETAIL_BODY_STYLE}>
+          <BlockStack gap="400">
+            <InlineStack align="space-between" blockAlign="start" gap="300">
+              <BlockStack gap="200">
+                <InlineStack gap="200" blockAlign="center">
+                  <Badge tone={priorityTone(card)}>{priorityActionLabel(card)}</Badge>
+                  <Badge tone={priorityTone(card)}>{priorityBoardLabel(card.board)}</Badge>
+                  <Badge tone={priorityTrendTone(card.trend_state)}>{card.trend_state}</Badge>
+                  {prioritySignalTone(card.signal_state) ? (
+                    <Badge tone={prioritySignalTone(card.signal_state)}>{card.signal_state}</Badge>
+                  ) : null}
+                </InlineStack>
+                <Text as="h2" variant="headingMd">{messages.analysis.priorityDetailHeading}</Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {priorityStepLabel(card.primary_step)}
+                </Text>
+              </BlockStack>
+              <Text as="p" variant="bodySm" tone="subdued">
+                {card.window_start_date} to {card.window_end_date}
+              </Text>
+            </InlineStack>
+
+            <div style={priorityConclusionStyle(card)}>
+              <BlockStack gap="100">
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {messages.analysis.priorityConclusion}
+                </Text>
+                <Text as="p" variant="bodyMd" fontWeight="semibold">
+                  {card.first_fix}
+                </Text>
+              </BlockStack>
+            </div>
+
+            <InlineGrid columns={{ xs: 2, md: 5 }} gap="300">
+              <PriorityDetailMetric label="PDP views" value={card.views} />
+              <PriorityDetailMetric label="Carts" value={card.add_to_carts} />
+              <PriorityDetailMetric label="Orders" value={card.orders} />
+              <PriorityDetailMetric label="Impressions" value={card.impressions} />
+              <PriorityDetailMetric label="Clicks" value={card.clicks} />
+            </InlineGrid>
+
+            <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+              <BlockStack gap="150">
+                <Text as="h3" variant="headingSm">{messages.analysis.priorityWhyNow}</Text>
+                <Text as="p" variant="bodyMd">{card.suspected_friction}</Text>
+                <Text as="p" variant="bodySm" tone="subdued">{card.trend_reason}</Text>
+              </BlockStack>
+              <BlockStack gap="150">
+                <Text as="h3" variant="headingSm">{messages.analysis.priorityEvidence}</Text>
+                <ul style={PRIORITY_DETAIL_LIST_STYLE}>
+                  {card.evidence.map((item) => (
+                    <li key={item}>
+                      <Text as="span" variant="bodyMd">{item}</Text>
+                    </li>
+                  ))}
+                </ul>
+              </BlockStack>
+            </InlineGrid>
+          </BlockStack>
+        </div>
+      </div>
+    </Card>
+  );
 }
 
 export function buildShopperJourney(analysis: ProductAnalysisResult): ShopperJourney {
@@ -179,32 +350,42 @@ function formatCount(value: number | undefined): string {
   return safeNumber(value).toLocaleString("en-US");
 }
 
-function ShopperJourneyCard({ analysis }: { analysis: ProductAnalysisResult }) {
+function ShopperJourneyCard({
+  analysis,
+  priorityCard,
+}: {
+  analysis: ProductAnalysisResult;
+  priorityCard?: PriorityCard | null;
+}) {
   const journey = buildShopperJourney(analysis);
+  const headerBadge = priorityCard ? priorityStepLabel(priorityCard.primary_step) : messages.analysis.primaryDropOff;
+  const headerTone = priorityCard ? priorityTone(priorityCard) : "critical";
+  const highlightedStepId = priorityCard
+    ? journeyStepIdForPriority(priorityCard.primary_step)
+    : journey.primaryDropOff.stepId;
 
   return (
     <Card>
       <BlockStack gap="400">
         <InlineStack align="space-between" blockAlign="center">
           <Text as="h2" variant="headingMd">{messages.analysis.journeyHeading}</Text>
-          <Badge tone="critical">{messages.analysis.primaryDropOff}</Badge>
+          <Badge tone={headerTone}>{headerBadge}</Badge>
         </InlineStack>
         <InlineGrid columns={{ xs: 2, md: 6 }} gap="300">
           {journey.steps.map((step) => (
-            <Box
+            <div
               key={step.id}
-              background={step.id === journey.primaryDropOff.stepId ? "bg-fill-critical-secondary" : "bg-surface"}
-              borderColor={step.id === journey.primaryDropOff.stepId ? "border-critical" : "border"}
-              borderRadius="200"
-              borderWidth="025"
-              padding="300"
+              style={journeyStepStyle({
+                isActive: step.id === highlightedStepId,
+                priorityCard,
+              })}
             >
               <BlockStack gap="100">
                 <Text as="p" variant="bodySm" tone="subdued">{step.label}</Text>
                 <Text as="p" variant="headingMd">{step.value}</Text>
                 <Text as="p" variant="bodySm" tone="subdued">{step.detail}</Text>
               </BlockStack>
-            </Box>
+            </div>
           ))}
         </InlineGrid>
         <Box
@@ -363,7 +544,7 @@ function DiagnosisCards({
   );
 }
 
-export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
+export function AnalysisPanel({ analysis, diagnosisPath, priorityCard }: AnalysisPanelProps) {
   const [diagnosis, setDiagnosis] = useState<DiagnosisResult>(createPendingDiagnosis);
   const [rerunToken, setRerunToken] = useState(0);
 
@@ -462,7 +643,8 @@ export function AnalysisPanel({ analysis, diagnosisPath }: AnalysisPanelProps) {
 
   return (
     <BlockStack gap="500">
-      <ShopperJourneyCard analysis={analysis} />
+      {priorityCard ? <PriorityDetailCard card={priorityCard} /> : null}
+      <ShopperJourneyCard analysis={analysis} priorityCard={priorityCard} />
       <DiagnosisCards
         diagnosis={diagnosis}
         onRerun={() => {

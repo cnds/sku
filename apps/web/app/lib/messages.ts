@@ -55,6 +55,10 @@ export const messages = {
   analysis: {
     journeyHeading: "Shopper Journey",
     primaryDropOff: "Primary drop-off",
+    priorityConclusion: "Conclusion",
+    priorityDetailHeading: "Priority detail",
+    priorityEvidence: "Evidence",
+    priorityWhyNow: "Why now",
     diagnosisHeading: "AI Diagnosis",
     diagnosisGenerating: "Generating",
     diagnosisFailed: "Failed",
