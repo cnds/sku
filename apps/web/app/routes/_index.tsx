@@ -72,14 +72,15 @@ export function priorityActionLabel(card: Pick<PriorityCard, "board"> & { card_r
 }
 
 const PRIORITY_SECTION_STYLE: CSSProperties = {
-  background: "var(--p-color-bg-surface-secondary, #f7f7f7)",
+  background: "var(--p-color-bg-surface, #ffffff)",
   border: "1px solid var(--p-color-border-secondary, #dcdcdc)",
-  borderRadius: "8px",
+  borderRadius: "12px",
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
 };
 
 const PRIORITY_METRICS_STRIP_STYLE: CSSProperties = {
-  background: "var(--p-color-bg-surface-secondary, #f7f7f7)",
-  borderRadius: "8px",
+  background: "var(--p-color-bg-surface-secondary, #f9fafb)",
+  borderRadius: "10px",
   padding: "0.75rem 0.875rem",
 };
 
@@ -106,15 +107,17 @@ function priorityAccentColor(card: Pick<PriorityCard, "board">): string {
     : "var(--p-color-border-critical, #d82c0d)";
 }
 
-function priorityActionBackground(): string {
-  return "var(--p-color-bg-surface-secondary, #f7f7f7)";
+function priorityActionBackground(card: Pick<PriorityCard, "board">): string {
+  return card.board === "hidden_winner"
+    ? "rgba(0, 128, 96, 0.05)"
+    : "rgba(216, 44, 13, 0.05)";
 }
 
 function priorityActionStyle(card: Pick<PriorityCard, "board">): CSSProperties {
   return {
-    background: priorityActionBackground(),
-    borderLeft: `4px solid ${priorityAccentColor(card)}`,
-    borderRadius: "8px",
+    background: priorityActionBackground(card),
+    borderLeft: `6px solid ${priorityAccentColor(card)}`,
+    borderRadius: "10px",
     padding: "0.875rem",
   };
 }
@@ -129,10 +132,16 @@ const PRIORITY_WHY_NOW_STYLE: CSSProperties = {
   paddingTop: "0.875rem",
 };
 
+const PRIORITY_CARD_STYLE: CSSProperties = {
+  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+  borderRadius: "12px",
+  overflow: "hidden",
+};
+
 function PriorityMetric({ label, value }: { label: string; value: number }) {
   return (
     <BlockStack gap="050">
-      <Text as="p" variant="headingMd">
+      <Text as="p" variant="headingLg" fontWeight="bold">
         {value.toLocaleString("en-US")}
       </Text>
       <Text as="p" variant="bodySm" tone="subdued">
@@ -173,10 +182,10 @@ function PriorityCardHeader({ card, rank }: { card: PriorityCard; rank: number }
         style={{
           background: priorityAccentColor(card),
           borderRadius: "2px",
-          height: "4px",
+          height: "6px",
         }}
       />
-      <InlineStack align="space-between" blockAlign="start" gap="200">
+      <InlineStack align="space-between" blockAlign="center" gap="200">
         <InlineStack gap="200" blockAlign="center">
           <Text as="span" variant="headingLg">
             #{rank}
@@ -229,9 +238,12 @@ function PriorityRecommendation({ card }: { card: PriorityCard }) {
   return (
     <div style={priorityActionStyle(card)}>
       <BlockStack gap="100">
-        <Text as="p" variant="bodySm" tone="subdued">
-          {messages.dashboard.priorityRecommendedMove}
-        </Text>
+        <InlineStack gap="150" blockAlign="center">
+          <Text as="span" variant="bodySm">💡</Text>
+          <Text as="p" variant="bodySm" tone="subdued">
+            {messages.dashboard.priorityRecommendedMove}
+          </Text>
+        </InlineStack>
         <Text as="p" variant="bodyMd" fontWeight="semibold">
           {card.first_fix}
         </Text>
@@ -423,9 +435,11 @@ function PriorityCards({
   return (
     <InlineGrid columns={{ xs: 1, md: 3 }} gap="400">
       {cards.map((card, index) => (
-        <Card key={`${card.board}-${card.product_id}`}>
-          <PriorityCardContent card={card} host={host} rank={index + 1} shopId={shopId} window={window} />
-        </Card>
+        <div key={`${card.board}-${card.product_id}`} style={PRIORITY_CARD_STYLE}>
+          <Card>
+            <PriorityCardContent card={card} host={host} rank={index + 1} shopId={shopId} window={window} />
+          </Card>
+        </div>
       ))}
     </InlineGrid>
   );
