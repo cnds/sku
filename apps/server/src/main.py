@@ -19,6 +19,7 @@ from db import (
     init_db,
 )
 from logging_utils import configure_logging
+from services.analysis import ProductAnalysisNotFoundError
 from services.diagnosis import DiagnosisNotFoundError
 from services.ingest_auth import (
     IngestAuthError,
@@ -73,6 +74,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def diagnosis_not_found_handler(
         request: Request,
         exc: DiagnosisNotFoundError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(ProductAnalysisNotFoundError)
+    async def product_analysis_not_found_handler(
+        request: Request,
+        exc: ProductAnalysisNotFoundError,
     ) -> JSONResponse:
         del request
         return JSONResponse(status_code=404, content={"detail": str(exc)})

@@ -236,6 +236,26 @@ async def test_app_maps_diagnosis_domain_errors_to_http_responses(
 
 
 @pytest.mark.asyncio
+async def test_app_maps_missing_product_analysis_to_http_response(
+    sqlite_database_url: str,
+    redis_url: str,
+) -> None:
+    app = create_app(_settings(sqlite_database_url, redis_url))
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get(
+            "/api/products/missing-product/analysis",
+            params={"shop_id": "shop-1", "window": "24h"},
+        )
+
+    assert response.status_code == 404
+    assert response.json() == {"detail": "Product analysis not found."}
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("error", "status_code", "detail"),
     [

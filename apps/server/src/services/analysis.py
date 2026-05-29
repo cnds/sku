@@ -23,6 +23,11 @@ from schemas import (
 from services.shop_time import ensure_utc_datetime, local_date_for_shop
 
 
+class ProductAnalysisNotFoundError(Exception):
+    def __init__(self) -> None:
+        super().__init__("Product analysis not found.")
+
+
 class ProductAnalysisService:
     def __init__(
         self,
@@ -49,13 +54,16 @@ class ProductAnalysisService:
             window=window,
             reference_date=reference_date,
         )
+        target = snapshots.get(product_id)
+        if target is None:
+            raise ProductAnalysisNotFoundError()
+
         benchmark_snapshots = await self._repository.fetch_product_snapshots(
             shop_id=shop_id,
             window=TimeWindow.DAYS_30,
             reference_date=reference_date,
         )
 
-        target = snapshots[product_id]
         benchmark_product_id, benchmark = self._select_benchmark(benchmark_snapshots)
         store_avg_cr = self._store_average_cr(snapshots)
         gap = (target.views * store_avg_cr) - target.orders

@@ -144,7 +144,7 @@ async def test_seed_demo_data_targets_existing_shopify_installation_without_wipi
 
     summary = await seed_demo_data(
         settings=settings,
-        now_utc=datetime(2026, 5, 27, 8, 0, tzinfo=UTC),
+        now_utc=datetime.now(UTC),
     )
 
     assert summary.shop_domain == shop_domain
