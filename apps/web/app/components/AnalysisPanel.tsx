@@ -54,23 +54,23 @@ const PRIORITY_DETAIL_BODY_STYLE: CSSProperties = {
   padding: "1rem",
 };
 
-const PRIORITY_DETAIL_METRIC_STYLE: CSSProperties = {
-  background: "var(--p-color-bg-surface-secondary, #f9fafb)",
-  border: "1px solid var(--p-color-border-secondary, #e3e3e3)",
-  borderRadius: 8,
-  padding: "0.75rem",
-};
-
-const PRIORITY_DETAIL_LIST_STYLE: CSSProperties = {
-  margin: 0,
-  paddingLeft: "1.25rem",
-};
-
 const JOURNEY_STEP_STYLE: CSSProperties = {
   background: "var(--p-color-bg-surface, #ffffff)",
   border: "1px solid var(--p-color-border-secondary, #e3e3e3)",
   borderRadius: 8,
   padding: "0.75rem",
+};
+
+const JOURNEY_INSIGHT_STYLE: CSSProperties = {
+  background: "var(--p-color-bg-fill-critical-secondary, #fff4f4)",
+  border: "1px solid var(--p-color-border-critical, #d82c0d)",
+  borderRadius: 8,
+  padding: "1rem",
+};
+
+const JOURNEY_INSIGHT_LIST_STYLE: CSSProperties = {
+  margin: 0,
+  paddingLeft: "1.25rem",
 };
 
 interface ShopperJourneyStep {
@@ -109,6 +109,18 @@ function priorityConclusionStyle(card: Pick<PriorityCard, "board">): CSSProperti
   };
 }
 
+function journeyInsightStyle(priorityCard?: PriorityCard | null): CSSProperties {
+  if (!priorityCard) {
+    return JOURNEY_INSIGHT_STYLE;
+  }
+
+  return {
+    ...JOURNEY_INSIGHT_STYLE,
+    background: priorityActionBackground(priorityCard),
+    border: `1px solid ${priorityAccentColor(priorityCard)}`,
+  };
+}
+
 function journeyStepIdForPriority(step: string): string | null {
   if (step === "collection_click") return "click";
   if (step === "data_volume" || step === "pdp_decision" || step === "tracking_coverage") return "pdp_view";
@@ -142,17 +154,6 @@ function journeyStepStyle({
     background: "var(--p-color-bg-fill-critical-secondary, #fff4f4)",
     border: "1px solid var(--p-color-border-critical, #d82c0d)",
   };
-}
-
-function PriorityDetailMetric({ label, value }: { label: string; value: number }) {
-  return (
-    <div style={PRIORITY_DETAIL_METRIC_STYLE}>
-      <BlockStack gap="100">
-        <Text as="p" variant="bodySm" tone="subdued">{label}</Text>
-        <Text as="p" variant="headingMd">{value.toLocaleString("en-US")}</Text>
-      </BlockStack>
-    </div>
-  );
 }
 
 function PriorityDetailCard({ card }: { card: PriorityCard }) {
@@ -189,34 +190,11 @@ function PriorityDetailCard({ card }: { card: PriorityCard }) {
                 <Text as="p" variant="bodyMd" fontWeight="semibold">
                   {card.first_fix}
                 </Text>
+                <Text as="p" variant="bodySm" tone="subdued">
+                  {card.trend_reason}
+                </Text>
               </BlockStack>
             </div>
-
-            <InlineGrid columns={{ xs: 2, md: 5 }} gap="300">
-              <PriorityDetailMetric label="PDP views" value={card.views} />
-              <PriorityDetailMetric label="Carts" value={card.add_to_carts} />
-              <PriorityDetailMetric label="Orders" value={card.orders} />
-              <PriorityDetailMetric label="Impressions" value={card.impressions} />
-              <PriorityDetailMetric label="Clicks" value={card.clicks} />
-            </InlineGrid>
-
-            <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-              <BlockStack gap="150">
-                <Text as="h3" variant="headingSm">{messages.analysis.priorityWhyNow}</Text>
-                <Text as="p" variant="bodyMd">{card.suspected_friction}</Text>
-                <Text as="p" variant="bodySm" tone="subdued">{card.trend_reason}</Text>
-              </BlockStack>
-              <BlockStack gap="150">
-                <Text as="h3" variant="headingSm">{messages.analysis.priorityEvidence}</Text>
-                <ul style={PRIORITY_DETAIL_LIST_STYLE}>
-                  {card.evidence.map((item) => (
-                    <li key={item}>
-                      <Text as="span" variant="bodyMd">{item}</Text>
-                    </li>
-                  ))}
-                </ul>
-              </BlockStack>
-            </InlineGrid>
           </BlockStack>
         </div>
       </div>
@@ -363,6 +341,10 @@ function ShopperJourneyCard({
   const highlightedStepId = priorityCard
     ? journeyStepIdForPriority(priorityCard.primary_step)
     : journey.primaryDropOff.stepId;
+  const insightTitle = priorityCard ? messages.analysis.priorityWhyNow : journey.primaryDropOff.label;
+  const insightEvidence = priorityCard ? priorityCard.evidence : [journey.primaryDropOff.evidence];
+  const insightFriction = priorityCard ? priorityCard.suspected_friction : journey.primaryDropOff.suspectedFriction;
+  const insightFirstFix = priorityCard ? null : journey.primaryDropOff.firstFix;
 
   return (
     <Card>
@@ -388,20 +370,26 @@ function ShopperJourneyCard({
             </div>
           ))}
         </InlineGrid>
-        <Box
-          background="bg-fill-critical-secondary"
-          borderColor="border-critical"
-          borderRadius="200"
-          borderWidth="025"
-          padding="400"
-        >
+        <div style={journeyInsightStyle(priorityCard)}>
           <BlockStack gap="200">
-            <Text as="h3" variant="headingSm">{journey.primaryDropOff.label}</Text>
-            <Text as="p" variant="bodyMd">{journey.primaryDropOff.evidence}</Text>
-            <Text as="p" variant="bodyMd">{journey.primaryDropOff.suspectedFriction}</Text>
-            <Text as="p" variant="bodyMd" fontWeight="semibold">{journey.primaryDropOff.firstFix}</Text>
+            <Text as="h3" variant="headingSm">{insightTitle}</Text>
+            {insightEvidence.length === 1 ? (
+              <Text as="p" variant="bodyMd">{insightEvidence[0]}</Text>
+            ) : (
+              <ul style={JOURNEY_INSIGHT_LIST_STYLE}>
+                {insightEvidence.map((item) => (
+                  <li key={item}>
+                    <Text as="span" variant="bodyMd">{item}</Text>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <Text as="p" variant="bodyMd">{insightFriction}</Text>
+            {insightFirstFix ? (
+              <Text as="p" variant="bodyMd" fontWeight="semibold">{insightFirstFix}</Text>
+            ) : null}
           </BlockStack>
-        </Box>
+        </div>
       </BlockStack>
     </Card>
   );

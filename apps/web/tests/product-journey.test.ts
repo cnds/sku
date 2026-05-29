@@ -23,7 +23,7 @@ describe("product shopper journey", () => {
     ]);
   });
 
-  it("renders the matched priority card as the product detail conclusion", () => {
+  it("keeps priority detail as a summary and journey as the detailed data", () => {
     const markup = renderToStaticMarkup(
       createElement(
         AppProvider,
@@ -37,13 +37,38 @@ describe("product shopper journey", () => {
     );
 
     expect(markup).toContain("Priority detail");
-    expect(markup).toContain("Move the trust cue beside the buy box.");
-    expect(markup).toContain("50 PDP views");
-    expect(markup).toContain("2 add-to-carts");
+    expect(countOccurrences(markup, "Move the trust cue beside the buy box.")).toBe(1);
+    expect(countOccurrences(markup, "50 PDP views")).toBe(1);
+    expect(countOccurrences(markup, "2 add-to-carts")).toBe(1);
+    expect(markup).not.toContain(">PDP views<");
+    expect(markup).not.toContain(">Carts<");
     expect(markup).toContain("Drop-off: PDP view to add-to-cart");
+    expect(markup).toContain("Why now");
+    expect(markup).toContain("Shoppers need more confidence before checkout.");
     expect(markup).toContain("Gap worsened versus the previous window.");
   });
+
+  it("keeps the derived journey recommendation when no priority card is matched", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        AppProvider,
+        { i18n: polarisTranslations },
+        createElement(AnalysisPanel, {
+          analysis: productAnalysisFixture(),
+          diagnosisPath: "/resources/products/product-1/diagnosis?shop=demo.myshopify.com&window=24h",
+        }),
+      ),
+    );
+
+    expect(markup).toContain("Shopper Journey");
+    expect(markup).toContain("PDP view to add-to-cart");
+    expect(markup).toContain("Move the strongest trust, fit, or offer cue next to the buy box and test one change.");
+  });
 });
+
+function countOccurrences(value: string, search: string): number {
+  return value.split(search).length - 1;
+}
 
 function productAnalysisFixture(): ProductAnalysisResult {
   return {
