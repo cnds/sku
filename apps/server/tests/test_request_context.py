@@ -26,6 +26,7 @@ from services.shopify import InvalidShopifyOAuthCallbackError
 
 def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
     return Settings(
+        celery_broker_url=None,
         database_url=sqlite_database_url,
         ai_api_key="test-key",
         ingest_shared_secret="ingest-secret",
@@ -33,7 +34,7 @@ def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
         shopify_api_key="test-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
 
@@ -87,9 +88,7 @@ async def test_db_session_middleware_commits_successful_requests(
     async with app.state.session_factory() as session:
         installation = (
             await session.exec(
-                select(ShopInstallation).where(
-                    ShopInstallation.shop_domain == "committed.myshopify.com"
-                )
+                select(ShopInstallation).where(ShopInstallation.shop_domain == "committed.myshopify.com")
             )
         ).one()
 
@@ -125,9 +124,7 @@ async def test_db_session_middleware_rolls_back_failed_requests(
     async with app.state.session_factory() as session:
         installation = (
             await session.exec(
-                select(ShopInstallation).where(
-                    ShopInstallation.shop_domain == "rolled-back.myshopify.com"
-                )
+                select(ShopInstallation).where(ShopInstallation.shop_domain == "rolled-back.myshopify.com")
             )
         ).first()
 

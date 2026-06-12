@@ -14,6 +14,7 @@ type SecretResolver = str | Callable[[Request], str]
 P = ParamSpec("P")
 T = TypeVar("T")
 
+
 def build_shopify_hmac(secret: str, body: bytes) -> str:
     digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).digest()
     return base64.b64encode(digest).decode("utf-8")
@@ -27,11 +28,7 @@ def verify_shopify_hmac(secret: str, body: bytes, signature: str | None) -> bool
 
 
 def build_shopify_oauth_hmac(secret: str, params: Mapping[str, str]) -> str:
-    encoded = "&".join(
-        f"{key}={value}"
-        for key, value in sorted(params.items())
-        if key not in {"hmac", "signature"}
-    )
+    encoded = "&".join(f"{key}={value}" for key, value in sorted(params.items()) if key not in {"hmac", "signature"})
     return hmac.new(secret.encode("utf-8"), encoded.encode("utf-8"), hashlib.sha256).hexdigest()
 
 

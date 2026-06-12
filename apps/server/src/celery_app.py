@@ -22,15 +22,11 @@ def broker_url() -> str:
     except ValidationError:
         pass
 
-    return (
-        os.environ.get("CELERY_BROKER_URL")
-        or os.environ.get("REDIS_URL")
-        or "redis://localhost:6379/0"
-    )
+    return os.environ.get("CELERY_BROKER_URL") or os.environ.get("REDIS_URL") or "redis://localhost:6379/0"
 
 
 def configure_celery(settings: Settings) -> None:
-    celery_app.conf.broker_url = settings.celery_broker_url or settings.redis_url
+    celery_app.conf.update(broker_url=settings.celery_broker_url or settings.redis_url)
 
 
 celery_app = Celery(

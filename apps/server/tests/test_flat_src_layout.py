@@ -43,6 +43,7 @@ def test_server_mvc_modules_are_importable_directly_from_src_root() -> None:
     assert diagnosis_repository.DiagnosisRepository.__name__ == "DiagnosisRepository"
     assert installation_repository.InstallationRepository.__name__ == "InstallationRepository"
     assert schemas.IngestAcceptedResponse.__name__ == "IngestAcceptedResponse"
+    assert schemas.ShopifyPixelBatchRequest.__name__ == "ShopifyPixelBatchRequest"
     assert schemas.ShopifyOAuthCallbackResponse.__name__ == "ShopifyOAuthCallbackResponse"
     assert schemas.ShopifyWebhookAcceptedResponse.__name__ == "ShopifyWebhookAcceptedResponse"
     assert services.ProductAnalysisService.__name__ == "ProductAnalysisService"
@@ -71,9 +72,7 @@ def test_celery_runtime_logic_lives_under_tasks_package() -> None:
 def test_main_module_only_exposes_assembly_helpers() -> None:
     main = importlib.import_module("main")
     main_functions = {
-        name
-        for name, value in vars(main).items()
-        if inspect.isfunction(value) and value.__module__ == "main"
+        name for name, value in vars(main).items() if inspect.isfunction(value) and value.__module__ == "main"
     }
 
     assert main_functions == {"_ensure_db", "create_app", "run"}

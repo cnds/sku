@@ -33,11 +33,7 @@ class RecommendationFeedbackService:
             shop_id=request.shop_id,
             window=request.window,
         )
-        latest_action = (
-            RecommendationFeedbackAction(latest.action)
-            if latest is not None
-            else request.action
-        )
+        latest_action = RecommendationFeedbackAction(latest.action) if latest is not None else request.action
         return RecommendationFeedbackResponse(
             accepted=True,
             latest_action=latest_action,

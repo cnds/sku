@@ -56,12 +56,8 @@ class IngestAuthService:
         if installation is None:
             raise ShopInstallationNotFoundError()
 
-        expected = hashlib.sha256(
-            f"{shop_domain}:{public_token}:{timestamp}".encode()
-        ).hexdigest()
-        current = hashlib.sha256(
-            f"{shop_domain}:{installation.public_token}:{timestamp}".encode()
-        ).hexdigest()
+        expected = hashlib.sha256(f"{shop_domain}:{public_token}:{timestamp}".encode()).hexdigest()
+        current = hashlib.sha256(f"{shop_domain}:{installation.public_token}:{timestamp}".encode()).hexdigest()
         if not secrets.compare_digest(expected, current):
             raise InvalidIngestTokenError()
         return installation

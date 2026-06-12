@@ -18,7 +18,7 @@ from repositories.analytics import AnalyticsRepository
 from schemas import IngestEvent, LeaderboardType, ProductSnapshot, TimeWindow
 from services.analysis import ProductAnalysisService
 from services.diagnosis import ProductDiagnosisService
-from services.ingestion import EventIngestionService
+from services.ingestion import SHOPIFY_PIXEL_EVENT_TYPES, EventIngestionService
 from services.shop_installations import ShopInstallationService
 from services.shop_time import ensure_utc_datetime, local_date_for_shop
 from services.shopify import normalize_shop_domain
@@ -356,27 +356,45 @@ async def _persist_scenarios(
     for index, scenario in enumerate(SHOPIFY_ADMIN_SCENARIOS):
         occurred_at = now_utc - timedelta(hours=index + 1)
         events = _events_for_scenario(scenario=scenario, occurred_at=occurred_at)
-        await ingestion_service.persist_batch_and_rollup(
-            channel="seed",
-            events=events,
-            session_id=f"seed-session-{scenario.product_id}",
-            shop_domain=shop_domain,
-            shop_id=shop_domain,
-            stat_dates={
-                local_date_for_shop(
-                    instant=event.occurred_at,
-                    timezone_name=timezone_name,
-                )
-                for event in events
-            },
-            timezone_name=timezone_name,
-            visitor_id=f"seed-visitor-{scenario.product_id}",
-        )
+        for channel, channel_events in _events_by_channel(events).items():
+            await ingestion_service.persist_batch_and_rollup(
+                channel=channel,
+                events=channel_events,
+                session_id=f"seed-session-{scenario.product_id}",
+                shop_domain=shop_domain,
+                shop_id=shop_domain,
+                stat_dates={
+                    local_date_for_shop(
+                        instant=event.occurred_at,
+                        timezone_name=timezone_name,
+                    )
+                    for event in channel_events
+                },
+                timezone_name=timezone_name,
+                visitor_id=f"seed-visitor-{scenario.product_id}",
+            )
     _persist_previous_seven_day_stats(
         now_utc=now_utc,
         shop_domain=shop_domain,
         timezone_name=timezone_name,
     )
+
+
+def _events_by_channel(events: list[IngestEvent]) -> dict[str, list[IngestEvent]]:
+    grouped = {
+        "shopify_pixel": [],
+        "shopify_webhook": [],
+        "sdk_dom": [],
+    }
+    for event in events:
+        if event.event_type in SHOPIFY_PIXEL_EVENT_TYPES:
+            channel = "shopify_pixel"
+        elif event.event_type is EventType.ORDER_COMPLETED:
+            channel = "shopify_webhook"
+        else:
+            channel = "sdk_dom"
+        grouped[channel].append(event)
+    return {channel: channel_events for channel, channel_events in grouped.items() if channel_events}
 
 
 def _persist_previous_seven_day_stats(
@@ -419,10 +437,7 @@ def _previous_daily_stat(
             scale=scale,
         ),
         engage_count=1,
-        impressions=_scaled_previous_value(
-            scenario.impressions + sum(scenario.component_impressions.values()),
-            scale=scale,
-        ),
+        impressions=_scaled_previous_value(scenario.impressions, scale=scale),
         media_interactions=_scaled_previous_value(scenario.media_interactions, scale=scale),
         orders=_scaled_previous_value(scenario.orders, scale=scale),
         product_id=scenario.product_id,
@@ -435,10 +450,7 @@ def _previous_daily_stat(
 
 
 def _scaled_previous_distribution(values: dict[str, int], *, scale: float) -> dict[str, int]:
-    return {
-        key: _scaled_previous_value(value, scale=scale)
-        for key, value in values.items()
-    }
+    return {key: _scaled_previous_value(value, scale=scale) for key, value in values.items()}
 
 
 def _scaled_previous_value(value: int, *, scale: float) -> int:
@@ -456,7 +468,7 @@ def _events_for_scenario(
 
     events.extend(
         _event(
-            EventType.IMPRESSION,
+            EventType.PRODUCT_IMPRESSION,
             occurred_at=occurred_at - timedelta(minutes=2),
             product_id=scenario.product_id,
             component_id="collection_card",
@@ -466,7 +478,7 @@ def _events_for_scenario(
     )
     events.extend(
         _event(
-            EventType.CLICK,
+            EventType.PRODUCT_CLICK,
             occurred_at=occurred_at - timedelta(minutes=1),
             product_id=scenario.product_id,
             component_id="collection_card",
@@ -476,7 +488,7 @@ def _events_for_scenario(
     )
     events.extend(
         _event(
-            EventType.VIEW,
+            EventType.PRODUCT_VIEW,
             occurred_at=occurred_at,
             product_id=scenario.product_id,
             context={"page_type": "pdp"},
@@ -488,7 +500,11 @@ def _events_for_scenario(
         for _ in range(scenario.add_to_carts)
     )
     events.extend(
-        _event(EventType.ORDER, occurred_at=occurred_at + timedelta(minutes=2), product_id=scenario.product_id)
+        _event(
+            EventType.ORDER_COMPLETED,
+            occurred_at=occurred_at + timedelta(minutes=2),
+            product_id=scenario.product_id,
+        )
         for _ in range(scenario.orders)
     )
 
@@ -506,7 +522,7 @@ def _events_for_scenario(
     for component_id, count in scenario.component_impressions.items():
         events.extend(
             _event(
-                EventType.IMPRESSION,
+                EventType.COMPONENT_IMPRESSION,
                 occurred_at=occurred_at + timedelta(minutes=3),
                 product_id=scenario.product_id,
                 component_id=component_id,
@@ -517,7 +533,7 @@ def _events_for_scenario(
 
     events.extend(
         _event(
-            EventType.MEDIA,
+            EventType.MEDIA_INTERACTION,
             occurred_at=occurred_at + timedelta(minutes=4),
             product_id=scenario.product_id,
             context={"action": "gallery"},
@@ -526,7 +542,7 @@ def _events_for_scenario(
     )
     events.extend(
         _event(
-            EventType.VARIANT,
+            EventType.VARIANT_INTENT,
             occurred_at=occurred_at + timedelta(minutes=5),
             product_id=scenario.product_id,
             context={"options": {"Size": "M"}},

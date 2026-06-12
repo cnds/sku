@@ -13,8 +13,4 @@ def test_shop_installation_default_timestamp_does_not_emit_deprecation_warning()
             public_token="token",
         )
 
-    assert not [
-        warning
-        for warning in caught
-        if issubclass(warning.category, DeprecationWarning)
-    ]
+    assert not [warning for warning in caught if issubclass(warning.category, DeprecationWarning)]

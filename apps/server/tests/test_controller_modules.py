@@ -39,7 +39,7 @@ def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
         shopify_api_key="test-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
 
@@ -97,6 +97,9 @@ def test_ingest_route_is_owned_by_ingestion_controller(
     assert _route_entries(app, "/ingest/events") == [
         (("POST",), "controllers.ingestion"),
     ]
+    assert _route_entries(app, "/ingest/pixel-events") == [
+        (("POST",), "controllers.ingestion"),
+    ]
 
 
 def test_shopify_routes_are_owned_by_shopify_controller(
@@ -133,6 +136,7 @@ def test_all_business_routes_are_owned_by_controller_modules(
         ("/api/products/{product_id}/diagnosis", ("POST",), "controllers.diagnosis"),
         ("/api/recommendation-feedback", ("POST",), "controllers.merchant_readiness"),
         ("/ingest/events", ("POST",), "controllers.ingestion"),
+        ("/ingest/pixel-events", ("POST",), "controllers.ingestion"),
         ("/shopify/oauth/callback", ("GET",), "controllers.shopify"),
         ("/shopify/oauth/callback", ("POST",), "controllers.shopify"),
         ("/shopify/oauth/start", ("GET",), "controllers.shopify"),

@@ -101,7 +101,7 @@ class OnboardingStatusService:
                 key="orders",
                 label="Confirm order webhook coverage",
                 source_key="orders_webhook",
-                pending_message="Order coverage appears after an order webhook reaches SKU Lens.",
+                pending_message="Order coverage appears after Shopify order webhooks reach SKU Lens.",
             ),
         ]
 
@@ -126,9 +126,7 @@ class OnboardingStatusService:
             key=key,
             label=label,
             status=(
-                OnboardingChecklistStatus.ACTION
-                if key == "component_tracking"
-                else OnboardingChecklistStatus.PENDING
+                OnboardingChecklistStatus.ACTION if key == "component_tracking" else OnboardingChecklistStatus.PENDING
             ),
             message=pending_message,
         )

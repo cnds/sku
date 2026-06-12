@@ -13,6 +13,7 @@ from db import create_session_factory, db_session_context, init_db
 from main import create_app
 from models import DailyProductStat, EventType, RawEvent, ShopInstallation
 from schemas import IngestEvent
+from security.shopify import build_shopify_hmac
 from services.ingestion import EventIngestionService
 from services.job_dispatch import AfterCommitCallbacks
 from services.rollups import DailyRollupService
@@ -27,7 +28,7 @@ def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
         shopify_api_key="test-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
 
@@ -46,29 +47,33 @@ async def test_ingestion_service_persists_raw_events_and_rolls_up_daily_stats(
         await ingestion_service.persist_batch_and_rollup(
             shop_id="shop-1",
             shop_domain="demo.myshopify.com",
-            channel="sdk",
+            channel="shopify_pixel",
             session_id="session-1",
             stat_date=date(2026, 4, 23),
             visitor_id="visitor-1",
             events=[
                 IngestEvent(
-                    event_type=EventType.VIEW,
+                    event_type=EventType.PRODUCT_VIEW,
                     occurred_at=occurred_at,
                     product_id="product-1",
-                ),
-                IngestEvent(
-                    event_type=EventType.COMPONENT_CLICK,
-                    occurred_at=occurred_at,
-                    product_id="product-1",
-                    component_id="size_chart",
                 ),
                 IngestEvent(
                     event_type=EventType.ADD_TO_CART,
                     occurred_at=occurred_at,
                     product_id="product-1",
                 ),
+            ],
+        )
+        await ingestion_service.persist_batch_and_rollup(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="shopify_webhook",
+            session_id="order-order-1",
+            stat_date=date(2026, 4, 23),
+            visitor_id="shopify-order-order-1",
+            events=[
                 IngestEvent(
-                    event_type=EventType.ORDER,
+                    event_type=EventType.ORDER_COMPLETED,
                     occurred_at=occurred_at,
                     product_id="product-1",
                 ),
@@ -80,14 +85,14 @@ async def test_ingestion_service_persists_raw_events_and_rolls_up_daily_stats(
         raw_events = (await session.exec(select(RawEvent).order_by(RawEvent.occurred_at))).all()
         daily_stat = (await session.exec(select(DailyProductStat))).one()
 
-    assert len(raw_events) == 4
-    assert raw_events[0].channel == "sdk"
+    assert len(raw_events) == 3
+    assert {event.channel for event in raw_events} == {"shopify_pixel", "shopify_webhook"}
     assert daily_stat.shop_id == "shop-1"
     assert daily_stat.product_id == "product-1"
     assert daily_stat.views == 1
     assert daily_stat.add_to_carts == 1
     assert daily_stat.orders == 1
-    assert daily_stat.component_clicks_distribution == {"size_chart": 1}
+    assert daily_stat.component_clicks_distribution == {}
 
 
 @pytest.mark.asyncio
@@ -126,13 +131,13 @@ async def test_ingestion_service_persists_rollup_and_registers_enqueue_callback(
             after_commit_callbacks=callbacks,
             shop_id="shop-1",
             shop_domain="demo.myshopify.com",
-            channel="sdk",
+            channel="shopify_pixel",
             session_id="session-1",
             stat_date=date(2026, 4, 23),
             visitor_id="visitor-1",
             events=[
                 IngestEvent(
-                    event_type=EventType.VIEW,
+                    event_type=EventType.PRODUCT_VIEW,
                     occurred_at=occurred_at,
                     product_id="product-1",
                 ),
@@ -156,7 +161,7 @@ async def test_ingestion_service_persists_rollup_and_registers_enqueue_callback(
 
 
 @pytest.mark.asyncio
-async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
+async def test_ingest_events_persists_sdk_dom_rollup_and_enqueues_job_after_commit(
     sqlite_database_url: str,
     redis_url: str,
     monkeypatch: pytest.MonkeyPatch,
@@ -214,11 +219,6 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
         "session_id": "session-1",
         "events": [
             {
-                "event_type": "view",
-                "occurred_at": occurred_at.isoformat(),
-                "product_id": "product-1",
-            },
-            {
                 "event_type": "component_click",
                 "occurred_at": occurred_at.isoformat(),
                 "product_id": "product-1",
@@ -241,7 +241,7 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
         )
 
     assert response.status_code == 202
-    assert response.json() == {"accepted": 2}
+    assert response.json() == {"accepted": 1}
     assert len(sent) == 1
     message = sent[0]
     enqueued_payload = message["kwargs"]
@@ -254,32 +254,237 @@ async def test_ingest_events_persists_rollup_and_enqueues_job_after_commit(
 
     async with app.state.session_factory() as session:
         raw_events = (
-            await session.exec(
-                select(RawEvent)
-                .where(RawEvent.shop_id == "demo.myshopify.com")
-                .order_by(RawEvent.id)
-            )
+            await session.exec(select(RawEvent).where(RawEvent.shop_id == "demo.myshopify.com").order_by(RawEvent.id))
         ).all()
         daily_stats = (
-            await session.exec(
-                select(DailyProductStat).where(
-                    DailyProductStat.shop_id == "demo.myshopify.com"
-                )
-            )
+            await session.exec(select(DailyProductStat).where(DailyProductStat.shop_id == "demo.myshopify.com"))
         ).all()
 
-    assert len(raw_events) == 2
-    assert raw_events[0].channel == "sdk"
+    assert len(raw_events) == 1
+    assert raw_events[0].channel == "sdk_dom"
     assert raw_events[0].shop_domain == "demo.myshopify.com"
     assert raw_events[0].session_id == "session-1"
-    assert raw_events[1].component_id == "size_chart"
+    assert raw_events[0].component_id == "size_chart"
     assert len(daily_stats) == 1
     assert daily_stats[0].product_id == "product-1"
     assert daily_stats[0].stat_date.isoformat() == "2026-04-29"
-    assert daily_stats[0].views == 1
+    assert daily_stats[0].views == 0
     assert daily_stats[0].add_to_carts == 0
     assert daily_stats[0].orders == 0
     assert daily_stats[0].component_clicks_distribution == {"size_chart": 1}
+
+
+@pytest.mark.asyncio
+async def test_ingest_pixel_events_maps_standard_events_and_dedupes(
+    sqlite_database_url: str,
+    redis_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _settings(sqlite_database_url, redis_url)
+    app = create_app(settings)
+    await init_db(app.state.session_factory.engine)
+
+    async with db_session_context(app.state.session_factory) as session:
+        session.add(
+            ShopInstallation(
+                shop_domain="demo.myshopify.com",
+                public_token="public-1",
+                timezone_name="UTC",
+            )
+        )
+        await session.commit()
+
+    sent: list[dict[str, object]] = []
+
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
+
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
+
+    occurred_at = datetime(2026, 4, 28, 15, 5, tzinfo=UTC)
+    payload = {
+        "shop_domain": "demo.myshopify.com",
+        "visitor_id": "visitor-1",
+        "session_id": "session-1",
+        "events": [
+            {
+                "event_id": "evt-product-view",
+                "source_event_name": "product_viewed",
+                "occurred_at": occurred_at.isoformat(),
+                "product_id": "product-1",
+                "variant_id": "variant-1",
+            },
+            {
+                "event_id": "evt-product-view",
+                "source_event_name": "product_viewed",
+                "occurred_at": occurred_at.isoformat(),
+                "product_id": "product-1",
+                "variant_id": "variant-1",
+            },
+            {
+                "event_id": "evt-add-cart",
+                "source_event_name": "product_added_to_cart",
+                "occurred_at": occurred_at.isoformat(),
+                "product_id": "product-1",
+                "variant_id": "variant-1",
+            },
+            {
+                "context": {"line_item_index": 0, "order_id": "order-1", "quantity": 1},
+                "event_id": "evt-checkout-completed",
+                "source_event_name": "checkout_completed",
+                "occurred_at": occurred_at.isoformat(),
+                "product_id": "product-1",
+                "variant_id": "variant-1",
+            },
+        ],
+    }
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        first = await client.post(
+            "/ingest/pixel-events",
+            json=payload,
+            headers={
+                "X-SKU-Lens-Public-Token": "public-1",
+                "X-SKU-Lens-Timestamp": str(int(time.time())),
+            },
+        )
+        second = await client.post(
+            "/ingest/pixel-events",
+            json=payload,
+            headers={
+                "X-SKU-Lens-Public-Token": "public-1",
+                "X-SKU-Lens-Timestamp": str(int(time.time())),
+            },
+        )
+
+    assert first.status_code == 202
+    assert first.json() == {"accepted": 3}
+    assert second.status_code == 202
+    assert second.json() == {"accepted": 0}
+    assert len(sent) == 1
+
+    async with app.state.session_factory() as session:
+        raw_events = (
+            await session.exec(select(RawEvent).where(RawEvent.shop_id == "demo.myshopify.com").order_by(RawEvent.id))
+        ).all()
+        daily_stat = (await session.exec(select(DailyProductStat))).one()
+
+    assert [event.event_type for event in raw_events] == [
+        EventType.PRODUCT_VIEW,
+        EventType.ADD_TO_CART,
+        EventType.CHECKOUT_COMPLETED,
+    ]
+    assert {event.channel for event in raw_events} == {"shopify_pixel"}
+    assert raw_events[0].event_id == "evt-product-view"
+    assert raw_events[0].source_event_name == "product_viewed"
+    assert daily_stat.views == 1
+    assert daily_stat.add_to_carts == 1
+    assert daily_stat.orders == 0
+
+
+@pytest.mark.asyncio
+async def test_shopify_order_webhook_persists_order_facts_and_dedupes(
+    sqlite_database_url: str,
+    redis_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = _settings(sqlite_database_url, redis_url)
+    app = create_app(settings)
+    await init_db(app.state.session_factory.engine)
+
+    async with db_session_context(app.state.session_factory) as session:
+        session.add(
+            ShopInstallation(
+                shop_domain="demo.myshopify.com",
+                public_token="public-1",
+                timezone_name="UTC",
+            )
+        )
+        await session.commit()
+
+    sent: list[dict[str, object]] = []
+
+    class FakeCeleryApp:
+        def send_task(
+            self,
+            name: str,
+            *,
+            kwargs: dict[str, object],
+            queue: str,
+            task_id: str,
+        ) -> None:
+            sent.append(
+                {
+                    "name": name,
+                    "kwargs": kwargs,
+                    "queue": queue,
+                    "task_id": task_id,
+                }
+            )
+
+    monkeypatch.setattr(job_dispatch_module, "celery_app", FakeCeleryApp(), raising=False)
+
+    body = (
+        b'{"id":9001,"name":"#1001","created_at":"2026-04-28T15:05:00Z",'
+        b'"line_items":[{"id":7001,"product_id":1001,"variant_id":2001,"quantity":2}]}'
+    )
+    headers = {
+        "Content-Type": "application/json",
+        "X-Shopify-Hmac-Sha256": build_shopify_hmac(settings.shopify_api_secret, body),
+        "X-Shopify-Shop-Domain": "demo.myshopify.com",
+    }
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        first = await client.post(
+            "/shopify/webhooks/orders/create",
+            content=body,
+            headers=headers,
+        )
+        second = await client.post(
+            "/shopify/webhooks/orders/create",
+            content=body,
+            headers=headers,
+        )
+
+    assert first.status_code == 202
+    assert first.json() == {"accepted": True, "enqueued": 1}
+    assert second.status_code == 202
+    assert second.json() == {"accepted": True, "enqueued": 0}
+    assert len(sent) == 1
+
+    async with app.state.session_factory() as session:
+        raw_events = (await session.exec(select(RawEvent).where(RawEvent.shop_id == "demo.myshopify.com"))).all()
+        daily_stat = (await session.exec(select(DailyProductStat))).one()
+
+    assert len(raw_events) == 1
+    assert raw_events[0].channel == "shopify_webhook"
+    assert raw_events[0].event_type == EventType.ORDER_COMPLETED
+    assert raw_events[0].event_id == "9001"
+    assert raw_events[0].source_event_name == "orders/create"
+    assert raw_events[0].dedupe_key == "orders/create|9001|1001|2001|7001"
+    assert raw_events[0].context_json["quantity"] == 2
+    assert daily_stat.orders == 1
 
 
 @pytest.mark.asyncio
@@ -293,8 +498,8 @@ async def test_daily_rollup_service_uses_shop_timezone_day_boundaries(
         session.add_all(
             [
                 RawEvent(
-                    channel="sdk",
-                    event_type=EventType.VIEW,
+                    channel="shopify_pixel",
+                    event_type=EventType.PRODUCT_VIEW,
                     occurred_at=datetime(2026, 4, 28, 14, 59, tzinfo=UTC),
                     product_id="product-1",
                     session_id="session-1",
@@ -303,8 +508,8 @@ async def test_daily_rollup_service_uses_shop_timezone_day_boundaries(
                     visitor_id="visitor-1",
                 ),
                 RawEvent(
-                    channel="sdk",
-                    event_type=EventType.VIEW,
+                    channel="shopify_pixel",
+                    event_type=EventType.PRODUCT_VIEW,
                     occurred_at=datetime(2026, 4, 28, 15, 1, tzinfo=UTC),
                     product_id="product-1",
                     session_id="session-1",
@@ -350,40 +555,40 @@ async def test_ingestion_service_persists_new_sdk_events_and_rolls_up(
         await EventIngestionService().persist_batch_and_rollup(
             shop_id="shop-1",
             shop_domain="demo.myshopify.com",
-            channel="sdk",
+            channel="sdk_dom",
             session_id="session-1",
             stat_date=date(2026, 4, 23),
             visitor_id="visitor-1",
             events=[
                 IngestEvent(
-                    event_type=EventType.IMPRESSION,
+                    event_type=EventType.PRODUCT_IMPRESSION,
                     occurred_at=occurred_at,
                     product_id="product-1",
                     component_id="featured-collection",
                     context={"position": 0},
                 ),
                 IngestEvent(
-                    event_type=EventType.IMPRESSION,
+                    event_type=EventType.PRODUCT_IMPRESSION,
                     occurred_at=occurred_at,
                     product_id="product-1",
                     component_id="featured-collection",
                     context={"position": 0},
                 ),
                 IngestEvent(
-                    event_type=EventType.CLICK,
+                    event_type=EventType.PRODUCT_CLICK,
                     occurred_at=occurred_at,
                     product_id="product-1",
                     component_id="featured-collection",
                     context={"position": 0, "target_url": "/products/widget"},
                 ),
                 IngestEvent(
-                    event_type=EventType.MEDIA,
+                    event_type=EventType.MEDIA_INTERACTION,
                     occurred_at=occurred_at,
                     product_id="product-1",
                     context={"action": "zoom", "media_index": 0},
                 ),
                 IngestEvent(
-                    event_type=EventType.VARIANT,
+                    event_type=EventType.VARIANT_INTENT,
                     occurred_at=occurred_at,
                     product_id="product-1",
                     variant_id="variant-42",
@@ -411,15 +616,15 @@ async def test_ingestion_service_persists_new_sdk_events_and_rolls_up(
     assert daily_stat.engage_count == 1
     assert daily_stat.total_dwell_ms == 15000
     assert daily_stat.avg_scroll_pct == 75
-    assert daily_stat.component_impressions_distribution == {"featured-collection": 2}
-    assert daily_stat.component_clicks_distribution == {"featured-collection": 1}
+    assert daily_stat.component_impressions_distribution == {}
+    assert daily_stat.component_clicks_distribution == {}
     assert daily_stat.views == 0
     assert daily_stat.add_to_carts == 0
     assert daily_stat.orders == 0
 
 
 @pytest.mark.asyncio
-async def test_daily_rollup_counts_pdp_view_buy_box_intent_and_add_to_cart_events(
+async def test_daily_rollup_counts_pixel_funnel_and_sdk_component_events(
     sqlite_database_url: str,
 ) -> None:
     session_factory = create_session_factory(sqlite_database_url)
@@ -431,19 +636,36 @@ async def test_daily_rollup_counts_pdp_view_buy_box_intent_and_add_to_cart_event
         await EventIngestionService().persist_batch_and_rollup(
             shop_id="shop-1",
             shop_domain="demo.myshopify.com",
-            channel="sdk",
+            channel="shopify_pixel",
             session_id="session-1",
             stat_date=date(2026, 4, 23),
             visitor_id="visitor-1",
             events=[
                 IngestEvent(
-                    event_type=EventType.VIEW,
+                    event_type=EventType.PRODUCT_VIEW,
                     occurred_at=occurred_at,
                     product_id="product-1",
                     context={"page_type": "pdp"},
                 ),
                 IngestEvent(
-                    event_type=EventType.IMPRESSION,
+                    event_type=EventType.ADD_TO_CART,
+                    occurred_at=occurred_at,
+                    product_id="product-1",
+                    variant_id="variant-1",
+                    context={"source": "product_form"},
+                ),
+            ],
+        )
+        await EventIngestionService().persist_batch_and_rollup(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="sdk_dom",
+            session_id="session-1",
+            stat_date=date(2026, 4, 23),
+            visitor_id="visitor-1",
+            events=[
+                IngestEvent(
+                    event_type=EventType.COMPONENT_IMPRESSION,
                     occurred_at=occurred_at,
                     product_id="product-1",
                     component_id="product_media",
@@ -456,13 +678,22 @@ async def test_daily_rollup_counts_pdp_view_buy_box_intent_and_add_to_cart_event
                     component_id="buy_box",
                     context={"action": "intent"},
                 ),
+            ],
+        )
+        await EventIngestionService().persist_batch_and_rollup(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="shopify_webhook",
+            session_id="order-order-1",
+            stat_date=date(2026, 4, 23),
+            visitor_id="shopify-order-order-1",
+            events=[
                 IngestEvent(
-                    event_type=EventType.ADD_TO_CART,
+                    event_type=EventType.ORDER_COMPLETED,
                     occurred_at=occurred_at,
                     product_id="product-1",
-                    variant_id="variant-1",
-                    context={"source": "product_form"},
-                ),
+                    context={"order_id": "order-1"},
+                )
             ],
         )
         await session.commit()
@@ -472,6 +703,7 @@ async def test_daily_rollup_counts_pdp_view_buy_box_intent_and_add_to_cart_event
 
     assert daily_stat.views == 1
     assert daily_stat.add_to_carts == 1
+    assert daily_stat.orders == 1
     assert daily_stat.component_clicks_distribution == {"buy_box": 1}
     assert daily_stat.component_impressions_distribution == {"product_media": 1}
 
@@ -487,7 +719,7 @@ async def test_engage_event_without_product_id_persists_but_excluded_from_rollup
         await EventIngestionService().persist_batch_and_rollup(
             shop_id="shop-1",
             shop_domain="demo.myshopify.com",
-            channel="sdk",
+            channel="sdk_dom",
             session_id="session-1",
             stat_date=date(2026, 4, 23),
             visitor_id="visitor-1",
@@ -550,14 +782,14 @@ async def test_ingest_new_sdk_events_via_http_endpoint(
         "session_id": "session-1",
         "events": [
             {
-                "event_type": "impression",
+                "event_type": "product_impression",
                 "occurred_at": occurred_at.isoformat(),
                 "product_id": "product-1",
                 "component_id": "featured-collection",
                 "context": {"position": 2},
             },
             {
-                "event_type": "click",
+                "event_type": "product_click",
                 "occurred_at": occurred_at.isoformat(),
                 "product_id": "product-1",
                 "component_id": "featured-collection",
@@ -589,15 +821,57 @@ async def test_ingest_new_sdk_events_via_http_endpoint(
 
     async with app.state.session_factory() as session:
         raw_events = (
-            await session.exec(
-                select(RawEvent)
-                .where(RawEvent.shop_id == "demo.myshopify.com")
-                .order_by(RawEvent.id)
-            )
+            await session.exec(select(RawEvent).where(RawEvent.shop_id == "demo.myshopify.com").order_by(RawEvent.id))
         ).all()
 
     assert len(raw_events) == 3
-    assert raw_events[0].event_type == EventType.IMPRESSION
-    assert raw_events[1].event_type == EventType.CLICK
+    assert raw_events[0].event_type == EventType.PRODUCT_IMPRESSION
+    assert raw_events[1].event_type == EventType.PRODUCT_CLICK
     assert raw_events[2].event_type == EventType.ENGAGE
     assert raw_events[2].product_id is None
+
+
+@pytest.mark.asyncio
+async def test_sdk_dom_endpoint_rejects_pixel_funnel_events(
+    sqlite_database_url: str,
+    redis_url: str,
+) -> None:
+    settings = _settings(sqlite_database_url, redis_url)
+    app = create_app(settings)
+    await init_db(app.state.session_factory.engine)
+
+    async with db_session_context(app.state.session_factory) as session:
+        session.add(
+            ShopInstallation(
+                shop_domain="demo.myshopify.com",
+                public_token="public-1",
+            )
+        )
+        await session.commit()
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.post(
+            "/ingest/events",
+            json={
+                "shop_domain": "demo.myshopify.com",
+                "visitor_id": "visitor-1",
+                "session_id": "session-1",
+                "events": [
+                    {
+                        "event_type": "product_view",
+                        "occurred_at": datetime.now(UTC).replace(microsecond=0).isoformat(),
+                        "product_id": "product-1",
+                    },
+                ],
+            },
+            headers={
+                "X-SKU-Lens-Public-Token": "public-1",
+                "X-SKU-Lens-Timestamp": str(int(time.time())),
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["detail"] == "Unsupported SDK DOM event: product_view."

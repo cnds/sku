@@ -9,14 +9,23 @@ from sqlmodel import Column, Field, SQLModel
 
 
 class EventType(StrEnum):
-    VIEW = "view"
-    COMPONENT_CLICK = "component_click"
+    PAGE_VIEW = "page_view"
+    PRODUCT_VIEW = "product_view"
+    COLLECTION_VIEW = "collection_view"
+    SEARCH_SUBMITTED = "search_submitted"
+    CART_VIEW = "cart_view"
     ADD_TO_CART = "add_to_cart"
-    ORDER = "order"
-    IMPRESSION = "impression"
-    CLICK = "click"
-    MEDIA = "media"
-    VARIANT = "variant"
+    REMOVE_FROM_CART = "remove_from_cart"
+    CHECKOUT_STARTED = "checkout_started"
+    CHECKOUT_STEP = "checkout_step"
+    CHECKOUT_COMPLETED = "checkout_completed"
+    ORDER_COMPLETED = "order_completed"
+    PRODUCT_IMPRESSION = "product_impression"
+    PRODUCT_CLICK = "product_click"
+    COMPONENT_IMPRESSION = "component_impression"
+    COMPONENT_CLICK = "component_click"
+    MEDIA_INTERACTION = "media_interaction"
+    VARIANT_INTENT = "variant_intent"
     ENGAGE = "engage"
 
 
@@ -35,6 +44,7 @@ class RecommendationFeedbackAction(StrEnum):
 
 class RawEvent(SQLModel, table=True):
     __tablename__ = "raw_events"
+    __table_args__ = (UniqueConstraint("shop_id", "channel", "dedupe_key", name="uq_raw_event_dedupe"),)
 
     id: int | None = Field(default=None, primary_key=True)
     shop_id: str = Field(index=True)
@@ -46,6 +56,9 @@ class RawEvent(SQLModel, table=True):
     product_id: str | None = Field(default=None, index=True)
     variant_id: str | None = Field(default=None, index=True)
     channel: str = Field(index=True)
+    event_id: str | None = Field(default=None, index=True)
+    source_event_name: str | None = Field(default=None, index=True)
+    dedupe_key: str | None = Field(default=None, index=True)
     occurred_at: datetime = Field(index=True)
     context_json: dict[str, Any] = Field(
         default_factory=dict,
@@ -55,9 +68,7 @@ class RawEvent(SQLModel, table=True):
 
 class DailyProductStat(SQLModel, table=True):
     __tablename__ = "daily_stats"
-    __table_args__ = (
-        UniqueConstraint("shop_id", "product_id", "stat_date", name="uq_daily_stats"),
-    )
+    __table_args__ = (UniqueConstraint("shop_id", "product_id", "stat_date", name="uq_daily_stats"),)
 
     id: int | None = Field(default=None, primary_key=True)
     shop_id: str = Field(index=True)
@@ -85,9 +96,7 @@ class DailyProductStat(SQLModel, table=True):
 
 class ProductDiagnosis(SQLModel, table=True):
     __tablename__ = "product_diagnoses"
-    __table_args__ = (
-        UniqueConstraint("shop_id", "product_id", "window", name="uq_product_diagnosis"),
-    )
+    __table_args__ = (UniqueConstraint("shop_id", "product_id", "window", name="uq_product_diagnosis"),)
 
     id: int | None = Field(default=None, primary_key=True)
     shop_id: str = Field(index=True)

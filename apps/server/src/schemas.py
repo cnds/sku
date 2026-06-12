@@ -23,9 +23,7 @@ class TimeWindow(StrEnum):
         return timedelta(days=30)
 
     def start_date(self, *, now: datetime | None = None) -> datetime.date:
-        return self.start_date_from_reference_date(
-            reference_date=(now or datetime.now(UTC)).date()
-        )
+        return self.start_date_from_reference_date(reference_date=(now or datetime.now(UTC)).date())
 
     def start_date_from_reference_date(self, *, reference_date: date) -> date:
         reference = datetime.combine(reference_date, time.min, tzinfo=UTC)
@@ -79,6 +77,9 @@ class IngestEvent(BaseModel):
     product_id: str | None = None
     variant_id: str | None = None
     component_id: str | None = None
+    event_id: str | None = None
+    source_event_name: str | None = None
+    dedupe_key: str | None = None
     context: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -87,6 +88,24 @@ class IngestBatchRequest(BaseModel):
     visitor_id: str
     session_id: str
     events: list[IngestEvent]
+
+
+class ShopifyPixelEvent(BaseModel):
+    source_event_name: str
+    event_id: str
+    occurred_at: datetime
+    product_id: str | None = None
+    variant_id: str | None = None
+    component_id: str | None = None
+    dedupe_key: str | None = None
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+class ShopifyPixelBatchRequest(BaseModel):
+    shop_domain: str
+    visitor_id: str
+    session_id: str
+    events: list[ShopifyPixelEvent]
 
 
 class IngestAcceptedResponse(BaseModel):

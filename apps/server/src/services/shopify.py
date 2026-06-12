@@ -23,6 +23,12 @@ SHOP_DOMAIN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
 
 
 @dataclass(slots=True)
+class ShopifyWebPixelSetupResult:
+    created: bool
+    pixel_id: str | None
+
+
+@dataclass(slots=True)
 class ShopifyOrderIngestionBatch:
     events: list[IngestEvent]
     session_id: str
@@ -50,6 +56,11 @@ class InvalidShopifyOAuthStateError(Exception):
 class InvalidShopifyShopDomainError(Exception):
     def __init__(self) -> None:
         super().__init__("Invalid Shopify shop domain.")
+
+
+class ShopifyWebPixelSetupError(Exception):
+    def __init__(self, message: str) -> None:
+        super().__init__(message)
 
 
 def normalize_shop_domain(shop_domain: str) -> str:
@@ -95,6 +106,10 @@ def build_ingest_endpoint(settings: Settings) -> str:
     return f"{settings.shopify_webhook_base_url.rstrip('/')}/ingest/events"
 
 
+def build_pixel_ingest_endpoint(settings: Settings) -> str:
+    return f"{settings.shopify_webhook_base_url.rstrip('/')}/ingest/pixel-events"
+
+
 def build_app_embed_deep_link(*, settings: Settings, shop_domain: str) -> str:
     normalized_shop_domain = normalize_shop_domain(shop_domain)
     query = urlencode(
@@ -103,10 +118,7 @@ def build_app_embed_deep_link(*, settings: Settings, shop_domain: str) -> str:
         }
     )
     activate_app_id = f"{settings.shopify_api_key}/{APP_EMBED_BLOCK_HANDLE}"
-    return (
-        f"https://{normalized_shop_domain}/admin/themes/current/editor?"
-        f"{query}&activateAppId={activate_app_id}"
-    )
+    return f"https://{normalized_shop_domain}/admin/themes/current/editor?{query}&activateAppId={activate_app_id}"
 
 
 def new_oauth_state() -> str:
@@ -133,18 +145,37 @@ class ShopifyOrderWebhookService:
         shop_domain: str,
         timezone_name: str | None = None,
     ) -> ShopifyOrderIngestionBatch:
-        order_id = str(payload.get("id", "unknown"))
-        occurred_at = self._time_provider()
+        order_id = str(payload.get("id") or payload.get("admin_graphql_api_id") or "unknown")
+        occurred_at = _order_occurred_at(payload, fallback=self._time_provider)
         line_items = payload.get("line_items", [])
         events = [
             IngestEvent(
-                event_type=EventType.ORDER,
+                context={
+                    "line_item_id": str(item.get("id")) if item.get("id") is not None else None,
+                    "line_item_index": index,
+                    "order_id": order_id,
+                    "order_name": payload.get("name"),
+                    "quantity": item.get("quantity", 1),
+                    "source_event_name": "orders/create",
+                },
+                dedupe_key="|".join(
+                    [
+                        "orders/create",
+                        order_id,
+                        str(item.get("product_id")),
+                        "" if item.get("variant_id") is None else str(item.get("variant_id")),
+                        str(item.get("id")) if item.get("id") is not None else str(index),
+                    ]
+                ),
+                event_id=order_id,
+                event_type=EventType.ORDER_COMPLETED,
                 occurred_at=occurred_at,
                 product_id=str(item["product_id"]),
-                context={"order_id": order_id, "quantity": item.get("quantity", 1)},
+                source_event_name="orders/create",
+                variant_id=str(item["variant_id"]) if item.get("variant_id") is not None else None,
             )
-            for item in line_items
-            if item.get("product_id") is not None
+            for index, item in enumerate(line_items)
+            if isinstance(item, dict) and item.get("product_id") is not None
         ]
         return ShopifyOrderIngestionBatch(
             events=events,
@@ -159,6 +190,21 @@ class ShopifyOrderWebhookService:
         )
 
 
+def _order_occurred_at(payload: dict[str, Any], *, fallback: Callable[[], datetime]) -> datetime:
+    for key in ("processed_at", "created_at", "updated_at"):
+        value = payload.get(key)
+        if not isinstance(value, str) or not value:
+            continue
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=UTC)
+        return parsed.astimezone(UTC)
+    return fallback()
+
+
 class ShopifyInstallationCallbackService:
     def __init__(
         self,
@@ -166,11 +212,13 @@ class ShopifyInstallationCallbackService:
         *,
         oauth_service: ShopifyOAuthService | None = None,
         installation_service: ShopInstallationService | None = None,
+        pixel_service: ShopifyWebPixelService | None = None,
         token_provider: Callable[[], str] | None = None,
     ) -> None:
         self._settings = settings
         self._oauth_service = oauth_service or ShopifyOAuthService(settings)
         self._installation_service = installation_service or ShopInstallationService()
+        self._pixel_service = pixel_service or ShopifyWebPixelService(settings)
         self._token_provider = token_provider or (lambda: secrets.token_urlsafe(24))
 
     async def complete_installation(
@@ -200,12 +248,19 @@ class ShopifyInstallationCallbackService:
                 shop_domain=normalized_shop_domain,
             )
 
-        return await self._installation_service.upsert_installation(
+        installation = await self._installation_service.upsert_installation(
             shop_domain=normalized_shop_domain,
             public_token=public_token,
             access_token=access_token,
             timezone_name=timezone_name,
         )
+        if access_token is not None:
+            await self._pixel_service.upsert_web_pixel(
+                access_token=access_token,
+                public_token=public_token,
+                shop_domain=normalized_shop_domain,
+            )
+        return installation
 
 
 class ShopifyOAuthService:
@@ -263,6 +318,147 @@ class ShopifyOAuthService:
             return normalize_shop_timezone(str(shop_payload.get("iana_timezone") or "UTC"))
         except httpx.HTTPError:
             return normalize_shop_timezone(None)
+        finally:
+            if should_close:
+                await client.aclose()
+
+
+class ShopifyWebPixelService:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        http_client: httpx.AsyncClient | None = None,
+    ) -> None:
+        self._settings = settings
+        self._http_client = http_client
+
+    async def upsert_web_pixel(
+        self,
+        *,
+        access_token: str,
+        public_token: str,
+        shop_domain: str,
+    ) -> ShopifyWebPixelSetupResult:
+        existing = await self._fetch_web_pixel(
+            access_token=access_token,
+            shop_domain=shop_domain,
+        )
+        settings = {
+            "endpoint": build_pixel_ingest_endpoint(self._settings),
+            "publicToken": public_token,
+            "shopDomain": shop_domain,
+        }
+
+        if existing is None:
+            pixel = await self._mutate_web_pixel(
+                access_token=access_token,
+                mutation_name="webPixelCreate",
+                query=(
+                    "mutation webPixelCreate($webPixel: WebPixelInput!) { "
+                    "webPixelCreate(webPixel: $webPixel) { "
+                    "userErrors { field message code } "
+                    "webPixel { id settings } "
+                    "} "
+                    "}"
+                ),
+                shop_domain=shop_domain,
+                variables={"webPixel": {"settings": settings}},
+            )
+            return ShopifyWebPixelSetupResult(
+                created=True,
+                pixel_id=pixel.get("id") if pixel is not None else None,
+            )
+
+        pixel = await self._mutate_web_pixel(
+            access_token=access_token,
+            mutation_name="webPixelUpdate",
+            query=(
+                "mutation webPixelUpdate($id: ID!, $webPixel: WebPixelInput!) { "
+                "webPixelUpdate(id: $id, webPixel: $webPixel) { "
+                "userErrors { field message code } "
+                "webPixel { id settings } "
+                "} "
+                "}"
+            ),
+            shop_domain=shop_domain,
+            variables={
+                "id": existing["id"],
+                "webPixel": {"settings": settings},
+            },
+        )
+        return ShopifyWebPixelSetupResult(
+            created=False,
+            pixel_id=pixel.get("id") if pixel is not None else existing["id"],
+        )
+
+    async def _fetch_web_pixel(
+        self,
+        *,
+        access_token: str,
+        shop_domain: str,
+    ) -> dict[str, Any] | None:
+        payload = await self._graphql(
+            access_token=access_token,
+            query="query { webPixel { id settings } }",
+            shop_domain=shop_domain,
+            variables={},
+        )
+        data = payload.get("data", {})
+        web_pixel = data.get("webPixel")
+        return web_pixel if isinstance(web_pixel, dict) else None
+
+    async def _mutate_web_pixel(
+        self,
+        *,
+        access_token: str,
+        mutation_name: str,
+        query: str,
+        shop_domain: str,
+        variables: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        payload = await self._graphql(
+            access_token=access_token,
+            query=query,
+            shop_domain=shop_domain,
+            variables=variables,
+        )
+        mutation_payload = payload.get("data", {}).get(mutation_name, {})
+        user_errors = mutation_payload.get("userErrors") or []
+        if user_errors:
+            messages = ", ".join(str(error.get("message", "Unknown error")) for error in user_errors)
+            raise ShopifyWebPixelSetupError(f"Shopify web pixel setup failed: {messages}")
+        web_pixel = mutation_payload.get("webPixel")
+        return web_pixel if isinstance(web_pixel, dict) else None
+
+    async def _graphql(
+        self,
+        *,
+        access_token: str,
+        query: str,
+        shop_domain: str,
+        variables: dict[str, Any],
+    ) -> dict[str, Any]:
+        client = self._http_client or httpx.AsyncClient(timeout=20.0)
+        should_close = self._http_client is None
+        try:
+            response = await client.post(
+                f"https://{shop_domain}/admin/api/latest/graphql.json",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Shopify-Access-Token": access_token,
+                },
+                json={
+                    "query": query,
+                    "variables": variables,
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+            errors = payload.get("errors")
+            if errors:
+                raise ShopifyWebPixelSetupError(f"Shopify web pixel setup failed: {errors}")
+            return payload
         finally:
             if should_close:
                 await client.aclose()

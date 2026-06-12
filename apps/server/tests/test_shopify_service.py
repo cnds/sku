@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+import json
+from typing import Any
 
 import httpx
 import pytest
@@ -13,6 +14,7 @@ from services.shopify import (
     ShopifyInstallationCallbackService,
     ShopifyOAuthService,
     ShopifyOrderWebhookService,
+    ShopifyWebPixelService,
 )
 
 
@@ -25,43 +27,15 @@ def _settings() -> Settings:
         shopify_api_key="shopify-key",
         shopify_api_secret="shopify-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
-
-
-def test_shopify_order_webhook_service_builds_ingestion_batch() -> None:
-    occurred_at = datetime(2026, 4, 28, 15, 5, tzinfo=UTC)
-    service = ShopifyOrderWebhookService(time_provider=lambda: occurred_at)
-
-    batch = service.build_order_ingestion_batch(
-        payload={
-            "id": 42,
-            "line_items": [
-                {"product_id": 1001, "quantity": 2},
-                {"quantity": 1},
-                {"product_id": None, "quantity": 5},
-            ],
-        },
-        shop_domain="demo.myshopify.com",
-        timezone_name="Asia/Tokyo",
-    )
-
-    assert batch.shop_id == "demo.myshopify.com"
-    assert batch.shop_domain == "demo.myshopify.com"
-    assert batch.session_id == "order-42"
-    assert batch.stat_date.isoformat() == "2026-04-29"
-    assert batch.visitor_id == "shopify-order-42"
-    assert len(batch.events) == 1
-    assert batch.events[0].event_type.value == "order"
-    assert batch.events[0].occurred_at == occurred_at
-    assert batch.events[0].product_id == "1001"
-    assert batch.events[0].context == {"order_id": "42", "quantity": 2}
 
 
 @pytest.mark.asyncio
 async def test_shopify_installation_callback_service_exchanges_token_and_upserts_installation() -> None:
     exchanged: list[tuple[str, str]] = []
+    pixel_upserts: list[tuple[str, str, str]] = []
     upserted: list[tuple[str, str, str | None, str]] = []
 
     class StubOAuthService:
@@ -97,10 +71,21 @@ async def test_shopify_installation_callback_service_exchanges_token_and_upserts
                 timezone_name=timezone_name,
             )
 
+    class StubPixelService:
+        async def upsert_web_pixel(
+            self,
+            *,
+            access_token: str,
+            public_token: str,
+            shop_domain: str,
+        ) -> None:
+            pixel_upserts.append((access_token, public_token, shop_domain))
+
     service = ShopifyInstallationCallbackService(
         _settings(),
         oauth_service=StubOAuthService(),
         installation_service=StubInstallationService(),
+        pixel_service=StubPixelService(),
         token_provider=lambda: "public-1",
     )
     callback_params = {
@@ -121,6 +106,7 @@ async def test_shopify_installation_callback_service_exchanges_token_and_upserts
 
     assert exchanged == [("oauth-code", "demo.myshopify.com")]
     assert upserted == [("demo.myshopify.com", "public-1", "access-1", "Asia/Tokyo")]
+    assert pixel_upserts == [("access-1", "public-1", "demo.myshopify.com")]
     assert installation.shop_domain == "demo.myshopify.com"
     assert installation.public_token == upserted[0][1]
     assert installation.access_token == upserted[0][2]
@@ -167,6 +153,128 @@ async def test_shopify_oauth_service_exchanges_access_token_with_form_encoded_bo
     assert captured_request is not None
     assert str(captured_request.url) == "https://demo.myshopify.com/admin/oauth/access_token"
     assert captured_request.headers["content-type"] == "application/x-www-form-urlencoded"
-    assert captured_request.content == (
-        b"client_id=shopify-key&client_secret=shopify-secret&code=oauth-code"
+    assert captured_request.content == (b"client_id=shopify-key&client_secret=shopify-secret&code=oauth-code")
+
+
+def test_shopify_order_webhook_service_builds_product_order_events() -> None:
+    batch = ShopifyOrderWebhookService().build_order_ingestion_batch(
+        payload={
+            "created_at": "2026-04-28T15:05:00Z",
+            "id": 9001,
+            "line_items": [
+                {
+                    "id": 7001,
+                    "product_id": 1001,
+                    "quantity": 2,
+                    "variant_id": 2001,
+                },
+                {"id": 7002, "quantity": 1},
+            ],
+            "name": "#1001",
+        },
+        shop_domain="demo.myshopify.com",
+        timezone_name="UTC",
     )
+
+    assert batch.shop_domain == "demo.myshopify.com"
+    assert batch.session_id == "order-9001"
+    assert batch.visitor_id == "shopify-order-9001"
+    assert batch.stat_date.isoformat() == "2026-04-28"
+    assert len(batch.events) == 1
+    assert batch.events[0].event_type.value == "order_completed"
+    assert batch.events[0].product_id == "1001"
+    assert batch.events[0].variant_id == "2001"
+    assert batch.events[0].event_id == "9001"
+    assert batch.events[0].source_event_name == "orders/create"
+    assert batch.events[0].dedupe_key == "orders/create|9001|1001|2001|7001"
+    assert batch.events[0].context["quantity"] == 2
+
+
+@pytest.mark.asyncio
+async def test_shopify_web_pixel_service_creates_missing_pixel() -> None:
+    requests: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        payload = json_body(request)
+        if "query { webPixel" in payload["query"]:
+            return httpx.Response(200, json={"data": {"webPixel": None}})
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "webPixelCreate": {
+                        "userErrors": [],
+                        "webPixel": {"id": "gid://shopify/WebPixel/1", "settings": "{}"},
+                    }
+                }
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await ShopifyWebPixelService(
+            _settings(),
+            http_client=client,
+        ).upsert_web_pixel(
+            access_token="access-1",
+            public_token="public-1",
+            shop_domain="demo.myshopify.com",
+        )
+
+    assert result.created is True
+    assert result.pixel_id == "gid://shopify/WebPixel/1"
+    assert len(requests) == 2
+    mutation_payload = json_body(requests[1])
+    assert "webPixelCreate" in mutation_payload["query"]
+    assert mutation_payload["variables"]["webPixel"]["settings"] == {
+        "endpoint": "https://example.com/ingest/pixel-events",
+        "publicToken": "public-1",
+        "shopDomain": "demo.myshopify.com",
+    }
+
+
+@pytest.mark.asyncio
+async def test_shopify_web_pixel_service_updates_existing_pixel() -> None:
+    requests: list[httpx.Request] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        payload = json_body(request)
+        if "query { webPixel" in payload["query"]:
+            return httpx.Response(
+                200,
+                json={"data": {"webPixel": {"id": "gid://shopify/WebPixel/1", "settings": "{}"}}},
+            )
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "webPixelUpdate": {
+                        "userErrors": [],
+                        "webPixel": {"id": "gid://shopify/WebPixel/1", "settings": "{}"},
+                    }
+                }
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        result = await ShopifyWebPixelService(
+            _settings(),
+            http_client=client,
+        ).upsert_web_pixel(
+            access_token="access-1",
+            public_token="public-2",
+            shop_domain="demo.myshopify.com",
+        )
+
+    assert result.created is False
+    assert result.pixel_id == "gid://shopify/WebPixel/1"
+    assert len(requests) == 2
+    mutation_payload = json_body(requests[1])
+    assert "webPixelUpdate" in mutation_payload["query"]
+    assert mutation_payload["variables"]["id"] == "gid://shopify/WebPixel/1"
+    assert mutation_payload["variables"]["webPixel"]["settings"]["publicToken"] == "public-2"
+
+
+def json_body(request: httpx.Request) -> dict[str, Any]:
+    return json.loads(request.content.decode())

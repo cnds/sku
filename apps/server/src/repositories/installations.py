@@ -12,11 +12,7 @@ from models import ShopInstallation
 class InstallationRepository:
     async def get_by_shop_domain(self, shop_domain: str) -> ShopInstallation | None:
         session = get_db_session()
-        return (
-            await session.exec(
-                select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
-            )
-        ).first()
+        return (await session.exec(select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain))).first()
 
     async def upsert(
         self,

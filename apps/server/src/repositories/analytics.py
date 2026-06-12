@@ -27,29 +27,19 @@ class AnalyticsRepository:
         )
         store_avg_cr = (
             select(
-                func.coalesce(func.sum(aggregated.c.orders), 0) * 1.0
+                func.coalesce(func.sum(aggregated.c.orders), 0)
+                * 1.0
                 / func.nullif(func.coalesce(func.sum(aggregated.c.views), 0), 0)
             )
             .select_from(aggregated)
             .scalar_subquery()
         )
-        store_avg_views = (
-            select(func.avg(aggregated.c.views))
-            .select_from(aggregated)
-            .scalar_subquery()
-        )
+        store_avg_views = select(func.avg(aggregated.c.views)).select_from(aggregated).scalar_subquery()
 
-        gap_score = (
-            aggregated.c.views * func.coalesce(store_avg_cr, literal(0.0)) - aggregated.c.orders
-        )
+        gap_score = aggregated.c.views * func.coalesce(store_avg_cr, literal(0.0)) - aggregated.c.orders
         opportunity_score = (
-            (
-                aggregated.c.add_to_carts * 1.0
-                / func.nullif(func.coalesce(aggregated.c.views, 0), 0)
-            )
-            * func.coalesce(store_avg_views, literal(0.0))
-            - aggregated.c.views
-        )
+            aggregated.c.add_to_carts * 1.0 / func.nullif(func.coalesce(aggregated.c.views, 0), 0)
+        ) * func.coalesce(store_avg_views, literal(0.0)) - aggregated.c.views
         score_column = gap_score if board is LeaderboardType.BLACK else opportunity_score
 
         statement = (
@@ -92,7 +82,8 @@ class AnalyticsRepository:
     ) -> dict[str, ProductSnapshot]:
         filters = [
             DailyProductStat.shop_id == shop_id,
-            DailyProductStat.stat_date >= (
+            DailyProductStat.stat_date
+            >= (
                 start_date
                 or self._window_start_date(
                     window=window,
@@ -103,10 +94,7 @@ class AnalyticsRepository:
         if end_date is not None:
             filters.append(DailyProductStat.stat_date <= end_date)
 
-        statement = (
-            sqlmodel_select(DailyProductStat)
-            .where(*filters)
-        )
+        statement = sqlmodel_select(DailyProductStat).where(*filters)
 
         rows = (await get_db_session().exec(statement)).all()
 
@@ -166,7 +154,8 @@ class AnalyticsRepository:
             )
             .where(
                 DailyProductStat.shop_id == shop_id,
-                DailyProductStat.stat_date >= self._window_start_date(
+                DailyProductStat.stat_date
+                >= self._window_start_date(
                     window=window,
                     reference_date=reference_date,
                 ),

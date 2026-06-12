@@ -50,11 +50,7 @@ async def test_init_db_upgrades_existing_shop_installations_schema(
 
     async with session_factory() as session:
         installation = (
-            await session.exec(
-                select(ShopInstallation).where(
-                    ShopInstallation.shop_domain == "legacy.myshopify.com"
-                )
-            )
+            await session.exec(select(ShopInstallation).where(ShopInstallation.shop_domain == "legacy.myshopify.com"))
         ).one()
 
     assert installation.timezone_name == "UTC"
@@ -71,10 +67,7 @@ def test_product_diagnoses_upgrade_statement_expands_report_markdown_for_mysql()
 
     statement = db._product_diagnoses_report_markdown_upgrade_statement("mysql")
 
-    assert statement == (
-        "ALTER TABLE product_diagnoses "
-        "MODIFY COLUMN report_markdown LONGTEXT NULL"
-    )
+    assert statement == ("ALTER TABLE product_diagnoses MODIFY COLUMN report_markdown LONGTEXT NULL")
 
 
 @pytest.mark.asyncio
@@ -118,11 +111,7 @@ async def test_init_db_upgrades_existing_recommendation_feedback_schema(
 
     async with session_factory() as session:
         row = (
-            await session.exec(
-                select(RecommendationFeedback).where(
-                    RecommendationFeedback.product_id == "product-1"
-                )
-            )
+            await session.exec(select(RecommendationFeedback).where(RecommendationFeedback.product_id == "product-1"))
         ).one()
 
     assert row.board_date == datetime(2026, 5, 27, tzinfo=UTC).date()

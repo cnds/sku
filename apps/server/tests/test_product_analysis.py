@@ -99,9 +99,7 @@ async def test_product_analysis_uses_top_twenty_percent_benchmark_and_component_
     assert analysis.funnel.target.orders == 4
     assert analysis.funnel.benchmark.orders == 18
     size_chart_delta = next(
-        component
-        for component in analysis.component_comparisons
-        if component.component_id == "size_chart"
+        component for component in analysis.component_comparisons if component.component_id == "size_chart"
     )
     assert round(size_chart_delta.target_ctr, 3) == 0.01
     assert round(size_chart_delta.benchmark_ctr, 3) == 0.08
@@ -303,18 +301,30 @@ async def test_product_priorities_gracefully_returns_fewer_than_three_cards(
 def test_priority_signal_state_derives_tracking_and_volume_quality() -> None:
     service = ProductAnalysisService()
 
-    assert service.derive_priority_signal_state(
-        ProductSnapshot(views=80, add_to_carts=5, orders=1),
-    ) is PrioritySignalState.TRACKING_ISSUE
-    assert service.derive_priority_signal_state(
-        ProductSnapshot(views=6, add_to_carts=1, orders=0, impressions=20, clicks=4),
-    ) is PrioritySignalState.INSUFFICIENT_DATA
-    assert service.derive_priority_signal_state(
-        ProductSnapshot(views=22, add_to_carts=2, orders=0, impressions=50, clicks=8),
-    ) is PrioritySignalState.WEAK_SIGNAL
-    assert service.derive_priority_signal_state(
-        ProductSnapshot(views=80, add_to_carts=10, orders=3, impressions=120, clicks=30),
-    ) is PrioritySignalState.READY
+    assert (
+        service.derive_priority_signal_state(
+            ProductSnapshot(views=80, add_to_carts=5, orders=1),
+        )
+        is PrioritySignalState.TRACKING_ISSUE
+    )
+    assert (
+        service.derive_priority_signal_state(
+            ProductSnapshot(views=6, add_to_carts=1, orders=0, impressions=20, clicks=4),
+        )
+        is PrioritySignalState.INSUFFICIENT_DATA
+    )
+    assert (
+        service.derive_priority_signal_state(
+            ProductSnapshot(views=22, add_to_carts=2, orders=0, impressions=50, clicks=8),
+        )
+        is PrioritySignalState.WEAK_SIGNAL
+    )
+    assert (
+        service.derive_priority_signal_state(
+            ProductSnapshot(views=80, add_to_carts=10, orders=3, impressions=120, clicks=30),
+        )
+        is PrioritySignalState.READY
+    )
 
 
 @pytest.mark.asyncio

@@ -100,7 +100,7 @@ describe("board copy", () => {
           {
             key: "orders_webhook",
             label: "Orders / webhook",
-            message: "No order or webhook events are present for this window.",
+            message: "No Shopify order webhook events are present for this window.",
             status: "missing",
           },
         ],

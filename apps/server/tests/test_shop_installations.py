@@ -38,11 +38,7 @@ async def test_shop_installation_service_upserts_public_and_access_tokens(
 
     async with session_factory() as session:
         installations = (
-            await session.exec(
-                select(ShopInstallation).where(
-                    ShopInstallation.shop_domain == "demo.myshopify.com"
-                )
-            )
+            await session.exec(select(ShopInstallation).where(ShopInstallation.shop_domain == "demo.myshopify.com"))
         ).all()
 
     assert created.shop_domain == "demo.myshopify.com"

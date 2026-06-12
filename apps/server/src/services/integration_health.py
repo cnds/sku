@@ -97,7 +97,7 @@ class IntegrationHealthService:
                 label="Orders / webhook",
                 ok=coverage.orders > 0,
                 ok_message="Order coverage is present.",
-                missing_message="No order or webhook events are present for this window.",
+                missing_message="No Shopify order webhook events are present for this window.",
             ),
         ]
 

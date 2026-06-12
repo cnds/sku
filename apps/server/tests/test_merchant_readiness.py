@@ -21,7 +21,7 @@ from models import (
     ShopInstallation,
 )
 from security.shopify import build_shopify_oauth_hmac
-from services.shopify import ShopifyOAuthService
+from services.shopify import ShopifyOAuthService, ShopifyWebPixelService
 
 
 def _settings(
@@ -38,7 +38,7 @@ def _settings(
         shopify_api_key="test-api-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://app.example.test",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://api.example.test",
         sku_lens_internal_review=internal_review,
     )
@@ -70,7 +70,7 @@ async def test_oauth_start_redirects_to_shopify_authorization_with_state_cookie(
     assert location.path == "/admin/oauth/authorize"
     query = parse_qs(location.query)
     assert query["client_id"] == ["test-api-key"]
-    assert query["scope"] == ["read_orders,read_products"]
+    assert query["scope"] == ["read_products,read_orders,write_pixels,read_customer_events"]
     assert query["redirect_uri"] == ["https://api.example.test/shopify/oauth/callback"]
     assert query["state"] == [state_cookie]
 
@@ -157,8 +157,21 @@ async def test_oauth_callback_installs_shop_and_redirects_to_onboarding(
         assert shop_domain == "demo.myshopify.com"
         return "America/New_York"
 
+    async def fake_upsert_web_pixel(
+        self: ShopifyWebPixelService,
+        *,
+        access_token: str,
+        public_token: str,
+        shop_domain: str,
+    ) -> None:
+        del self
+        assert access_token == expected_oauth_value
+        assert public_token
+        assert shop_domain == "demo.myshopify.com"
+
     monkeypatch.setattr(ShopifyOAuthService, "exchange_access_token", fake_exchange_access_token)
     monkeypatch.setattr(ShopifyOAuthService, "fetch_shop_timezone", fake_fetch_shop_timezone)
+    monkeypatch.setattr(ShopifyWebPixelService, "upsert_web_pixel", fake_upsert_web_pixel)
 
     params = {
         "code": "oauth-code",
@@ -182,18 +195,13 @@ async def test_oauth_callback_installs_shop_and_redirects_to_onboarding(
 
     assert response.status_code == 307
     assert response.headers["location"] == (
-        "https://app.example.test/onboarding?"
-        "shop=demo.myshopify.com&window=24h&host=admin.shopify.com%2Fstore%2Fdemo"
+        "https://app.example.test/onboarding?shop=demo.myshopify.com&window=24h&host=admin.shopify.com%2Fstore%2Fdemo"
     )
     assert response.cookies.get("sku_lens_oauth_state") is None
 
     async with app.state.session_factory() as session:
         installation = (
-            await session.exec(
-                select(ShopInstallation).where(
-                    ShopInstallation.shop_domain == "demo.myshopify.com"
-                )
-            )
+            await session.exec(select(ShopInstallation).where(ShopInstallation.shop_domain == "demo.myshopify.com"))
         ).one()
 
     assert installation.access_token == expected_oauth_value
@@ -251,9 +259,7 @@ async def test_onboarding_status_explains_missing_installation(
     assert payload["installed"] is False
     assert payload["public_token"] is None
     assert payload["ingest_endpoint"] == "https://api.example.test/ingest/events"
-    assert payload["app_embed_deep_link"].startswith(
-        "https://missing.myshopify.com/admin/themes/current/editor"
-    )
+    assert payload["app_embed_deep_link"].startswith("https://missing.myshopify.com/admin/themes/current/editor")
     assert payload["integration_health"]["status"] == "not_connected"
     checklist = {item["key"]: item for item in payload["checklist"]}
     assert checklist["install"]["status"] == "action"
@@ -284,9 +290,9 @@ async def test_onboarding_status_returns_token_health_and_next_steps_for_install
                 shop_domain="demo.myshopify.com",
                 visitor_id="visitor-1",
                 session_id="session-1",
-                event_type=EventType.VIEW,
+                event_type=EventType.PRODUCT_VIEW,
                 product_id="product-1",
-                channel="sdk",
+                channel="shopify_pixel",
                 occurred_at=now_utc,
             )
         )
@@ -366,11 +372,7 @@ async def test_recommendation_feedback_appends_rows_and_reports_latest_action(
     async with app.state.session_factory() as session:
         rows = (
             await session.exec(
-                text(
-                    "SELECT action FROM recommendation_feedback "
-                    "WHERE shop_id = 'demo.myshopify.com' "
-                    "ORDER BY id"
-                )
+                text("SELECT action FROM recommendation_feedback WHERE shop_id = 'demo.myshopify.com' ORDER BY id")
             )
         ).all()
 
@@ -412,11 +414,7 @@ async def test_recommendation_feedback_persists_board_window_and_card_context(
 
     async with app.state.session_factory() as session:
         feedback = (
-            await session.exec(
-                select(RecommendationFeedback).where(
-                    RecommendationFeedback.product_id == "product-1"
-                )
-            )
+            await session.exec(select(RecommendationFeedback).where(RecommendationFeedback.product_id == "product-1"))
         ).one()
 
     assert feedback.board_date == date(2026, 5, 27)
@@ -535,7 +533,7 @@ async def test_internal_card_review_returns_evidence_chain_when_enabled(
                     event_type=EventType.ADD_TO_CART,
                     product_id="leaker-1",
                     component_id="buy_box",
-                    channel="sdk",
+                    channel="shopify_pixel",
                     occurred_at=now_utc,
                 ),
             ]

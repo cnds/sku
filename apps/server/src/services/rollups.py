@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from sqlalchemy import case, delete, func, select
+from sqlalchemy import and_, case, delete, func, select
 from sqlmodel import select as sqlmodel_select
 
 from db import get_db_session
@@ -44,28 +44,27 @@ class DailyRollupService:
         metrics_statement = (
             select(
                 RawEvent.product_id.label("product_id"),
-                func.sum(case((RawEvent.event_type == EventType.VIEW, 1), else_=0)).label("views"),
+                func.sum(case((RawEvent.event_type == EventType.PRODUCT_VIEW, 1), else_=0)).label("views"),
+                func.sum(case((RawEvent.event_type == EventType.ADD_TO_CART, 1), else_=0)).label("add_to_carts"),
                 func.sum(
-                    case((RawEvent.event_type == EventType.ADD_TO_CART, 1), else_=0)
-                ).label("add_to_carts"),
-                func.sum(case((RawEvent.event_type == EventType.ORDER, 1), else_=0)).label(
-                    "orders"
-                ),
-                func.sum(
-                    case((RawEvent.event_type == EventType.IMPRESSION, 1), else_=0)
-                ).label("impressions"),
-                func.sum(case((RawEvent.event_type == EventType.CLICK, 1), else_=0)).label(
-                    "clicks"
-                ),
-                func.sum(case((RawEvent.event_type == EventType.MEDIA, 1), else_=0)).label(
+                    case(
+                        (
+                            and_(
+                                RawEvent.event_type == EventType.ORDER_COMPLETED,
+                                RawEvent.channel == "shopify_webhook",
+                            ),
+                            1,
+                        ),
+                        else_=0,
+                    )
+                ).label("orders"),
+                func.sum(case((RawEvent.event_type == EventType.PRODUCT_IMPRESSION, 1), else_=0)).label("impressions"),
+                func.sum(case((RawEvent.event_type == EventType.PRODUCT_CLICK, 1), else_=0)).label("clicks"),
+                func.sum(case((RawEvent.event_type == EventType.MEDIA_INTERACTION, 1), else_=0)).label(
                     "media_interactions"
                 ),
-                func.sum(case((RawEvent.event_type == EventType.VARIANT, 1), else_=0)).label(
-                    "variant_changes"
-                ),
-                func.sum(case((RawEvent.event_type == EventType.ENGAGE, 1), else_=0)).label(
-                    "engage_count"
-                ),
+                func.sum(case((RawEvent.event_type == EventType.VARIANT_INTENT, 1), else_=0)).label("variant_changes"),
+                func.sum(case((RawEvent.event_type == EventType.ENGAGE, 1), else_=0)).label("engage_count"),
             )
             .where(*day_filter)
             .group_by(RawEvent.product_id)
@@ -79,7 +78,7 @@ class DailyRollupService:
             )
             .where(
                 *day_filter,
-                RawEvent.event_type.in_([EventType.COMPONENT_CLICK, EventType.CLICK]),
+                RawEvent.event_type == EventType.COMPONENT_CLICK,
                 RawEvent.component_id.is_not(None),
             )
             .group_by(RawEvent.product_id, RawEvent.component_id)
@@ -93,16 +92,13 @@ class DailyRollupService:
             )
             .where(
                 *day_filter,
-                RawEvent.event_type == EventType.IMPRESSION,
+                RawEvent.event_type == EventType.COMPONENT_IMPRESSION,
                 RawEvent.component_id.is_not(None),
             )
             .group_by(RawEvent.product_id, RawEvent.component_id)
         )
 
-        engage_statement = (
-            sqlmodel_select(RawEvent)
-            .where(*day_filter, RawEvent.event_type == EventType.ENGAGE)
-        )
+        engage_statement = sqlmodel_select(RawEvent).where(*day_filter, RawEvent.event_type == EventType.ENGAGE)
 
         metrics_rows = (await session.exec(metrics_statement)).all()
         click_rows = (await session.exec(clicks_statement)).all()
@@ -145,9 +141,7 @@ class DailyRollupService:
                         round(eng[1] / eng[2]) if (eng := engage_index.get(row.product_id)) and eng[2] else 0
                     ),
                     component_clicks_distribution=click_index.get(row.product_id, {}),
-                    component_impressions_distribution=impression_index.get(
-                        row.product_id, {}
-                    ),
+                    component_impressions_distribution=impression_index.get(row.product_id, {}),
                 )
                 for row in metrics_rows
             ]

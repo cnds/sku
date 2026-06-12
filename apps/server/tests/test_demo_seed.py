@@ -22,7 +22,7 @@ def _settings(sqlite_database_url: str) -> Settings:
         shopify_api_key="test-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
 
@@ -94,10 +94,7 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
         "demo-media-trust-leaker",
         "demo-hidden-winner",
     ]
-    assert {
-        card["trend_reason"]
-        for card in seven_day_priorities.json()
-    } != {"No previous 7d comparison window yet."}
+    assert {card["trend_reason"] for card in seven_day_priorities.json()} != {"No previous 7d comparison window yet."}
     assert analysis.json()["benchmark_product_id"] == "demo-benchmark"
     assert analysis.json()["component_comparisons"]
     assert diagnosis.json()["status"] == "ready"
@@ -106,11 +103,7 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
 
     async with create_session_factory(settings.database_url)() as session:
         daily_stats = (
-            await session.exec(
-                select(DailyProductStat).where(
-                    DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN
-                )
-            )
+            await session.exec(select(DailyProductStat).where(DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN))
         ).all()
     component_labels = set()
     for daily_stat in daily_stats:
@@ -177,9 +170,7 @@ async def test_seed_demo_data_targets_existing_shopify_installation_without_wipi
 
     async with session_factory() as session:
         installation = (
-            await session.exec(
-                select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain)
-            )
+            await session.exec(select(ShopInstallation).where(ShopInstallation.shop_domain == shop_domain))
         ).one()
 
     assert installation.access_token == existing_access
@@ -236,22 +227,12 @@ async def test_seed_demo_data_is_idempotent_for_demo_products(
     )
 
     async with session_factory() as session:
-        first_raw_events = (
-            await session.exec(
-                select(RawEvent).where(RawEvent.shop_id == DEFAULT_SHOP_DOMAIN)
-            )
-        ).all()
+        first_raw_events = (await session.exec(select(RawEvent).where(RawEvent.shop_id == DEFAULT_SHOP_DOMAIN))).all()
         first_daily_stats = (
-            await session.exec(
-                select(DailyProductStat).where(DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN)
-            )
+            await session.exec(select(DailyProductStat).where(DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN))
         ).all()
         first_diagnoses = (
-            await session.exec(
-                select(ProductDiagnosis).where(
-                    ProductDiagnosis.shop_id == DEFAULT_SHOP_DOMAIN
-                )
-            )
+            await session.exec(select(ProductDiagnosis).where(ProductDiagnosis.shop_id == DEFAULT_SHOP_DOMAIN))
         ).all()
 
     await seed_demo_data(
@@ -260,22 +241,12 @@ async def test_seed_demo_data_is_idempotent_for_demo_products(
     )
 
     async with session_factory() as session:
-        second_raw_events = (
-            await session.exec(
-                select(RawEvent).where(RawEvent.shop_id == DEFAULT_SHOP_DOMAIN)
-            )
-        ).all()
+        second_raw_events = (await session.exec(select(RawEvent).where(RawEvent.shop_id == DEFAULT_SHOP_DOMAIN))).all()
         second_daily_stats = (
-            await session.exec(
-                select(DailyProductStat).where(DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN)
-            )
+            await session.exec(select(DailyProductStat).where(DailyProductStat.shop_id == DEFAULT_SHOP_DOMAIN))
         ).all()
         second_diagnoses = (
-            await session.exec(
-                select(ProductDiagnosis).where(
-                    ProductDiagnosis.shop_id == DEFAULT_SHOP_DOMAIN
-                )
-            )
+            await session.exec(select(ProductDiagnosis).where(ProductDiagnosis.shop_id == DEFAULT_SHOP_DOMAIN))
         ).all()
 
     assert len(first_raw_events) > 0

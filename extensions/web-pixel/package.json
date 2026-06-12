@@ -1,0 +1,16 @@
+{
+  "name": "@sku-lens/pixel",
+  "description": "Shopify Web Pixel extension for SKU Lens standard customer events.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "shopify app build",
+    "dev": "shopify app dev",
+    "lint": "echo 'No pixel lint configured yet'",
+    "test": "echo 'No pixel tests configured yet'",
+    "typecheck": "echo 'No pixel typecheck configured yet'"
+  },
+  "dependencies": {
+    "@shopify/web-pixels-extension": "^2.18.0"
+  }
+}

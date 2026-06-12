@@ -62,25 +62,14 @@ def _upgrade_legacy_shop_installations_schema(connection: Connection) -> None:
     if "shop_installations" not in inspector.get_table_names():
         return
 
-    existing_columns = {
-        column["name"] for column in inspector.get_columns("shop_installations")
-    }
+    existing_columns = {column["name"] for column in inspector.get_columns("shop_installations")}
     statements: list[str] = []
     if "timezone_name" not in existing_columns:
-        statements.append(
-            "ALTER TABLE shop_installations "
-            "ADD COLUMN timezone_name VARCHAR(255) NOT NULL DEFAULT 'UTC'"
-        )
+        statements.append("ALTER TABLE shop_installations ADD COLUMN timezone_name VARCHAR(255) NOT NULL DEFAULT 'UTC'")
     if "last_completed_local_date" not in existing_columns:
-        statements.append(
-            "ALTER TABLE shop_installations "
-            "ADD COLUMN last_completed_local_date DATE NULL"
-        )
+        statements.append("ALTER TABLE shop_installations ADD COLUMN last_completed_local_date DATE NULL")
     if "next_rollup_at_utc" not in existing_columns:
-        statements.append(
-            "ALTER TABLE shop_installations "
-            "ADD COLUMN next_rollup_at_utc DATETIME NULL"
-        )
+        statements.append("ALTER TABLE shop_installations ADD COLUMN next_rollup_at_utc DATETIME NULL")
 
     for statement in statements:
         connection.exec_driver_sql(statement)
@@ -91,9 +80,7 @@ def _upgrade_legacy_product_diagnoses_schema(connection: Connection) -> None:
     if "product_diagnoses" not in inspector.get_table_names():
         return
 
-    existing_columns = {
-        column["name"]: column for column in inspector.get_columns("product_diagnoses")
-    }
+    existing_columns = {column["name"]: column for column in inspector.get_columns("product_diagnoses")}
     report_markdown = existing_columns.get("report_markdown")
     if report_markdown is None:
         return
@@ -102,9 +89,7 @@ def _upgrade_legacy_product_diagnoses_schema(connection: Connection) -> None:
     if not normalized_type.startswith(("VARCHAR", "CHAR")):
         return
 
-    statement = _product_diagnoses_report_markdown_upgrade_statement(
-        connection.dialect.name
-    )
+    statement = _product_diagnoses_report_markdown_upgrade_statement(connection.dialect.name)
     if statement is None:
         return
     connection.exec_driver_sql(statement)
@@ -115,30 +100,16 @@ def _upgrade_legacy_recommendation_feedback_schema(connection: Connection) -> No
     if "recommendation_feedback" not in inspector.get_table_names():
         return
 
-    existing_columns = {
-        column["name"] for column in inspector.get_columns("recommendation_feedback")
-    }
+    existing_columns = {column["name"] for column in inspector.get_columns("recommendation_feedback")}
     statements: list[str] = []
     if "board_date" not in existing_columns:
-        statements.append(
-            "ALTER TABLE recommendation_feedback "
-            "ADD COLUMN board_date DATE NULL"
-        )
+        statements.append("ALTER TABLE recommendation_feedback ADD COLUMN board_date DATE NULL")
     if "window_start_date" not in existing_columns:
-        statements.append(
-            "ALTER TABLE recommendation_feedback "
-            "ADD COLUMN window_start_date DATE NULL"
-        )
+        statements.append("ALTER TABLE recommendation_feedback ADD COLUMN window_start_date DATE NULL")
     if "window_end_date" not in existing_columns:
-        statements.append(
-            "ALTER TABLE recommendation_feedback "
-            "ADD COLUMN window_end_date DATE NULL"
-        )
+        statements.append("ALTER TABLE recommendation_feedback ADD COLUMN window_end_date DATE NULL")
     if "card_rank" not in existing_columns:
-        statements.append(
-            "ALTER TABLE recommendation_feedback "
-            "ADD COLUMN card_rank INTEGER NULL"
-        )
+        statements.append("ALTER TABLE recommendation_feedback ADD COLUMN card_rank INTEGER NULL")
 
     for statement in statements:
         connection.exec_driver_sql(statement)
@@ -148,13 +119,7 @@ def _product_diagnoses_report_markdown_upgrade_statement(
     dialect_name: str,
 ) -> str | None:
     if dialect_name == "mysql":
-        return (
-            "ALTER TABLE product_diagnoses "
-            "MODIFY COLUMN report_markdown LONGTEXT NULL"
-        )
+        return "ALTER TABLE product_diagnoses MODIFY COLUMN report_markdown LONGTEXT NULL"
     if dialect_name == "postgresql":
-        return (
-            "ALTER TABLE product_diagnoses "
-            "ALTER COLUMN report_markdown TYPE TEXT"
-        )
+        return "ALTER TABLE product_diagnoses ALTER COLUMN report_markdown TYPE TEXT"
     return None

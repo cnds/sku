@@ -119,13 +119,6 @@
     '[name="id"]',
   ].join(",");
 
-  var ADD_TO_CART_SELECTORS = [
-    'form[action*="/cart/add"] button[type="submit"]',
-    'form[action*="/cart/add"] input[type="submit"]',
-    'button[name="add"]',
-    "[data-add-to-cart]",
-  ].join(",");
-
   var PDP_COMPONENT_SELECTORS = [
     "[data-sku-lens-component]",
     'form[action*="/cart/add"]',
@@ -189,7 +182,6 @@
   var queue = [];
   var visitorId = ensureId("sku-lens:visitor-id");
   var sessionId = getSessionId();
-  var lastAddToCartAt = 0;
 
   // ---------------------------------------------------------------------------
   // Product ID resolution
@@ -251,25 +243,48 @@
     return typeof value === "string" ? value.slice(0, 160) : "";
   }
 
-  function componentDebugContext(element, action) {
+  function componentSignature(element) {
+    if (!element) return "";
+    var tag = element.tagName ? element.tagName.toLowerCase() : "element";
+    var id = element.id ? "#" + element.id : "";
+    var classes = classHint(element)
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 4)
+      .join(".");
+    return (tag + id + (classes ? "." + classes : "")).slice(0, 180);
+  }
+
+  function componentDebugContext(element, action, mapping) {
     return {
       action: action,
       page_type: "pdp",
       section_hint: findSectionName(element),
+      component_signature: componentSignature(element),
+      mapping_confidence: mapping.mappingConfidence,
+      mapping_source: mapping.mappingSource,
       class_hint: classHint(element),
     };
   }
 
-  function resolvePdpComponentId(element) {
-    if (!element || !element.closest) return "pdp_component";
+  function componentMapping(id, source, confidence) {
+    return {
+      id: id,
+      mappingConfidence: confidence,
+      mappingSource: source,
+    };
+  }
+
+  function resolvePdpComponent(element) {
+    if (!element || !element.closest) return componentMapping("pdp_component", "unknown", "low");
 
     var explicit = element.closest("[data-sku-lens-component]");
     if (explicit) {
       var component = explicit.getAttribute("data-sku-lens-component");
-      if (component) return component;
+      if (component) return componentMapping(component, "explicit_data_attribute", "high");
     }
 
-    if (element.closest('form[action*="/cart/add"]')) return "buy_box";
+    if (element.closest('form[action*="/cart/add"]')) return componentMapping("buy_box", "shopify_structured", "high");
     if (
       element.closest(".product__media") ||
       element.closest(".product__media-list") ||
@@ -280,29 +295,48 @@
       element.closest(".Product__Slideshow") ||
       element.closest(".Product__SlideshowNav") ||
       element.closest("[data-media-id]")
-    ) return "product_media";
+    ) return componentMapping("product_media", "shopify_structured", "high");
+
+    if (
+      element.closest(".product__description") ||
+      element.closest(".product-single__description") ||
+      element.closest(".ProductMeta__Description")
+    ) return componentMapping("product_description", "theme_selector", "medium");
+    if (element.closest(".product-recommendations") || element.closest(".related-products") || element.closest("product-recommendations")) {
+      return componentMapping("recommendations", "theme_selector", "medium");
+    }
+    if (element.closest(".product__accordion")) return componentMapping("product_details", "theme_selector", "medium");
+
+    var classes = classHint(element).toLowerCase();
+    if (classes.indexOf("review") >= 0) return componentMapping("review_tab", "theme_selector", "medium");
+    if (classes.indexOf("size") >= 0 || classes.indexOf("fit") >= 0) return componentMapping("size_chart", "theme_selector", "medium");
+    if (classes.indexOf("shipping") >= 0 || classes.indexOf("return") >= 0 || classes.indexOf("policy") >= 0) {
+      return componentMapping("shipping_returns", "theme_selector", "medium");
+    }
+    if (classes.indexOf("description") >= 0) return componentMapping("product_description", "theme_selector", "medium");
+    if (classes.indexOf("detail") >= 0 || classes.indexOf("spec") >= 0) return componentMapping("product_details", "theme_selector", "medium");
+    if (classes.indexOf("recommend") >= 0) return componentMapping("recommendations", "theme_selector", "medium");
 
     var text = [
       element.id || "",
-      classHint(element),
       element.getAttribute("aria-label") || "",
       findSectionName(element) || "",
       element.textContent || "",
     ].join(" ").toLowerCase();
-    if (text.indexOf("review") >= 0) return "review_tab";
-    if (text.indexOf("size") >= 0 || text.indexOf("fit") >= 0) return "size_chart";
-    if (text.indexOf("shipping") >= 0 || text.indexOf("return") >= 0 || text.indexOf("refund") >= 0) return "shipping_returns";
-    if (text.indexOf("recommend") >= 0 || text.indexOf("related") >= 0) return "recommendations";
-    if (text.indexOf("description") >= 0) return "product_description";
     if (
       text.indexOf("detail") >= 0 ||
       text.indexOf("spec") >= 0 ||
       text.indexOf("material") >= 0 ||
-      text.indexOf("care") >= 0 ||
-      element.closest(".product__accordion")
-    ) return "product_details";
+      text.indexOf("care") >= 0
+    ) return componentMapping("product_details", "text_fallback", "low");
 
-    return "pdp_component";
+    if (text.indexOf("review") >= 0) return componentMapping("review_tab", "text_fallback", "low");
+    if (text.indexOf("size") >= 0 || text.indexOf("fit") >= 0) return componentMapping("size_chart", "text_fallback", "low");
+    if (text.indexOf("shipping") >= 0 || text.indexOf("return") >= 0 || text.indexOf("refund") >= 0) return componentMapping("shipping_returns", "text_fallback", "low");
+    if (text.indexOf("recommend") >= 0 || text.indexOf("related") >= 0) return componentMapping("recommendations", "text_fallback", "low");
+    if (text.indexOf("description") >= 0) return componentMapping("product_description", "text_fallback", "low");
+
+    return componentMapping("pdp_component", "text_fallback", "low");
   }
 
   // ---------------------------------------------------------------------------
@@ -406,10 +440,17 @@
                 for (var j = 0; j < cards.length; j++) {
                   if (cards[j] === target) { pos = j; break; }
                 }
-                track("impression", {
+                track("product_impression", {
                   productId: productId,
                   componentId: findSectionName(target),
-                  context: { position: pos >= 0 ? pos : null },
+                  context: {
+                    component_signature: componentSignature(target),
+                    mapping_confidence: target.hasAttribute && target.hasAttribute("data-product-id") ? "high" : "medium",
+                    mapping_source: "product_card_selector",
+                    page_type: resolvePageType(),
+                    position: pos >= 0 ? pos : null,
+                    section_hint: findSectionName(target),
+                  },
                 });
               }, IMPRESSION_DWELL_MS);
               timers.set(target, t);
@@ -465,32 +506,22 @@
           card.querySelector('a[href*="/products/"]') || target.closest("a");
         var targetUrl = link ? link.getAttribute("href") : null;
 
-        track("click", {
+        track("product_click", {
           productId: productId,
           componentId: findSectionName(card),
-          context: { position: pos >= 0 ? pos : null, target_url: targetUrl },
+          context: {
+            component_signature: componentSignature(card),
+            mapping_confidence: card.hasAttribute && card.hasAttribute("data-product-id") ? "high" : "medium",
+            mapping_source: "product_card_selector",
+            page_type: resolvePageType(),
+            position: pos >= 0 ? pos : null,
+            section_hint: findSectionName(card),
+            target_url: targetUrl,
+          },
         });
       },
       true
     );
-  }
-
-  // ---------------------------------------------------------------------------
-  // view — PDP page view
-  // ---------------------------------------------------------------------------
-
-  function initPdpViewTracking() {
-    if (resolvePageType() !== "pdp") return;
-    var productId = resolveProductId(null);
-    if (!productId) return;
-
-    track("view", {
-      productId: productId,
-      context: {
-        page_type: "pdp",
-        path: window.location.pathname,
-      },
-    });
   }
 
   // ---------------------------------------------------------------------------
@@ -511,11 +542,12 @@
 
         var productId = resolveProductId(null);
         if (!productId) return;
+        var mapping = resolvePdpComponent(component);
 
         track("component_click", {
           productId: productId,
-          componentId: resolvePdpComponentId(component),
-          context: componentDebugContext(component, "click"),
+          componentId: mapping.id,
+          context: componentDebugContext(component, "click", mapping),
         });
       },
       true
@@ -536,11 +568,12 @@
 
           var productId = resolveProductId(null);
           if (!productId) return;
+          var mapping = resolvePdpComponent(entry.target);
 
-          track("impression", {
+          track("component_impression", {
             productId: productId,
-            componentId: resolvePdpComponentId(entry.target),
-            context: componentDebugContext(entry.target, "impression"),
+            componentId: mapping.id,
+            context: componentDebugContext(entry.target, "impression", mapping),
           });
         }
       },
@@ -559,7 +592,7 @@
   }
 
   // ---------------------------------------------------------------------------
-  // buy box and add_to_cart — PDP purchase intent
+  // buy box — PDP purchase intent
   // ---------------------------------------------------------------------------
 
   function initBuyBoxIntentTracking() {
@@ -580,57 +613,16 @@
           variantId: resolveSelectedVariantId(),
           context: {
             action: "intent",
+            component_signature: componentSignature(target.closest('form[action*="/cart/add"]')),
+            mapping_confidence: "high",
+            mapping_source: "shopify_structured",
             page_type: "pdp",
+            section_hint: findSectionName(target),
           },
         });
       },
       true
     );
-  }
-
-  function initAddToCartTracking() {
-    if (resolvePageType() !== "pdp") return;
-
-    document.addEventListener(
-      "submit",
-      function (event) {
-        var target = event.target instanceof HTMLElement ? event.target : null;
-        if (!target || !target.matches('form[action*="/cart/add"]')) return;
-        trackAddToCart("submit");
-      },
-      true
-    );
-
-    document.addEventListener(
-      "click",
-      function (event) {
-        var target = event.target instanceof HTMLElement ? event.target : null;
-        if (!target || !target.closest) return;
-        if (!target.closest(ADD_TO_CART_SELECTORS)) return;
-        trackAddToCart("click");
-      },
-      true
-    );
-  }
-
-  function trackAddToCart(action) {
-    var now = Date.now();
-    if (now - lastAddToCartAt < 1000) return;
-    lastAddToCartAt = now;
-
-    var productId = resolveProductId(null);
-    if (!productId) return;
-
-    track("add_to_cart", {
-      productId: productId,
-      componentId: "buy_box",
-      variantId: resolveSelectedVariantId(),
-      context: {
-        action: action,
-        page_type: "pdp",
-        source: "product_form",
-      },
-    });
   }
 
   // ---------------------------------------------------------------------------
@@ -653,7 +645,7 @@
         var productId = resolveProductId(null);
         if (!productId) return;
 
-        track("media", {
+        track("media_interaction", {
           productId: productId,
           componentId: "product_media",
           context: {
@@ -710,7 +702,7 @@
         var productId = resolveProductId(null);
         if (!productId) return;
 
-        track("variant", {
+        track("variant_intent", {
           productId: productId,
           variantId: resolveSelectedVariantId(),
           context: { options: collectSelectedOptions() },
@@ -847,10 +839,8 @@
   var impressionTracker = initImpressionTracking();
   var pdpComponentImpressionTracker = initPdpComponentImpressionTracking();
   initClickTracking();
-  initPdpViewTracking();
   initPdpComponentClickTracking();
   initBuyBoxIntentTracking();
-  initAddToCartTracking();
   initMediaTracking();
   initVariantTracking();
   initEngageTracking();

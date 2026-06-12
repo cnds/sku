@@ -3,38 +3,57 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const source = readFileSync(
-  new URL("../../extension/assets/sku-lens-tracker.js", import.meta.url),
+  new URL("../../../extensions/theme/assets/sku-lens-tracker.js", import.meta.url),
   "utf8",
 );
 
 describe("storefront tracker event surface", () => {
-  it("emits PDP view, buy-box intent, add-to-cart, and component PDP events", () => {
-    expect(source).toContain('track("view"');
-    expect(source).toContain('track("add_to_cart"');
+  it("emits SDK DOM events without PDP view or add-to-cart funnel events", () => {
+    expect(source).not.toContain('track("view"');
+    expect(source).not.toContain('track("add_to_cart"');
+    expect(source).toContain('track("product_impression"');
+    expect(source).toContain('track("product_click"');
+    expect(source).toContain('track("component_impression"');
     expect(source).toContain('track("component_click"');
+    expect(source).toContain('track("media_interaction"');
+    expect(source).toContain('track("variant_intent"');
     expect(source).toContain('componentId: "buy_box"');
     expect(source).toContain('componentId: "product_media"');
   });
 
-  it("maps common PDP sections into stable component labels with debug hints", () => {
+  it("maps common PDP sections into stable component labels with attribution hints", () => {
     expect(source).toContain('"product_description"');
     expect(source).toContain('"shipping_returns"');
     expect(source).toContain('"recommendations"');
     expect(source).toContain('"product_details"');
+    expect(source).toContain("mapping_confidence");
+    expect(source).toContain("mapping_source");
     expect(source).toContain("section_hint");
-    expect(source).toContain("class_hint");
+    expect(source).toContain("component_signature");
   });
 
   it.each([
-    ["Dawn", "product__media", "product__description", "product-form__input"],
-    ["Refresh", "product__media-wrapper", "product__accordion", "product-form__input"],
-    ["Sense", "product-media", "product__details", "product-form__input"],
-    ["Impulse", "product-single__media-wrapper", "product-single__description", "variant-wrapper"],
-    ["Prestige", "Product__Slideshow", "ProductMeta__Description", "ProductForm__Variants"],
-    ["Debutify", "product-single__media-group", "product-single__description", "selector-wrapper"],
+    ["Dawn", "product__media", "product__description", "product-form__input", "product_description"],
+    ["Refresh", "product__media-wrapper", "product__accordion", "product-form__input", "product_details"],
+    ["Sense", "product-media", "product__details", "product-form__input", "product_details"],
+    [
+      "Impulse",
+      "product-single__media-wrapper",
+      "product-single__description",
+      "variant-wrapper",
+      "product_description",
+    ],
+    ["Prestige", "Product__Slideshow", "ProductMeta__Description", "ProductForm__Variants", "product_description"],
+    [
+      "Debutify",
+      "product-single__media-group",
+      "product-single__description",
+      "selector-wrapper",
+      "product_description",
+    ],
   ])(
     "executes the tracker against %s PDP markup and emits stable component labels",
-    async (_theme, mediaClass, descriptionClass, variantClass) => {
+    async (_theme, mediaClass, descriptionClass, variantClass, expectedDetailComponent) => {
       const capturedBatches = await runTrackerFixture({
         descriptionClass,
         mediaClass,
@@ -43,11 +62,15 @@ describe("storefront tracker event surface", () => {
       const events = capturedBatches.flatMap((batch) => batch.events);
 
       expect(events.map((event) => event.event_type)).toEqual(
-        expect.arrayContaining(["view", "component_click", "add_to_cart", "media", "variant"]),
+        expect.arrayContaining(["component_click", "media_interaction", "variant_intent"]),
+      );
+      expect(events.map((event) => event.event_type)).not.toEqual(
+        expect.arrayContaining(["view", "add_to_cart"]),
       );
       expect(componentIds(events)).toEqual(
-        expect.arrayContaining(["buy_box", "product_media", "product_description"]),
+        expect.arrayContaining(["buy_box", "product_media", expectedDetailComponent]),
       );
+      expect(events.some((event) => event.context.mapping_source === "theme_selector")).toBe(true);
       expect(capturedBatches[0]).toMatchObject({
         shop_domain: "fixture.myshopify.com",
       });
@@ -64,6 +87,7 @@ interface TrackerFixtureArgs {
 interface CapturedBatch {
   events: Array<{
     component_id: string | null;
+    context: Record<string, unknown>;
     event_type: string;
   }>;
   shop_domain: string;

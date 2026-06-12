@@ -1,0 +1,37 @@
+type = "web_pixel_extension"
+name = "sku-lens-pixel"
+uid = "8c2e1437-7a57-4d85-93d1-629f4d642b3c"
+runtime_context = "strict"
+
+[customer_privacy]
+analytics = true
+marketing = false
+preferences = false
+sale_of_data = "disabled"
+
+[settings]
+type = "object"
+
+[settings.fields.endpoint]
+name = "Endpoint"
+description = "SKU Lens pixel ingest endpoint"
+type = "single_line_text_field"
+validations = [
+  { name = "min", value = "1" }
+]
+
+[settings.fields.publicToken]
+name = "Public token"
+description = "SKU Lens public ingest token"
+type = "single_line_text_field"
+validations = [
+  { name = "min", value = "1" }
+]
+
+[settings.fields.shopDomain]
+name = "Shop domain"
+description = "Permanent myshopify.com domain"
+type = "single_line_text_field"
+validations = [
+  { name = "min", value = "1" }
+]

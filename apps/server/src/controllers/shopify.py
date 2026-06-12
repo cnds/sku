@@ -62,9 +62,7 @@ async def shopify_oauth_callback_browser(
         cookie_state=request.cookies.get(SHOPIFY_OAUTH_STATE_COOKIE),
         returned_state=state,
     )
-    installation = await ShopifyInstallationCallbackService(
-        request.app.state.settings
-    ).complete_installation(
+    installation = await ShopifyInstallationCallbackService(request.app.state.settings).complete_installation(
         shop_domain=shop_domain,
         code=code,
         callback_params=dict(request.query_params),
@@ -91,9 +89,7 @@ async def shopify_oauth_callback(
     request: Request,
     code: str | None = None,
 ) -> ShopifyOAuthCallbackResponse:
-    installation = await ShopifyInstallationCallbackService(
-        request.app.state.settings
-    ).complete_installation(
+    installation = await ShopifyInstallationCallbackService(request.app.state.settings).complete_installation(
         shop_domain=shop,
         code=code,
         callback_params=dict(request.query_params),
@@ -112,34 +108,36 @@ async def shopify_oauth_callback(
 @shopify_hmac_required(lambda request: request.app.state.settings.shopify_api_secret)
 async def shopify_order_webhook(request: Request) -> ShopifyWebhookAcceptedResponse:
     payload = await request.json()
-    shop_domain = request.headers.get("X-Shopify-Shop-Domain", "unknown.myshopify.com")
+    shop_domain = normalize_shop_domain(request.headers.get("X-Shopify-Shop-Domain", "unknown.myshopify.com"))
     installation = await ShopInstallationService().get_by_shop_domain(shop_domain)
+    timezone_name = installation.timezone_name if installation is not None else None
     ingestion_batch = ShopifyOrderWebhookService().build_order_ingestion_batch(
         payload=payload,
         shop_domain=shop_domain,
-        timezone_name=installation.timezone_name if installation is not None else None,
+        timezone_name=timezone_name,
     )
 
+    accepted = 0
     if ingestion_batch.events:
-        await EventIngestionService().persist_batch_rollup_and_enqueue(
+        accepted = await EventIngestionService().persist_batch_rollup_and_enqueue(
             after_commit_callbacks=request.state.after_commit_callbacks,
-            channel="webhook",
+            channel="shopify_webhook",
             events=ingestion_batch.events,
             session_id=ingestion_batch.session_id,
             shop_domain=ingestion_batch.shop_domain,
             stat_date=ingestion_batch.stat_date,
             shop_id=ingestion_batch.shop_id,
-            timezone_name=installation.timezone_name if installation is not None else None,
+            timezone_name=timezone_name,
             visitor_id=ingestion_batch.visitor_id,
         )
 
     LOGGER.info(
-        "shopify webhook accepted channel=%s enqueued=%s shop_domain=%s",
-        "webhook",
-        len(ingestion_batch.events),
+        "shopify webhook accepted channel=%s accepted=%s shop_domain=%s",
+        "shopify_webhook",
+        accepted,
         shop_domain,
     )
     return ShopifyWebhookAcceptedResponse(
         accepted=True,
-        enqueued=len(ingestion_batch.events),
+        enqueued=accepted,
     )

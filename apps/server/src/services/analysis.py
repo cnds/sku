@@ -68,9 +68,7 @@ class ProductAnalysisService:
         store_avg_cr = self._store_average_cr(snapshots)
         gap = (target.views * store_avg_cr) - target.orders
 
-        component_ids = sorted(
-            set(target.component_clicks_distribution) | set(benchmark.component_clicks_distribution)
-        )
+        component_ids = sorted(set(target.component_clicks_distribution) | set(benchmark.component_clicks_distribution))
         component_comparisons = [
             ComponentComparison(
                 component_id=component_id,

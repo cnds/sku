@@ -16,7 +16,7 @@ Most ecommerce dashboards show more metrics. SKU Lens reduces the decision: whic
 
 - Product cards combine traffic, PDP behavior, add-to-cart, order, and component signals.
 - Low-data states explain what is missing instead of overclaiming.
-- Setup status shows install, raw events, PDP views, component coverage, add-to-cart, and order/webhook coverage.
+- Setup status shows install, raw events, PDP views, component coverage, add-to-cart, and order webhook coverage.
 - Merchant feedback stays lightweight: try it, not useful, already fixed, or remind later.
 
 ## Call To Action

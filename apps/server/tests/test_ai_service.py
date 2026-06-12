@@ -26,13 +26,14 @@ def _settings(
         shopify_api_key="test-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
 
 
 def _settings_without_api_key() -> Settings:
     return Settings(
+        ai_api_key="",
         ai_base_url="https://ai.example.test/v1",
         ai_model="sku-diagnosis-model",
         database_url="sqlite+aiosqlite:///test.db",
@@ -41,7 +42,7 @@ def _settings_without_api_key() -> Settings:
         shopify_api_key="test-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
 

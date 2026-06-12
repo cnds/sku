@@ -23,7 +23,7 @@ def test_fastapi_metadata_exposes_current_brand(
             shopify_api_key="test-key",
             shopify_api_secret="test-secret",
             shopify_app_url="https://example.com",
-            shopify_scopes="read_orders,read_products",
+            shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
             shopify_webhook_base_url="https://example.com",
         )
     )

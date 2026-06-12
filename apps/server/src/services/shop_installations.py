@@ -33,8 +33,7 @@ class ShopInstallationService:
         normalized_timezone = normalize_shop_timezone(timezone_name)
         existing = await self._repository.get_by_shop_domain(shop_domain)
         timezone_changed = (
-            normalize_shop_timezone(existing.timezone_name if existing is not None else None)
-            != normalized_timezone
+            normalize_shop_timezone(existing.timezone_name if existing is not None else None) != normalized_timezone
         )
         installation = await self._repository.upsert(
             shop_domain=shop_domain,

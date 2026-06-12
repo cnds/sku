@@ -22,7 +22,7 @@ def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
         shopify_api_key="test-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
 
@@ -84,9 +84,9 @@ async def test_integration_health_reports_partial_when_funnel_steps_are_missing(
                 shop_domain="demo.myshopify.com",
                 visitor_id="visitor-1",
                 session_id="session-1",
-                event_type=EventType.VIEW,
+                event_type=EventType.PRODUCT_VIEW,
                 product_id="product-1",
-                channel="sdk",
+                channel="shopify_pixel",
                 occurred_at=now_utc,
             )
         )
@@ -160,9 +160,9 @@ async def test_integration_health_uses_shop_local_reference_date_for_window(
                 shop_domain="tokyo.myshopify.com",
                 visitor_id="visitor-1",
                 session_id="session-1",
-                event_type=EventType.VIEW,
+                event_type=EventType.PRODUCT_VIEW,
                 product_id="product-1",
-                channel="sdk",
+                channel="shopify_pixel",
                 occurred_at=fixed_now,
             )
         )
@@ -221,10 +221,10 @@ async def test_integration_health_does_not_count_collection_clicks_as_component_
                 shop_domain="demo.myshopify.com",
                 visitor_id="visitor-1",
                 session_id="session-1",
-                event_type=EventType.CLICK,
+                event_type=EventType.PRODUCT_CLICK,
                 component_id="featured-collection",
                 product_id="product-1",
-                channel="sdk",
+                channel="sdk_dom",
                 occurred_at=now_utc,
             )
         )
@@ -292,9 +292,9 @@ async def test_integration_health_reports_healthy_when_core_coverage_is_present(
                     shop_domain="demo.myshopify.com",
                     visitor_id="visitor-1",
                     session_id="session-1",
-                    event_type=EventType.VIEW,
+                    event_type=EventType.PRODUCT_VIEW,
                     product_id="product-1",
-                    channel="sdk",
+                    channel="shopify_pixel",
                     occurred_at=now_utc,
                 ),
                 RawEvent(
@@ -302,9 +302,9 @@ async def test_integration_health_reports_healthy_when_core_coverage_is_present(
                     shop_domain="demo.myshopify.com",
                     visitor_id="visitor-1",
                     session_id="session-1",
-                    event_type=EventType.ORDER,
+                    event_type=EventType.ORDER_COMPLETED,
                     product_id="product-1",
-                    channel="webhook",
+                    channel="shopify_webhook",
                     occurred_at=now_utc,
                 ),
                 *[
@@ -316,7 +316,7 @@ async def test_integration_health_reports_healthy_when_core_coverage_is_present(
                         event_type=EventType.COMPONENT_CLICK,
                         component_id=component_id,
                         product_id="product-1",
-                        channel="sdk",
+                        channel="sdk_dom",
                         occurred_at=now_utc,
                     )
                     for component_id, count in component_clicks.items()

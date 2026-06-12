@@ -59,7 +59,7 @@ class AIDiagnosisService:
                 "recommended_action": "Review the markdown report and prioritize the first action item.",
                 "source": "openai-compatible",
             }
-        except (httpx.HTTPError, ValueError):
+        except httpx.HTTPError, ValueError:
             return self._fallback_report(snapshot=snapshot)
         finally:
             if should_close:
@@ -68,9 +68,7 @@ class AIDiagnosisService:
     @staticmethod
     def _build_prompt(*, snapshot: ProductSnapshot) -> str:
         avg_dwell_s = (
-            round(snapshot.total_dwell_ms / snapshot.engage_count / 1000, 1)
-            if snapshot.engage_count > 0
-            else 0
+            round(snapshot.total_dwell_ms / snapshot.engage_count / 1000, 1) if snapshot.engage_count > 0 else 0
         )
         collection_ctr = AIDiagnosisService._percent(snapshot.clicks, snapshot.impressions)
         view_to_cart = AIDiagnosisService._percent(snapshot.add_to_carts, snapshot.views)

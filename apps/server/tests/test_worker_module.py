@@ -35,7 +35,7 @@ def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
         shopify_api_key="test-key",
         shopify_api_secret="test-secret",
         shopify_app_url="https://example.com",
-        shopify_scopes="read_orders,read_products",
+        shopify_scopes="read_products,read_orders,write_pixels,read_customer_events",
         shopify_webhook_base_url="https://example.com",
     )
 
@@ -216,8 +216,8 @@ async def test_task_handlers_process_rollup_jobs_with_initialized_runtime(
         session.add_all(
             [
                 RawEvent(
-                    channel="sdk",
-                    event_type=EventType.VIEW,
+                    channel="shopify_pixel",
+                    event_type=EventType.PRODUCT_VIEW,
                     occurred_at=occurred_at,
                     product_id="product-1",
                     session_id="session-1",
@@ -226,7 +226,7 @@ async def test_task_handlers_process_rollup_jobs_with_initialized_runtime(
                     visitor_id="visitor-1",
                 ),
                 RawEvent(
-                    channel="sdk",
+                    channel="sdk_dom",
                     component_id="size_chart",
                     event_type=EventType.COMPONENT_CLICK,
                     occurred_at=occurred_at,
@@ -451,8 +451,8 @@ async def test_task_scheduler_runs_due_shop_rollups_when_shop_crosses_local_midn
         session.add_all(
             [
                 RawEvent(
-                    channel="sdk",
-                    event_type=EventType.VIEW,
+                    channel="shopify_pixel",
+                    event_type=EventType.PRODUCT_VIEW,
                     occurred_at=datetime(2026, 4, 28, 14, 50, tzinfo=UTC),
                     product_id="product-1",
                     session_id="session-1",
@@ -461,8 +461,8 @@ async def test_task_scheduler_runs_due_shop_rollups_when_shop_crosses_local_midn
                     visitor_id="visitor-1",
                 ),
                 RawEvent(
-                    channel="sdk",
-                    event_type=EventType.VIEW,
+                    channel="shopify_pixel",
+                    event_type=EventType.PRODUCT_VIEW,
                     occurred_at=datetime(2026, 4, 28, 15, 5, tzinfo=UTC),
                     product_id="product-1",
                     session_id="session-1",
@@ -481,11 +481,7 @@ async def test_task_scheduler_runs_due_shop_rollups_when_shop_crosses_local_midn
 
         async with session_factory() as session:
             installation = (
-                await session.exec(
-                    select(ShopInstallation).where(
-                        ShopInstallation.shop_domain == "demo.myshopify.com"
-                    )
-                )
+                await session.exec(select(ShopInstallation).where(ShopInstallation.shop_domain == "demo.myshopify.com"))
             ).one()
             daily_stats = (
                 await session.exec(
