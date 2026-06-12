@@ -5,7 +5,10 @@ Daily Decision Board for Shopify Products
 SKU Lens helps merchants decide which products to promote, which products to fix,
 why each product was flagged, and what first action to try next. The first screen
 centers on `Today's product priorities`: two Leakers with shopper drop-off evidence
-and one Hidden Winner with high intent but limited exposure.
+and one Hidden Winner with high intent but limited exposure. Priority selection is
+score-driven, while the merchant-facing suspected friction and first fix are
+generated from the same AI diagnosis chain used on the product detail page when
+OpenAI-compatible credentials are configured.
 
 ## Apps
 
@@ -41,6 +44,7 @@ and one Hidden Winner with high intent but limited exposure.
 - FastAPI, worker jobs, Remix server fetches, and the storefront tracker all propagate `X-SKU-Lens-Request-Id` when available. Celery dispatch uses `job_id` as `task_id` so server enqueue logs and worker processing logs can be correlated.
 - The Remix loaders and resource routes default analytics and diagnosis requests to `24h` when `window` is missing or invalid; preserve the supported `24h`, `7d`, and `30d` values end-to-end.
 - Current analytics windows use shop-local calendar-day buckets; `24h` is not an exact rolling 24-hour lookback.
+- Priority cards are selected from score-ranked product statistics: up to two Leakers and one Hidden Winner. When a real `AI_API_KEY` is configured, the selected cards reuse the AI diagnosis prompt to produce the card-level `suspected_friction` and `first_fix`; if AI is unavailable, rule-based copy remains the fallback.
 - Browser-side logs stay silent by default. To inspect `apps/web` browser polling or `extensions/theme` tracker behavior locally, set `localStorage['sku-lens:debug'] = '1'` before reproducing the flow.
 
 ## Containerized Development
@@ -87,7 +91,7 @@ The `server` and `web` services use source mounts for live development. The Cele
 8. Seed repeatable demo data with `uv run --directory apps/server sku-lens-seed-demo`.
 9. Run the admin app with `pnpm dev`.
 
-`SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag and build the App Embed activation link. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook HMAC verification. `SHOPIFY_SCOPES` must include `read_orders` for order webhooks plus `write_pixels` and `read_customer_events` so OAuth can activate the app pixel. `SHOPIFY_WEBHOOK_BASE_URL` is the public backend base used for OAuth callback, webhook, and ingest URLs, while `SHOPIFY_APP_URL` is the embedded web app base used after install. `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for generated diagnosis reports; without a real `AI_API_KEY`, diagnosis generation uses the local fallback report. `REDIS_URL` is also the default Celery broker URL; set `CELERY_BROKER_URL` only if you need Celery to use a different Redis broker. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs. Set `SKU_LENS_INTERNAL_REVIEW=1` only when the gated card-review endpoint should be available.
+`SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag and build the App Embed activation link. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook HMAC verification. `SHOPIFY_SCOPES` must include `read_orders` for order webhooks plus `write_pixels` and `read_customer_events` so OAuth can activate the app pixel. `SHOPIFY_WEBHOOK_BASE_URL` is the public backend base used for OAuth callback, webhook, and ingest URLs, while `SHOPIFY_APP_URL` is the embedded web app base used after install. `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for priority-card advice and product diagnosis reports; without a real `AI_API_KEY`, SKU Lens keeps the same score-based card selection and uses local fallback copy for merchant-facing advice. `REDIS_URL` is also the default Celery broker URL; set `CELERY_BROKER_URL` only if you need Celery to use a different Redis broker. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs. Set `SKU_LENS_INTERNAL_REVIEW=1` only when the gated card-review endpoint should be available.
 
 The demo seed command targets the most recent OAuth-installed Shopify shop by default, so data appears in the embedded admin app for that development store. If no OAuth-installed shop exists, it uses the latest installation record; if no installation exists, it falls back to `sku-dev-uaop8pff.myshopify.com`. Pass `--shop-domain <store>.myshopify.com` to seed a specific store. The command replaces only the repo's `demo-*` products for that shop, preserves existing OAuth tokens unless you explicitly override them, includes stable PDP component labels such as `product_description`, `shipping_returns`, and `recommendations`, and pre-generates diagnosis cards so `http://localhost:3000/?shop=<store>.myshopify.com&window=24h` renders real board and product data immediately.
 
