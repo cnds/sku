@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { AppProvider } from "@shopify/polaris";
 import polarisTranslations from "@shopify/polaris/locales/en.json";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PriorityCard } from "../app/lib/contracts";
 
 const {
   fetchIntegrationHealthMock,
@@ -24,7 +25,13 @@ vi.mock("../app/lib/api.server", () => ({
 }));
 
 import { messages } from "../app/lib/messages";
-import { ErrorBoundary, loader, readinessBannerContent } from "../app/routes/_index";
+import {
+  ErrorBoundary,
+  PriorityRecommendation,
+  PriorityWhyNow,
+  loader,
+  readinessBannerContent,
+} from "../app/routes/_index";
 
 describe("dashboard route loader", () => {
   beforeEach(() => {
@@ -98,6 +105,26 @@ describe("dashboard route loader", () => {
     expect(markup).toContain(messages.dashboard.errorMessage);
   });
 
+  it("renders markdown emphasis in dashboard priority card copy", () => {
+    const card = priorityCardFixture();
+    const markup = renderToStaticMarkup(
+      createElement(
+        AppProvider,
+        { i18n: polarisTranslations },
+        createElement("div", null, [
+          createElement(PriorityRecommendation, { card, key: "recommendation" }),
+          createElement(PriorityWhyNow, { card, key: "why-now" }),
+        ]),
+      ),
+    );
+
+    expect(markup).toContain("<strong>trust cue</strong>");
+    expect(markup).toContain("<strong>more confidence</strong>");
+    expect(markup).toContain("<strong>50 PDP views</strong>");
+    expect(markup).toContain("<strong>2 add-to-carts</strong>");
+    expect(markup).not.toContain("**");
+  });
+
   it("separates missing install, missing raw events, low PDP traffic, and partial coverage states", () => {
     expect(
       readinessBannerContent({
@@ -164,3 +191,28 @@ describe("dashboard route loader", () => {
     ).toContain("Partial coverage");
   });
 });
+
+function priorityCardFixture(): PriorityCard {
+  return {
+    add_to_carts: 2,
+    board: "leaker",
+    board_date: "2026-05-27",
+    card_rank: 1,
+    clicks: 5,
+    evidence: ["**50 PDP views**", "**2 add-to-carts**"],
+    first_fix: "Move the **trust cue** beside the buy box.",
+    flag_reason: "Orders lag similar traffic",
+    impressions: 20,
+    orders: 1,
+    primary_step: "pdp_add_to_cart",
+    product_id: "product-1",
+    score: 3,
+    signal_state: "Ready",
+    suspected_friction: "Shoppers need **more confidence** before checkout.",
+    trend_reason: "**Gap worsened** versus the previous window.",
+    trend_state: "Worsening",
+    views: 50,
+    window_end_date: "2026-05-27",
+    window_start_date: "2026-05-20",
+  };
+}

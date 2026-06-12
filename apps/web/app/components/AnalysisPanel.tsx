@@ -14,6 +14,7 @@ import {
   Text,
 } from "@shopify/polaris";
 import { RefreshIcon } from "@shopify/polaris-icons";
+import { MarkdownText } from "@/components/MarkdownText";
 import type { DiagnosisResult, PriorityCard, ProductAnalysisResult } from "@/lib/contracts";
 
 import {
@@ -71,6 +72,22 @@ const JOURNEY_INSIGHT_STYLE: CSSProperties = {
 const JOURNEY_INSIGHT_LIST_STYLE: CSSProperties = {
   margin: 0,
   paddingLeft: "1.25rem",
+};
+
+const MARKDOWN_BODY_STYLE: CSSProperties = {
+  fontSize: "0.875rem",
+  lineHeight: 1.5,
+};
+
+const MARKDOWN_SEMIBOLD_STYLE: CSSProperties = {
+  ...MARKDOWN_BODY_STYLE,
+  fontWeight: 600,
+};
+
+const MARKDOWN_SUBDUED_STYLE: CSSProperties = {
+  color: "var(--p-color-text-subdued)",
+  fontSize: "0.8125rem",
+  lineHeight: 1.4,
 };
 
 interface ShopperJourneyStep {
@@ -187,12 +204,12 @@ function PriorityDetailCard({ card }: { card: PriorityCard }) {
                 <Text as="p" variant="bodySm" tone="subdued">
                   {messages.analysis.priorityConclusion}
                 </Text>
-                <Text as="p" variant="bodyMd" fontWeight="semibold">
-                  {card.first_fix}
-                </Text>
-                <Text as="p" variant="bodySm" tone="subdued">
-                  {card.trend_reason}
-                </Text>
+                <div style={MARKDOWN_SEMIBOLD_STYLE}>
+                  <MarkdownText markdown={card.first_fix} fallback="—" />
+                </div>
+                <div style={MARKDOWN_SUBDUED_STYLE}>
+                  <MarkdownText markdown={card.trend_reason} fallback="" />
+                </div>
               </BlockStack>
             </div>
           </BlockStack>
@@ -374,19 +391,27 @@ function ShopperJourneyCard({
           <BlockStack gap="200">
             <Text as="h3" variant="headingSm">{insightTitle}</Text>
             {insightEvidence.length === 1 ? (
-              <Text as="p" variant="bodyMd">{insightEvidence[0]}</Text>
+              <div style={MARKDOWN_BODY_STYLE}>
+                <MarkdownText markdown={insightEvidence[0] ?? ""} fallback="—" />
+              </div>
             ) : (
               <ul style={JOURNEY_INSIGHT_LIST_STYLE}>
                 {insightEvidence.map((item) => (
                   <li key={item}>
-                    <Text as="span" variant="bodyMd">{item}</Text>
+                    <div style={MARKDOWN_BODY_STYLE}>
+                      <MarkdownText markdown={item} fallback="—" />
+                    </div>
                   </li>
                 ))}
               </ul>
             )}
-            <Text as="p" variant="bodyMd">{insightFriction}</Text>
+            <div style={MARKDOWN_BODY_STYLE}>
+              <MarkdownText markdown={insightFriction} fallback="—" />
+            </div>
             {insightFirstFix ? (
-              <Text as="p" variant="bodyMd" fontWeight="semibold">{insightFirstFix}</Text>
+              <div style={MARKDOWN_SEMIBOLD_STYLE}>
+                <MarkdownText markdown={insightFirstFix} fallback="—" />
+              </div>
             ) : null}
           </BlockStack>
         </div>
@@ -523,7 +548,7 @@ function DiagnosisCards({
               {card.title}
             </div>
             <div style={{ padding: 14, fontSize: 13, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
-              {card.content || "—"}
+              <MarkdownText markdown={card.content} fallback="—" />
             </div>
           </div>
         ))}

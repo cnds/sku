@@ -17,6 +17,7 @@ import {
 } from "@shopify/polaris";
 
 import { LeaderboardTable } from "@/components/LeaderboardTable";
+import { MarkdownText } from "@/components/MarkdownText";
 import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { TIME_WINDOWS, formatTimeWindowLabel } from "@/lib/analytics";
 import { fetchIntegrationHealth, fetchLeaderboard, fetchPriorities, parseTimeWindow } from "@/lib/api.server";
@@ -114,6 +115,22 @@ const PRIORITY_CARD_STYLE: CSSProperties = {
   overflow: "hidden",
 };
 
+const PRIORITY_MARKDOWN_BODY_STYLE: CSSProperties = {
+  fontSize: "0.875rem",
+  lineHeight: 1.5,
+};
+
+const PRIORITY_MARKDOWN_SEMIBOLD_STYLE: CSSProperties = {
+  ...PRIORITY_MARKDOWN_BODY_STYLE,
+  fontWeight: 600,
+};
+
+const PRIORITY_MARKDOWN_SUBDUED_STYLE: CSSProperties = {
+  color: "var(--p-color-text-subdued)",
+  fontSize: "0.8125rem",
+  lineHeight: 1.4,
+};
+
 function PriorityMetric({ label, value }: { label: string; value: number }) {
   return (
     <BlockStack gap="050">
@@ -198,19 +215,21 @@ function PriorityProductSummary({
       </Text>
       <InlineStack gap="100" blockAlign="center">
         <Badge tone={priorityTone(card)}>{priorityBoardLabel(card.board)}</Badge>
-        <Text as="span" variant="bodySm" tone="subdued">
-          {card.flag_reason}
-        </Text>
+        <div style={PRIORITY_MARKDOWN_SUBDUED_STYLE}>
+          <MarkdownText markdown={card.flag_reason} fallback="" />
+        </div>
       </InlineStack>
       <Text as="p" variant="bodySm" tone="subdued">
         <span style={PRIORITY_MUTED_ROW_STYLE}>{priorityStepLabel(card.primary_step)}</span>
       </Text>
-      <Text as="p" variant="bodySm" tone="subdued">{card.trend_reason}</Text>
+      <div style={PRIORITY_MARKDOWN_SUBDUED_STYLE}>
+        <MarkdownText markdown={card.trend_reason} fallback="" />
+      </div>
     </BlockStack>
   );
 }
 
-function PriorityRecommendation({ card }: { card: PriorityCard }) {
+export function PriorityRecommendation({ card }: { card: PriorityCard }) {
   return (
     <div style={priorityActionStyle(card)}>
       <BlockStack gap="100">
@@ -220,24 +239,28 @@ function PriorityRecommendation({ card }: { card: PriorityCard }) {
             {messages.dashboard.priorityRecommendedMove}
           </Text>
         </InlineStack>
-        <Text as="p" variant="bodyMd" fontWeight="semibold">
-          {card.first_fix}
-        </Text>
+        <div style={PRIORITY_MARKDOWN_SEMIBOLD_STYLE}>
+          <MarkdownText markdown={card.first_fix} fallback="—" />
+        </div>
       </BlockStack>
     </div>
   );
 }
 
-function PriorityWhyNow({ card }: { card: PriorityCard }) {
+export function PriorityWhyNow({ card }: { card: PriorityCard }) {
   return (
     <div style={PRIORITY_WHY_NOW_STYLE}>
       <BlockStack gap="150">
         <Text as="p" variant="bodySm" tone="subdued">
           {messages.dashboard.priorityWhyNow}
         </Text>
-        <Text as="p" variant="bodyMd">{card.suspected_friction}</Text>
+        <div style={PRIORITY_MARKDOWN_BODY_STYLE}>
+          <MarkdownText markdown={card.suspected_friction} fallback="—" />
+        </div>
         {card.evidence.slice(0, 2).map((item) => (
-          <Text as="p" key={item} variant="bodySm" tone="subdued">{item}</Text>
+          <div key={item} style={PRIORITY_MARKDOWN_SUBDUED_STYLE}>
+            <MarkdownText markdown={item} fallback="—" />
+          </div>
         ))}
       </BlockStack>
     </div>

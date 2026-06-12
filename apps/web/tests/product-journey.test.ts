@@ -5,6 +5,7 @@ import polarisTranslations from "@shopify/polaris/locales/en.json";
 import { describe, expect, it } from "vitest";
 
 import { AnalysisPanel, buildShopperJourney } from "../app/components/AnalysisPanel";
+import { MarkdownText } from "../app/components/MarkdownText";
 import type { PriorityCard, ProductAnalysisResult } from "../app/lib/contracts";
 
 describe("product shopper journey", () => {
@@ -48,6 +49,33 @@ describe("product shopper journey", () => {
     expect(markup).toContain("Gap worsened versus the previous window.");
   });
 
+  it("renders markdown emphasis in priority conclusion and why now copy", () => {
+    const markup = renderToStaticMarkup(
+      createElement(
+        AppProvider,
+        { i18n: polarisTranslations },
+        createElement(AnalysisPanel, {
+          analysis: productAnalysisFixture(),
+          diagnosisPath: "/resources/products/product-1/diagnosis?shop=demo.myshopify.com&window=24h",
+          priorityCard: {
+            ...priorityCardFixture(),
+            evidence: ["**50 PDP views**", "**2 add-to-carts**"],
+            first_fix: "Move the **trust cue** beside the buy box.",
+            suspected_friction: "Shoppers need **more confidence** before checkout.",
+            trend_reason: "**Gap worsened** versus the previous window.",
+          },
+        }),
+      ),
+    );
+
+    expect(markup).toContain("<strong>trust cue</strong>");
+    expect(markup).toContain("<strong>Gap worsened</strong>");
+    expect(markup).toContain("<strong>50 PDP views</strong>");
+    expect(markup).toContain("<strong>2 add-to-carts</strong>");
+    expect(markup).toContain("<strong>more confidence</strong>");
+    expect(markup).not.toContain("**");
+  });
+
   it("keeps the derived journey recommendation when no priority card is matched", () => {
     const markup = renderToStaticMarkup(
       createElement(
@@ -63,6 +91,22 @@ describe("product shopper journey", () => {
     expect(markup).toContain("Shopper Journey");
     expect(markup).toContain("PDP view to add-to-cart");
     expect(markup).toContain("Move the strongest trust, fit, or offer cue next to the buy box and test one change.");
+  });
+
+  it("renders markdown emphasis in generated diagnosis text", () => {
+    const markup = renderToStaticMarkup(
+      createElement(MarkdownText, {
+        fallback: "No report",
+        markdown:
+          "- **240 PDP views** produced **16 add to carts** for a **6.7% PDP view-to-add-to-cart rate**",
+      }),
+    );
+
+    expect(markup).toContain("<ul");
+    expect(markup).toContain("<li>");
+    expect(markup).toContain("<strong>240 PDP views</strong>");
+    expect(markup).toContain("<strong>16 add to carts</strong>");
+    expect(markup).not.toContain("**");
   });
 });
 
