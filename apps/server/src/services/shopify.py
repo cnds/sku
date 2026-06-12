@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 import secrets
 from collections.abc import Callable, Mapping
@@ -20,6 +21,7 @@ from services.shop_time import local_date_for_shop, normalize_shop_timezone
 SHOPIFY_OAUTH_STATE_COOKIE = "sku_lens_oauth_state"
 APP_EMBED_BLOCK_HANDLE = "sku-lens-tracker"
 SHOP_DOMAIN_PATTERN = re.compile(r"^[a-z0-9][a-z0-9-]*\.myshopify\.com$")
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -51,6 +53,15 @@ class MissingShopifyOAuthCodeError(Exception):
 class InvalidShopifyOAuthStateError(Exception):
     def __init__(self) -> None:
         super().__init__("Invalid Shopify OAuth state.")
+
+
+class ShopifyOAuthTokenExchangeError(Exception):
+    def __init__(self, *, upstream_status_code: int | None = None) -> None:
+        self.upstream_status_code = upstream_status_code
+        super().__init__(
+            "Shopify OAuth token exchange failed. Check Shopify app credentials, allowed redirect URL, "
+            "and retry installation from /shopify/oauth/start."
+        )
 
 
 class InvalidShopifyShopDomainError(Exception):
@@ -205,6 +216,10 @@ def _order_occurred_at(payload: dict[str, Any], *, fallback: Callable[[], dateti
     return fallback()
 
 
+def _response_excerpt(response: httpx.Response) -> str:
+    return response.text.strip()[:300]
+
+
 class ShopifyInstallationCallbackService:
     def __init__(
         self,
@@ -285,16 +300,45 @@ class ShopifyOAuthService:
                     "code": code,
                 },
             )
-            response.raise_for_status()
-            payload = response.json()
+            try:
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                LOGGER.warning(
+                    "shopify oauth token exchange failed shop_domain=%s status=%s response=%s",
+                    shop_domain,
+                    exc.response.status_code,
+                    _response_excerpt(exc.response),
+                )
+                raise ShopifyOAuthTokenExchangeError(upstream_status_code=exc.response.status_code) from exc
+
+            try:
+                payload = response.json()
+            except ValueError as exc:
+                LOGGER.warning(
+                    "shopify oauth token exchange returned invalid json shop_domain=%s status=%s response=%s",
+                    shop_domain,
+                    response.status_code,
+                    _response_excerpt(response),
+                )
+                raise ShopifyOAuthTokenExchangeError(upstream_status_code=response.status_code) from exc
+
             access_token = payload.get("access_token")
             if not access_token:
-                raise httpx.HTTPStatusError(
-                    "Missing access token in Shopify OAuth response.",
-                    request=response.request,
-                    response=response,
+                LOGGER.warning(
+                    "shopify oauth token exchange returned no access token shop_domain=%s status=%s response=%s",
+                    shop_domain,
+                    response.status_code,
+                    _response_excerpt(response),
                 )
-            return access_token
+                raise ShopifyOAuthTokenExchangeError(upstream_status_code=response.status_code)
+            return str(access_token)
+        except httpx.RequestError as exc:
+            LOGGER.warning(
+                "shopify oauth token exchange request failed shop_domain=%s error=%s",
+                shop_domain,
+                exc,
+            )
+            raise ShopifyOAuthTokenExchangeError(upstream_status_code=None) from exc
         finally:
             if should_close:
                 await client.aclose()

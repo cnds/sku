@@ -33,6 +33,7 @@ from services.shopify import (
     InvalidShopifyOAuthStateError,
     InvalidShopifyShopDomainError,
     MissingShopifyOAuthCodeError,
+    ShopifyOAuthTokenExchangeError,
 )
 
 REQUEST_ID_HEADER = "X-SKU-Lens-Request-Id"
@@ -126,6 +127,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> JSONResponse:
         del request
         return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(ShopifyOAuthTokenExchangeError)
+    async def shopify_oauth_token_exchange_error_handler(
+        request: Request,
+        exc: ShopifyOAuthTokenExchangeError,
+    ) -> JSONResponse:
+        del request
+        status_code = 502 if exc.upstream_status_code is None or exc.upstream_status_code >= 500 else 400
+        return JSONResponse(status_code=status_code, content={"detail": str(exc)})
 
     @app.exception_handler(InvalidShopifyShopDomainError)
     async def shopify_shop_domain_error_handler(

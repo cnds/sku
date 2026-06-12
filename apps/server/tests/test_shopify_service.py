@@ -13,6 +13,7 @@ from services.shopify import (
     InvalidShopifyOAuthCallbackError,
     ShopifyInstallationCallbackService,
     ShopifyOAuthService,
+    ShopifyOAuthTokenExchangeError,
     ShopifyOrderWebhookService,
     ShopifyWebPixelService,
 )
@@ -154,6 +155,28 @@ async def test_shopify_oauth_service_exchanges_access_token_with_form_encoded_bo
     assert str(captured_request.url) == "https://demo.myshopify.com/admin/oauth/access_token"
     assert captured_request.headers["content-type"] == "application/x-www-form-urlencoded"
     assert captured_request.content == (b"client_id=shopify-key&client_secret=shopify-secret&code=oauth-code")
+
+
+@pytest.mark.asyncio
+async def test_shopify_oauth_service_maps_token_exchange_400_to_domain_error() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(400, json={"error": "invalid_request"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(ShopifyOAuthTokenExchangeError) as exc_info:
+            await ShopifyOAuthService(
+                _settings(),
+                http_client=client,
+            ).exchange_access_token(
+                code="oauth-code",
+                shop_domain="demo.myshopify.com",
+            )
+
+    assert exc_info.value.upstream_status_code == 400
+    assert str(exc_info.value) == (
+        "Shopify OAuth token exchange failed. Check Shopify app credentials, allowed redirect URL, "
+        "and retry installation from /shopify/oauth/start."
+    )
 
 
 def test_shopify_order_webhook_service_builds_product_order_events() -> None:

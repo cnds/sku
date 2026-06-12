@@ -21,7 +21,7 @@ from services.ingest_auth import (
     ShopInstallationNotFoundError,
 )
 from services.job_dispatch import AfterCommitCallbacks, JobDispatchService
-from services.shopify import InvalidShopifyOAuthCallbackError
+from services.shopify import InvalidShopifyOAuthCallbackError, ShopifyOAuthTokenExchangeError
 
 
 def _settings(sqlite_database_url: str, redis_url: str) -> Settings:
@@ -303,6 +303,32 @@ async def test_app_maps_shopify_oauth_callback_errors_to_http_responses(
 
     assert response.status_code == 401
     assert response.json() == {"detail": "Invalid Shopify OAuth callback signature."}
+
+
+@pytest.mark.asyncio
+async def test_app_maps_shopify_oauth_token_exchange_errors_to_http_responses(
+    sqlite_database_url: str,
+    redis_url: str,
+) -> None:
+    app = create_app(_settings(sqlite_database_url, redis_url))
+
+    @app.get("/test/context/shopify-oauth-token-error")
+    async def _shopify_oauth_token_error_route() -> None:
+        raise ShopifyOAuthTokenExchangeError(upstream_status_code=400)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app),
+        base_url="http://testserver",
+    ) as client:
+        response = await client.get("/test/context/shopify-oauth-token-error")
+
+    assert response.status_code == 400
+    assert response.json() == {
+        "detail": (
+            "Shopify OAuth token exchange failed. Check Shopify app credentials, allowed redirect URL, "
+            "and retry installation from /shopify/oauth/start."
+        )
+    }
 
 
 @pytest.mark.asyncio
