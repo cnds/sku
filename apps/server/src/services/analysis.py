@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
+from typing import Protocol
 
 from config import Settings
 from repositories.analytics import AnalyticsRepository
@@ -20,6 +22,7 @@ from schemas import (
     ProductSnapshot,
     TimeWindow,
 )
+from services.ai import AIDiagnosisService, PriorityAdvice
 from services.shop_time import ensure_utc_datetime, local_date_for_shop
 
 
@@ -28,10 +31,21 @@ class ProductAnalysisNotFoundError(Exception):
         super().__init__("Product analysis not found.")
 
 
+class PriorityAdviceGenerator(Protocol):
+    async def generate_priority_advice(
+        self,
+        *,
+        fallback_first_fix: str,
+        fallback_suspected_friction: str,
+        snapshot: ProductSnapshot,
+    ) -> PriorityAdvice: ...
+
+
 class ProductAnalysisService:
     def __init__(
         self,
         *,
+        ai_service: PriorityAdviceGenerator | None = None,
         settings: Settings | None = None,
         installation_repository: InstallationRepository | None = None,
         time_provider: Callable[[], datetime] | None = None,
@@ -39,6 +53,8 @@ class ProductAnalysisService:
         self._repository = AnalyticsRepository()
         self._installation_repository = installation_repository or InstallationRepository()
         self._time_provider = time_provider or (lambda: datetime.now(UTC))
+        self._settings = settings
+        self._ai_service = ai_service
         self._benchmark_min_views = (settings or Settings.model_construct()).benchmark_min_views
 
     async def get_product_analysis(
@@ -214,7 +230,47 @@ class ProductAnalysisService:
             )
             break
 
-        return selected[:3]
+        return await self._enrich_priority_advice(
+            cards=selected[:3],
+            snapshots=snapshots,
+        )
+
+    async def _enrich_priority_advice(
+        self,
+        *,
+        cards: list[PriorityCard],
+        snapshots: dict[str, ProductSnapshot],
+    ) -> list[PriorityCard]:
+        advice_service = self._priority_advice_service()
+        if advice_service is None or not cards:
+            return cards
+
+        advice_results = await asyncio.gather(
+            *[
+                advice_service.generate_priority_advice(
+                    fallback_first_fix=card.first_fix,
+                    fallback_suspected_friction=card.suspected_friction,
+                    snapshot=snapshots[card.product_id],
+                )
+                for card in cards
+            ]
+        )
+        return [
+            card.model_copy(
+                update={
+                    "first_fix": advice.first_fix,
+                    "suspected_friction": advice.suspected_friction,
+                }
+            )
+            for card, advice in zip(cards, advice_results, strict=True)
+        ]
+
+    def _priority_advice_service(self) -> PriorityAdviceGenerator | None:
+        if self._ai_service is not None:
+            return self._ai_service
+        if self._settings is None or not self._settings.ai_api_key or self._settings.ai_api_key == "replace-me":
+            return None
+        return AIDiagnosisService(self._settings)
 
     async def _shop_reference_date(self, *, shop_id: str) -> date:
         installation = await self._installation_repository.get_by_shop_domain(shop_id)

@@ -1,11 +1,20 @@
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from typing import Any
 
 import httpx
 
 from config import Settings
 from schemas import ProductSnapshot
+
+
+@dataclass(slots=True)
+class PriorityAdvice:
+    suspected_friction: str
+    first_fix: str
+    source: str
 
 
 class AIDiagnosisService:
@@ -64,6 +73,30 @@ class AIDiagnosisService:
         finally:
             if should_close:
                 await client.aclose()
+
+    async def generate_priority_advice(
+        self,
+        *,
+        fallback_first_fix: str,
+        fallback_suspected_friction: str,
+        snapshot: ProductSnapshot,
+    ) -> PriorityAdvice:
+        report_markdown, summary = await self.generate_report(snapshot=snapshot)
+        if summary.get("source") != "openai-compatible":
+            return PriorityAdvice(
+                suspected_friction=fallback_suspected_friction,
+                first_fix=fallback_first_fix,
+                source=summary.get("source", "fallback"),
+            )
+
+        sections = self._extract_sections(report_markdown)
+        suspected_friction = sections.get("suspected friction", "").strip() or fallback_suspected_friction
+        first_fix = sections.get("first fix to try", "").strip() or fallback_first_fix
+        return PriorityAdvice(
+            suspected_friction=suspected_friction,
+            first_fix=first_fix,
+            source="openai-compatible",
+        )
 
     @staticmethod
     def _build_prompt(*, snapshot: ProductSnapshot) -> str:
@@ -166,6 +199,13 @@ class AIDiagnosisService:
 
         content = message.get("content", "")
         return content.strip() if isinstance(content, str) else ""
+
+    @staticmethod
+    def _extract_sections(markdown: str) -> dict[str, str]:
+        sections: dict[str, str] = {}
+        for match in re.finditer(r"^##\s+(.+?)\s*\n([\s\S]*?)(?=^##\s+|\s*$)", markdown, re.MULTILINE):
+            sections[match.group(1).strip().lower()] = match.group(2).strip()
+        return sections
 
     @staticmethod
     def _fallback_report(*, snapshot: ProductSnapshot) -> tuple[str, dict[str, str]]:

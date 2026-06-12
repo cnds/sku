@@ -217,7 +217,8 @@ async def test_priorities_endpoint_smoke(
     redis_url: str,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    app = create_app(_settings(sqlite_database_url, redis_url))
+    settings = _settings(sqlite_database_url, redis_url)
+    app = create_app(settings)
     seen: dict[str, object] = {}
     expected = [
         PriorityCard(
@@ -273,7 +274,7 @@ async def test_priorities_endpoint_smoke(
     assert response.status_code == 200
     assert response.json() == [entry.model_dump(mode="json") for entry in expected]
     assert seen == {
-        "settings": None,
+        "settings": settings,
         "shop_id": "shop-123",
         "window": TimeWindow.HOURS_24,
     }

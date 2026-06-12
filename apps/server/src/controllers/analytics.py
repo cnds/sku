@@ -36,10 +36,11 @@ async def get_leaderboard(
 
 @router.get("/api/priorities")
 async def get_priorities(
+    request: Request,
     shop_id: str,
     window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.HOURS_24,
 ) -> list[PriorityCard]:
-    return await ProductAnalysisService().get_product_priorities(
+    return await ProductAnalysisService(settings=request.app.state.settings).get_product_priorities(
         shop_id=shop_id,
         window=window,
     )

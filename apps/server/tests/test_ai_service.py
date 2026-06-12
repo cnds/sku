@@ -122,6 +122,42 @@ async def test_ai_service_posts_chat_completions_request_and_parses_response() -
 
 
 @pytest.mark.asyncio
+async def test_ai_service_derives_priority_advice_from_diagnosis_sections() -> None:
+    async def _handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            status_code=200,
+            json={
+                "choices": [
+                    {
+                        "message": {
+                            "content": (
+                                "## Observed\nTraffic is engaged but not converting.\n\n"
+                                "## Evidence\n120 views and 2 orders.\n\n"
+                                "## Suspected friction\nAI says fit confidence is weak.\n\n"
+                                "## First fix to try\nAI says move fit guidance beside the buy box."
+                            )
+                        }
+                    }
+                ]
+            },
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(_handler)) as client:
+        advice = await AIDiagnosisService(
+            _settings(),
+            http_client=client,
+        ).generate_priority_advice(
+            fallback_first_fix="Fallback first fix.",
+            fallback_suspected_friction="Fallback friction.",
+            snapshot=_snapshot(),
+        )
+
+    assert advice.suspected_friction == "AI says fit confidence is weak."
+    assert advice.first_fix == "AI says move fit guidance beside the buy box."
+    assert advice.source == "openai-compatible"
+
+
+@pytest.mark.asyncio
 async def test_ai_service_uses_fallback_when_api_key_is_placeholder() -> None:
     async def _handler(request: httpx.Request) -> httpx.Response:
         raise AssertionError(f"unexpected request to {request.url}")
