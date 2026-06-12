@@ -42,7 +42,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: mysql+aiomysql://sku:sku@mysql:3306/sku_lens
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${DOCKER_CELERY_BROKER_URL:-redis://redis:6379/0}
       SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:?set SHOPIFY_API_KEY in .env}
       SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:?set SHOPIFY_API_SECRET in .env}
       SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:?set SHOPIFY_SCOPES in .env}
@@ -85,7 +86,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: mysql+aiomysql://sku:sku@mysql:3306/sku_lens
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${DOCKER_CELERY_BROKER_URL:-redis://redis:6379/0}
       SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:?set SHOPIFY_API_KEY in .env}
       SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:?set SHOPIFY_API_SECRET in .env}
       SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:?set SHOPIFY_SCOPES in .env}
@@ -116,7 +118,8 @@ services:
         condition: service_healthy
     environment:
       DATABASE_URL: mysql+aiomysql://sku:sku@mysql:3306/sku_lens
-      REDIS_URL: redis://redis:6379/0
+      REDIS_URL: ${DOCKER_REDIS_URL:-redis://redis:6379/0}
+      CELERY_BROKER_URL: ${DOCKER_CELERY_BROKER_URL:-redis://redis:6379/0}
       SHOPIFY_API_KEY: ${SHOPIFY_API_KEY:?set SHOPIFY_API_KEY in .env}
       SHOPIFY_API_SECRET: ${SHOPIFY_API_SECRET:?set SHOPIFY_API_SECRET in .env}
       SHOPIFY_SCOPES: ${SHOPIFY_SCOPES:?set SHOPIFY_SCOPES in .env}

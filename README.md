@@ -56,7 +56,7 @@ OpenAI-compatible credentials are configured.
 5. Open `http://localhost:3000` for the embedded admin app.
 6. Use `http://localhost:8000` for direct API and ingest testing.
 
-Keep the `.env` host values on `localhost`. Docker Compose overrides `DATABASE_URL`, `REDIS_URL`, and `SERVER_API_URL` inside the containers so the same `.env` can still be used for bare-metal workflows.
+Keep the `.env` host-facing values such as `DATABASE_URL`, `REDIS_URL`, and optional `CELERY_BROKER_URL` on `localhost` for bare-metal workflows. Docker Compose uses container-facing overrides for services inside the stack, including `DOCKER_REDIS_URL` and `DOCKER_CELERY_BROKER_URL`, which default to `redis://redis:6379/0`.
 
 Services started by Compose:
 
