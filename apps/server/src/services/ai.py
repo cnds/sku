@@ -89,13 +89,29 @@ class AIDiagnosisService:
                 source=summary.get("source", "fallback"),
             )
 
-        sections = self._extract_sections(report_markdown)
+        return self.priority_advice_from_report(
+            fallback_first_fix=fallback_first_fix,
+            fallback_suspected_friction=fallback_suspected_friction,
+            report_markdown=report_markdown,
+            source="openai-compatible",
+        )
+
+    @classmethod
+    def priority_advice_from_report(
+        cls,
+        *,
+        fallback_first_fix: str,
+        fallback_suspected_friction: str,
+        report_markdown: str,
+        source: str,
+    ) -> PriorityAdvice:
+        sections = cls._extract_sections(report_markdown)
         suspected_friction = sections.get("suspected friction", "").strip() or fallback_suspected_friction
         first_fix = sections.get("first fix to try", "").strip() or fallback_first_fix
         return PriorityAdvice(
             suspected_friction=suspected_friction,
             first_fix=first_fix,
-            source="openai-compatible",
+            source=source,
         )
 
     @staticmethod

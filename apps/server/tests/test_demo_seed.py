@@ -94,6 +94,9 @@ async def test_seed_demo_data_populates_dashboard_and_product_analysis_endpoints
         "demo-media-trust-leaker",
         "demo-hidden-winner",
     ]
+    assert priorities.json()[0]["first_fix"] == (
+        "Move the size chart beside the variant selector and repeat fit guidance near the buy box."
+    )
     assert {card["trend_reason"] for card in seven_day_priorities.json()} != {"No previous 7d comparison window yet."}
     assert analysis.json()["benchmark_product_id"] == "demo-benchmark"
     assert analysis.json()["component_comparisons"]

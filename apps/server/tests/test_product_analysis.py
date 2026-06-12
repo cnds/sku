@@ -5,7 +5,7 @@ from datetime import UTC, date, datetime
 import pytest
 
 from db import create_session_factory, db_session_context, init_db
-from models import DailyProductStat, ShopInstallation
+from models import DailyProductStat, DiagnosisStatus, ProductDiagnosis, ShopInstallation
 from schemas import (
     LeaderboardEntry,
     LeaderboardType,
@@ -17,6 +17,7 @@ from schemas import (
 )
 from services.ai import PriorityAdvice
 from services.analysis import ProductAnalysisService
+from services.diagnosis import ProductDiagnosisService
 
 
 @pytest.mark.asyncio
@@ -372,6 +373,82 @@ async def test_product_priorities_enriches_selected_cards_with_ai_advice(
     assert priorities[0].first_fix == "AI first fix from the shared diagnosis prompt."
     assert priorities[0].suspected_friction == "AI friction from the shared diagnosis prompt."
     assert advice_service.snapshots[0].views == 120
+
+
+@pytest.mark.asyncio
+async def test_product_priorities_reuses_ready_diagnosis_for_card_advice(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+    selected_snapshot = ProductSnapshot(
+        views=120,
+        add_to_carts=8,
+        orders=1,
+        impressions=240,
+        clicks=44,
+        component_clicks_distribution={"size_chart": 1},
+        component_impressions_distribution={"size_chart": 70},
+    )
+
+    async with session_factory() as session:
+        session.add_all(
+            [
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="selected-leaker",
+                    stat_date=date(2026, 4, 23),
+                    views=selected_snapshot.views,
+                    add_to_carts=selected_snapshot.add_to_carts,
+                    orders=selected_snapshot.orders,
+                    impressions=selected_snapshot.impressions,
+                    clicks=selected_snapshot.clicks,
+                    component_clicks_distribution=selected_snapshot.component_clicks_distribution,
+                    component_impressions_distribution=selected_snapshot.component_impressions_distribution,
+                ),
+                DailyProductStat(
+                    shop_id="shop-1",
+                    product_id="benchmark",
+                    stat_date=date(2026, 4, 23),
+                    views=120,
+                    add_to_carts=24,
+                    orders=16,
+                    impressions=260,
+                    clicks=58,
+                    component_clicks_distribution={"size_chart": 10},
+                    component_impressions_distribution={"size_chart": 72},
+                ),
+                ProductDiagnosis(
+                    shop_id="shop-1",
+                    product_id="selected-leaker",
+                    window=TimeWindow.DAYS_7.value,
+                    snapshot_hash=ProductDiagnosisService._snapshot_hash(selected_snapshot),
+                    status=DiagnosisStatus.READY,
+                    report_markdown=(
+                        "## Observed\nStored diagnosis observed.\n\n"
+                        "## Evidence\nStored diagnosis evidence.\n\n"
+                        "## Suspected friction\nStored AI friction.\n\n"
+                        "## First fix to try\nStored AI first fix."
+                    ),
+                    summary_json={"source": "seed"},
+                    generated_at=datetime(2026, 4, 23, 12, 0, tzinfo=UTC),
+                ),
+            ],
+        )
+        await session.commit()
+
+    analysis_service = ProductAnalysisService(
+        time_provider=lambda: datetime(2026, 4, 29, 12, 0, tzinfo=UTC),
+    )
+    async with db_session_context(session_factory):
+        priorities = await analysis_service.get_product_priorities(
+            shop_id="shop-1",
+            window=TimeWindow.DAYS_7,
+        )
+
+    assert priorities[0].product_id == "selected-leaker"
+    assert priorities[0].suspected_friction == "Stored AI friction."
+    assert priorities[0].first_fix == "Stored AI first fix."
 
 
 def test_priority_signal_state_derives_tracking_and_volume_quality() -> None:

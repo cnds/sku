@@ -6,7 +6,9 @@ from datetime import UTC, date, datetime, timedelta
 from typing import Protocol
 
 from config import Settings
+from models import DiagnosisStatus
 from repositories.analytics import AnalyticsRepository
+from repositories.diagnosis import DiagnosisRepository
 from repositories.installations import InstallationRepository
 from schemas import (
     ComponentComparison,
@@ -23,6 +25,7 @@ from schemas import (
     TimeWindow,
 )
 from services.ai import AIDiagnosisService, PriorityAdvice
+from services.diagnosis import ProductDiagnosisService
 from services.shop_time import ensure_utc_datetime, local_date_for_shop
 
 
@@ -46,11 +49,13 @@ class ProductAnalysisService:
         self,
         *,
         ai_service: PriorityAdviceGenerator | None = None,
+        diagnosis_repository: DiagnosisRepository | None = None,
         settings: Settings | None = None,
         installation_repository: InstallationRepository | None = None,
         time_provider: Callable[[], datetime] | None = None,
     ) -> None:
         self._repository = AnalyticsRepository()
+        self._diagnosis_repository = diagnosis_repository or DiagnosisRepository()
         self._installation_repository = installation_repository or InstallationRepository()
         self._time_provider = time_provider or (lambda: datetime.now(UTC))
         self._settings = settings
@@ -232,25 +237,31 @@ class ProductAnalysisService:
 
         return await self._enrich_priority_advice(
             cards=selected[:3],
+            shop_id=shop_id,
             snapshots=snapshots,
+            window=window,
         )
 
     async def _enrich_priority_advice(
         self,
         *,
         cards: list[PriorityCard],
+        shop_id: str,
         snapshots: dict[str, ProductSnapshot],
+        window: TimeWindow,
     ) -> list[PriorityCard]:
         advice_service = self._priority_advice_service()
-        if advice_service is None or not cards:
+        if not cards:
             return cards
 
         advice_results = await asyncio.gather(
             *[
-                advice_service.generate_priority_advice(
-                    fallback_first_fix=card.first_fix,
-                    fallback_suspected_friction=card.suspected_friction,
+                self._priority_advice_for_card(
+                    advice_service=advice_service,
+                    card=card,
+                    shop_id=shop_id,
                     snapshot=snapshots[card.product_id],
+                    window=window,
                 )
                 for card in cards
             ]
@@ -264,6 +275,48 @@ class ProductAnalysisService:
             )
             for card, advice in zip(cards, advice_results, strict=True)
         ]
+
+    async def _priority_advice_for_card(
+        self,
+        *,
+        advice_service: PriorityAdviceGenerator | None,
+        card: PriorityCard,
+        shop_id: str,
+        snapshot: ProductSnapshot,
+        window: TimeWindow,
+    ) -> PriorityAdvice:
+        fallback = PriorityAdvice(
+            suspected_friction=card.suspected_friction,
+            first_fix=card.first_fix,
+            source="fallback",
+        )
+        existing = await self._diagnosis_repository.get_record(
+            product_id=card.product_id,
+            shop_id=shop_id,
+            window=window,
+        )
+        snapshot_hash = ProductDiagnosisService._snapshot_hash(snapshot)
+        if (
+            existing is not None
+            and existing.status == DiagnosisStatus.READY
+            and existing.snapshot_hash == snapshot_hash
+            and existing.report_markdown
+        ):
+            return AIDiagnosisService.priority_advice_from_report(
+                fallback_first_fix=card.first_fix,
+                fallback_suspected_friction=card.suspected_friction,
+                report_markdown=existing.report_markdown,
+                source="stored-diagnosis",
+            )
+
+        if advice_service is None:
+            return fallback
+
+        return await advice_service.generate_priority_advice(
+            fallback_first_fix=card.first_fix,
+            fallback_suspected_friction=card.suspected_friction,
+            snapshot=snapshot,
+        )
 
     def _priority_advice_service(self) -> PriorityAdviceGenerator | None:
         if self._ai_service is not None:
