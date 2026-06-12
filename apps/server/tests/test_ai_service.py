@@ -99,10 +99,19 @@ async def test_ai_service_posts_chat_completions_request_and_parses_response() -
     payload = json.loads(requests[0].content)
     assert payload["model"] == "sku-diagnosis-model"
     assert [message["role"] for message in payload["messages"]] == ["system", "user"]
-    assert "Shopify product detail page" in payload["messages"][0]["content"]
-    assert "## Observed" in payload["messages"][1]["content"]
-    assert "## First fix to try" in payload["messages"][1]["content"]
-    assert "Page views (all sources): 120" in payload["messages"][1]["content"]
+    assert "cautious Shopify merchandising analyst" in payload["messages"][0]["content"]
+    assert "do not invent page content" in payload["messages"][0]["content"]
+    prompt = payload["messages"][1]["content"]
+    assert "## Observed" in prompt
+    assert "## First fix to try" in prompt
+    assert "not a generic ecommerce checklist" in prompt
+    assert "Anchor the diagnosis to one observed step" in prompt
+    assert "Do not claim causality" in prompt
+    assert "Page views (all sources): 120" in prompt
+    assert "Collection/listing CTR: 13.1%" in prompt
+    assert "PDP view to add-to-cart rate: 7.5%" in prompt
+    assert "Add-to-cart to order rate: 22.2%" in prompt
+    assert "Strongest component signal: size_chart: 0 clicks from 30 impressions (0.0% CTR)" in prompt
     assert report_markdown.startswith("## Observed")
     assert summary == {
         "primary_issue": "Observed",

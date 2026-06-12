@@ -27,7 +27,11 @@ class AIDiagnosisService:
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are diagnosing a Shopify product detail page.",
+                    "content": (
+                        "You are a cautious Shopify merchandising analyst. "
+                        "Use only the supplied shopper-event evidence; do not invent page content, pricing, "
+                        "reviews, competitors, promotions, or campaign facts."
+                    ),
                 },
                 {
                     "role": "user",
@@ -68,34 +72,85 @@ class AIDiagnosisService:
             if snapshot.engage_count > 0
             else 0
         )
+        collection_ctr = AIDiagnosisService._percent(snapshot.clicks, snapshot.impressions)
+        view_to_cart = AIDiagnosisService._percent(snapshot.add_to_carts, snapshot.views)
+        cart_to_order = AIDiagnosisService._percent(snapshot.orders, snapshot.add_to_carts)
+        component_signal = AIDiagnosisService._component_signal(snapshot=snapshot)
         return "\n".join(
             [
-                "Use the following aggregated metrics to produce a concise markdown report.",
+                "Use the following aggregated Shopify shopper-event metrics to produce a concise markdown report.",
+                "The goal is a SKU-specific optimization suggestion, not a generic ecommerce checklist.",
                 "",
                 "Structure the report with EXACTLY these four sections using ## headings:",
                 "## Observed",
-                "(State the visible shopper-journey pattern without over-claiming)",
+                "(Name the primary shopper-journey pattern and funnel step without over-claiming)",
                 "## Evidence",
-                "(List the specific metrics that support the observation)",
+                "(List 3-5 specific metrics, rates, or component signals that support the observation)",
                 "## Suspected friction",
-                "(Explain the likely buying hesitation or discovery constraint)",
+                (
+                    "(Explain the likely buying hesitation or discovery constraint, and state uncertainty when "
+                    "evidence is thin)"
+                ),
                 "## First fix to try",
-                "(Give one concrete page or merchandising change to test first)",
+                "(Give one concrete page or merchandising change to test first, plus the metric to watch next)",
+                "",
+                "Recommendation rules:",
+                (
+                    "- Anchor the diagnosis to one observed step: listing impression to PDP click, PDP view to "
+                    "add-to-cart, add-to-cart to order, or PDP component engagement."
+                ),
+                (
+                    "- Prefer component-specific advice when component impression/click data points to a concrete "
+                    "component."
+                ),
+                "- If traffic or engagement volume is thin, recommend validation or more traffic before page redesign.",
+                (
+                    "- Avoid generic advice like improve images, rewrite copy, add reviews, lower price, or offer "
+                    "discounts unless the supplied metrics directly support that type of issue."
+                ),
+                "- Do not claim causality; phrase recommendations as the next experiment to test.",
                 "",
                 "Metrics:",
                 f"Impressions (collection pages): {snapshot.impressions}",
                 f"Clicks (collection to PDP): {snapshot.clicks}",
+                f"Collection/listing CTR: {collection_ctr}",
                 f"Page views (all sources): {snapshot.views}",
                 f"Add to carts: {snapshot.add_to_carts}",
+                f"PDP view to add-to-cart rate: {view_to_cart}",
                 f"Orders: {snapshot.orders}",
+                f"Add-to-cart to order rate: {cart_to_order}",
                 f"Media interactions: {snapshot.media_interactions}",
                 f"Variant changes: {snapshot.variant_changes}",
                 f"Avg dwell time: {avg_dwell_s}s",
                 f"Avg scroll depth: {snapshot.avg_scroll_pct}%",
+                f"Strongest component signal: {component_signal}",
                 f"Component click distribution: {snapshot.component_clicks_distribution}",
                 f"Component impression distribution: {snapshot.component_impressions_distribution}",
             ]
         )
+
+    @staticmethod
+    def _percent(numerator: int, denominator: int) -> str:
+        if denominator <= 0:
+            return "n/a"
+        return f"{numerator / denominator:.1%}"
+
+    @staticmethod
+    def _component_signal(*, snapshot: ProductSnapshot) -> str:
+        candidates: list[tuple[float, str, int, int]] = []
+        for component_id, impressions in snapshot.component_impressions_distribution.items():
+            if impressions <= 0:
+                continue
+            clicks = snapshot.component_clicks_distribution.get(component_id, 0)
+            candidates.append((clicks / impressions, component_id, clicks, impressions))
+
+        if not candidates:
+            if snapshot.component_clicks_distribution:
+                return "component clicks are present, but component impressions are not available"
+            return "n/a"
+
+        ctr, component_id, clicks, impressions = sorted(candidates, key=lambda item: (item[0], item[1]))[0]
+        return f"{component_id}: {clicks} clicks from {impressions} impressions ({ctr:.1%} CTR)"
 
     @staticmethod
     def _extract_text(payload: dict[str, Any]) -> str:
