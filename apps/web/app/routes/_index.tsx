@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import { useCallback, useMemo } from "react";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { isRouteErrorResponse, useLoaderData, useNavigate, useRouteError } from "@remix-run/react";
+import { useLoaderData, useNavigate } from "@remix-run/react";
 import {
   Badge,
   Banner,
@@ -521,21 +521,12 @@ export default function DashboardRoute() {
 }
 
 export function ErrorBoundary() {
-  const error = useRouteError();
-
-  let message: string = messages.dashboard.errorMessage;
-  if (isRouteErrorResponse(error) && typeof error.data === "string") {
-    message = error.data;
-  } else if (error instanceof Error) {
-    message = error.message;
-  }
-
   return (
     <Page title={messages.app.name}>
       <Layout>
         <Layout.Section>
           <Banner tone="critical">
-            <Text as="p" variant="bodyMd">{message}</Text>
+            <Text as="p" variant="bodyMd">{messages.dashboard.errorMessage}</Text>
           </Banner>
         </Layout.Section>
       </Layout>

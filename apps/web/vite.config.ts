@@ -15,6 +15,9 @@ export default defineConfig(async () => {
 
   return {
     plugins: [remix({ future }), tsconfigPaths()],
+    resolve: {
+      dedupe: ["@remix-run/react", "react", "react-dom"],
+    },
     server: {
       allowedHosts: [
         ".ngrok-free.app",

@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { isRouteErrorResponse, useLoaderData, useRouteError } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Badge,
   Banner,
@@ -153,19 +153,12 @@ function Metric({ label, value }: { label: string; value: number }) {
 }
 
 export function ErrorBoundary() {
-  const error = useRouteError();
-  const message = isRouteErrorResponse(error)
-    ? (typeof error.data === "string" ? error.data : messages.errors.unexpectedError)
-    : error instanceof Error
-      ? error.message
-      : messages.errors.unexpectedError;
-
   return (
     <Page title="SKU Lens setup">
       <Layout>
         <Layout.Section>
           <Banner tone="critical">
-            <Text as="p" variant="bodyMd">{message}</Text>
+            <Text as="p" variant="bodyMd">{messages.errors.unexpectedError}</Text>
           </Banner>
         </Layout.Section>
       </Layout>

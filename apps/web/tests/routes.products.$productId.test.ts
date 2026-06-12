@@ -1,3 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { AppProvider } from "@shopify/polaris";
+import polarisTranslations from "@shopify/polaris/locales/en.json";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -19,7 +23,8 @@ vi.mock("../app/lib/api.server", () => ({
   parseTimeWindow: parseTimeWindowMock,
 }));
 
-import { loader } from "../app/routes/products.$productId";
+import { messages } from "../app/lib/messages";
+import { ErrorBoundary, loader } from "../app/routes/products.$productId";
 
 describe("product analysis route loader", () => {
   beforeEach(() => {
@@ -134,5 +139,13 @@ describe("product analysis route loader", () => {
         product_id: "product-1",
       },
     });
+  });
+
+  it("renders the route error fallback without Remix route hooks", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AppProvider, { i18n: polarisTranslations }, createElement(ErrorBoundary)),
+    );
+
+    expect(markup).toContain(messages.product.errorMessage);
   });
 });

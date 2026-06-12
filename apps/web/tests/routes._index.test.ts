@@ -1,3 +1,7 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { AppProvider } from "@shopify/polaris";
+import polarisTranslations from "@shopify/polaris/locales/en.json";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -19,7 +23,8 @@ vi.mock("../app/lib/api.server", () => ({
   parseTimeWindow: parseTimeWindowMock,
 }));
 
-import { loader, readinessBannerContent } from "../app/routes/_index";
+import { messages } from "../app/lib/messages";
+import { ErrorBoundary, loader, readinessBannerContent } from "../app/routes/_index";
 
 describe("dashboard route loader", () => {
   beforeEach(() => {
@@ -83,6 +88,14 @@ describe("dashboard route loader", () => {
       shopId: "sku-dev-uaop8pff.myshopify.com",
       window: "24h",
     });
+  });
+
+  it("renders the route error fallback without Remix route hooks", () => {
+    const markup = renderToStaticMarkup(
+      createElement(AppProvider, { i18n: polarisTranslations }, createElement(ErrorBoundary)),
+    );
+
+    expect(markup).toContain(messages.dashboard.errorMessage);
   });
 
   it("separates missing install, missing raw events, low PDP traffic, and partial coverage states", () => {

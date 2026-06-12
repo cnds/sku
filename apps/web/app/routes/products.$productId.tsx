@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { isRouteErrorResponse, useLoaderData, useRouteError } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import { Badge, Banner, BlockStack, Card, InlineStack, Layout, Page, Text } from "@shopify/polaris";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
@@ -19,23 +19,12 @@ export function boardLabelForGap(gapValue: number): { label: string; tone: "crit
 }
 
 export function ErrorBoundary() {
-  const error = useRouteError();
-
-  let message: string = messages.product.errorMessage;
-  if (isRouteErrorResponse(error)) {
-    message = error.status === 404
-      ? messages.product.notFound
-      : (typeof error.data === "string" ? error.data : message);
-  } else if (error instanceof Error) {
-    message = error.message;
-  }
-
   return (
     <Page title={messages.product.errorTitle} backAction={{ content: messages.product.backAction, url: "/" }}>
       <Layout>
         <Layout.Section>
           <Banner tone="critical">
-            <Text as="p" variant="bodyMd">{message}</Text>
+            <Text as="p" variant="bodyMd">{messages.product.errorMessage}</Text>
           </Banner>
         </Layout.Section>
       </Layout>
