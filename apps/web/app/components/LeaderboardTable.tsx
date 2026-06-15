@@ -10,6 +10,7 @@ import {
 import type { LeaderboardEntry, TimeWindow } from "@/lib/contracts";
 import { messages } from "@/lib/messages";
 import { productPath } from "@/lib/url";
+import interactiveStyles from "@/styles/interactive.module.css";
 
 type ActivityRow = Pick<LeaderboardEntry, "add_to_carts" | "orders" | "views">;
 
@@ -98,8 +99,8 @@ export function LeaderboardTable({
             <IndexTable.Cell>
               <Text as="span" variant="bodyMd" fontWeight="semibold">
                 <a
+                  className={interactiveStyles.tableLink}
                   href={productPath(row.product_id, shopId, window, host)}
-                  style={{ color: "var(--p-color-text-link)", textDecoration: "none" }}
                 >
                   {row.product_id}
                 </a>

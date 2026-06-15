@@ -63,7 +63,7 @@ function ReviewBlock({ title, value }: { title: string; value: unknown }) {
   return (
     <BlockStack gap="100">
       <Text as="h3" variant="headingSm">{title}</Text>
-      <pre style={{ fontSize: 12, lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap" }}>
+      <pre style={{ fontSize: "var(--p-font-size-275, 0.75rem)", lineHeight: 1.5, margin: 0, whiteSpace: "pre-wrap" }}>
         {JSON.stringify(value, null, 2)}
       </pre>
     </BlockStack>

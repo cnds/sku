@@ -16,6 +16,7 @@ import {
 import { RefreshIcon } from "@shopify/polaris-icons";
 import { MarkdownText } from "@/components/MarkdownText";
 import type { DiagnosisResult, PriorityCard, ProductAnalysisResult } from "@/lib/contracts";
+import { BORDER_SECONDARY, INNER_BORDER_RADIUS } from "@/lib/tokens";
 
 import {
   createFailedDiagnosis,
@@ -47,7 +48,7 @@ interface AnalysisPanelProps {
 const DIAGNOSIS_POLL_INTERVAL_MS = 3_000;
 
 const PRIORITY_DETAIL_STYLE: CSSProperties = {
-  borderRadius: 8,
+  borderRadius: INNER_BORDER_RADIUS,
   overflow: "hidden",
 };
 
@@ -57,15 +58,15 @@ const PRIORITY_DETAIL_BODY_STYLE: CSSProperties = {
 
 const JOURNEY_STEP_STYLE: CSSProperties = {
   background: "var(--p-color-bg-surface, #ffffff)",
-  border: "1px solid var(--p-color-border-secondary, #e3e3e3)",
-  borderRadius: 8,
+  border: `1px solid ${BORDER_SECONDARY}`,
+  borderRadius: INNER_BORDER_RADIUS,
   padding: "0.75rem",
 };
 
 const JOURNEY_INSIGHT_STYLE: CSSProperties = {
   background: "var(--p-color-bg-fill-critical-secondary, #fff4f4)",
   border: "1px solid var(--p-color-border-critical, #d82c0d)",
-  borderRadius: 8,
+  borderRadius: INNER_BORDER_RADIUS,
   padding: "1rem",
 };
 
@@ -75,7 +76,7 @@ const JOURNEY_INSIGHT_LIST_STYLE: CSSProperties = {
 };
 
 const MARKDOWN_BODY_STYLE: CSSProperties = {
-  fontSize: "0.875rem",
+  fontSize: "var(--p-font-size-325, 0.875rem)",
   lineHeight: 1.5,
 };
 
@@ -86,7 +87,7 @@ const MARKDOWN_SEMIBOLD_STYLE: CSSProperties = {
 
 const MARKDOWN_SUBDUED_STYLE: CSSProperties = {
   color: "var(--p-color-text-subdued)",
-  fontSize: "0.8125rem",
+  fontSize: "var(--p-font-size-300, 0.8125rem)",
   lineHeight: 1.4,
 };
 
@@ -121,8 +122,8 @@ function priorityConclusionStyle(card: Pick<PriorityCard, "board">): CSSProperti
   return {
     background: priorityActionBackground(card),
     border: `1px solid ${priorityAccentColor(card)}`,
-    borderRadius: 8,
-    padding: "0.875rem",
+    borderRadius: INNER_BORDER_RADIUS,
+    padding: "1rem",
   };
 }
 
@@ -491,30 +492,30 @@ function DiagnosisCards({
     {
       title: messages.analysis.cardObserved,
       content: observed,
-      toneColor: "#d48806",
-      bgColor: "#fffbe6",
-      borderColor: "#ffe58f",
+      toneColor: "var(--p-color-text-warning)",
+      bgColor: "var(--p-color-bg-fill-warning-secondary)",
+      borderColor: "var(--p-color-border-warning)",
     },
     {
       title: messages.analysis.cardEvidence,
       content: evidence,
-      toneColor: "#333333",
-      bgColor: "#fafafa",
-      borderColor: "#d9d9d9",
+      toneColor: "var(--p-color-text)",
+      bgColor: "var(--p-color-bg-surface-secondary)",
+      borderColor: BORDER_SECONDARY,
     },
     {
       title: messages.analysis.cardSuspectedFriction,
       content: suspectedFriction,
-      toneColor: "#096dd9",
-      bgColor: "#e6f7ff",
-      borderColor: "#91d5ff",
+      toneColor: "var(--p-color-text-info)",
+      bgColor: "var(--p-color-bg-fill-info-secondary)",
+      borderColor: "var(--p-color-border-info)",
     },
     {
       title: messages.analysis.cardFirstFix,
       content: firstFix,
-      toneColor: "#389e0d",
-      bgColor: "#f6ffed",
-      borderColor: "#b7eb8f",
+      toneColor: "var(--p-color-text-success)",
+      bgColor: "var(--p-color-bg-fill-success-secondary)",
+      borderColor: "var(--p-color-border-success)",
     },
   ];
 
@@ -532,22 +533,22 @@ function DiagnosisCards({
             key={card.title}
             style={{
               border: `1px solid ${card.borderColor}`,
-              borderRadius: 8,
+              borderRadius: INNER_BORDER_RADIUS,
               overflow: "hidden",
             }}
           >
             <div
               style={{
                 background: card.bgColor,
-                padding: "10px 14px",
-                fontWeight: "bold",
                 color: card.toneColor,
-                fontSize: 13,
+                fontSize: "var(--p-font-size-300, 0.8125rem)",
+                fontWeight: "bold",
+                padding: "0.75rem 1rem",
               }}
             >
               {card.title}
             </div>
-            <div style={{ padding: 14, fontSize: 13, color: "#444", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+            <div style={{ color: "var(--p-color-text)", fontSize: "var(--p-font-size-300, 0.8125rem)", lineHeight: 1.6, padding: "1rem", whiteSpace: "pre-wrap" }}>
               <MarkdownText markdown={card.content} fallback="—" />
             </div>
           </div>

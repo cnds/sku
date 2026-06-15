@@ -1,7 +1,6 @@
 import type { CSSProperties } from "react";
-import { useCallback, useMemo } from "react";
 import type { LoaderFunctionArgs } from "@remix-run/node";
-import { useLoaderData, useNavigate } from "@remix-run/react";
+import { useLoaderData } from "@remix-run/react";
 import {
   Badge,
   Banner,
@@ -12,7 +11,6 @@ import {
   InlineStack,
   Layout,
   Page,
-  Tabs,
   Text,
 } from "@shopify/polaris";
 
@@ -26,8 +24,8 @@ import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
 import {
   priorityAccentColor,
-  priorityActionBackground,
   priorityActionLabel,
+  priorityActionStyle,
   priorityBoardLabel,
   prioritySignalTone,
   priorityStepLabel,
@@ -35,10 +33,13 @@ import {
   priorityTrendTone,
 } from "@/lib/priorities";
 import { hostFromUrl, shopIdFromUrl } from "@/lib/shop";
+import { BORDER_SECONDARY, CARD_BORDER_RADIUS, CARD_SHADOW, INNER_BORDER_RADIUS } from "@/lib/tokens";
 import { dashboardPath, productPath } from "@/lib/url";
+import interactiveStyles from "@/styles/interactive.module.css";
 
 export {
   priorityActionLabel,
+  priorityActionStyle,
   prioritySignalTone,
   priorityStepLabel,
   priorityTrendTone,
@@ -61,16 +62,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 const PRIORITY_SECTION_STYLE: CSSProperties = {
-  background: "var(--p-color-bg-surface, #ffffff)",
-  border: "1px solid var(--p-color-border-secondary, #dcdcdc)",
-  borderRadius: "12px",
-  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
+  background: "var(--p-color-bg-surface)",
+  border: `1px solid ${BORDER_SECONDARY}`,
+  borderRadius: CARD_BORDER_RADIUS,
+  boxShadow: CARD_SHADOW,
 };
 
 const PRIORITY_METRICS_STRIP_STYLE: CSSProperties = {
-  background: "var(--p-color-bg-surface-secondary, #f9fafb)",
-  borderRadius: "10px",
-  padding: "0.75rem 0.875rem",
+  background: "var(--p-color-bg-surface-secondary)",
+  borderRadius: INNER_BORDER_RADIUS,
+  padding: "0.75rem",
 };
 
 const PRIORITY_METRIC_LABEL_STYLE: CSSProperties = {
@@ -81,42 +82,8 @@ const PRIORITY_MUTED_ROW_STYLE: CSSProperties = {
   color: "var(--p-color-text-subdued)",
 };
 
-const PRIORITY_PRODUCT_LINK_STYLE: CSSProperties = {
-  color: "var(--p-color-text-link)",
-  cursor: "pointer",
-  overflowWrap: "anywhere",
-  textDecoration: "underline",
-  textDecorationThickness: "1px",
-  textUnderlineOffset: "3px",
-};
-
-function priorityActionStyle(card: Pick<PriorityCard, "board">): CSSProperties {
-  return {
-    background: priorityActionBackground(card),
-    borderLeft: `6px solid ${priorityAccentColor(card)}`,
-    borderRadius: "10px",
-    padding: "0.875rem",
-  };
-}
-
-const PRIORITY_FEEDBACK_STYLE: CSSProperties = {
-  borderTop: "1px solid var(--p-color-border-secondary, #e3e3e3)",
-  paddingTop: "0.75rem",
-};
-
-const PRIORITY_WHY_NOW_STYLE: CSSProperties = {
-  borderTop: "1px solid var(--p-color-border-secondary, #e3e3e3)",
-  paddingTop: "0.875rem",
-};
-
-const PRIORITY_CARD_STYLE: CSSProperties = {
-  boxShadow: "0 2px 8px rgba(0, 0, 0, 0.08)",
-  borderRadius: "12px",
-  overflow: "hidden",
-};
-
 const PRIORITY_MARKDOWN_BODY_STYLE: CSSProperties = {
-  fontSize: "0.875rem",
+  fontSize: "var(--p-font-size-325, 0.875rem)",
   lineHeight: 1.5,
 };
 
@@ -127,8 +94,26 @@ const PRIORITY_MARKDOWN_SEMIBOLD_STYLE: CSSProperties = {
 
 const PRIORITY_MARKDOWN_SUBDUED_STYLE: CSSProperties = {
   color: "var(--p-color-text-subdued)",
-  fontSize: "0.8125rem",
+  fontSize: "var(--p-font-size-300, 0.8125rem)",
   lineHeight: 1.4,
+};
+
+const PRIORITY_DIVIDER_STYLE: CSSProperties = {
+  borderTop: `1px solid ${BORDER_SECONDARY}`,
+  paddingBottom: "0.25rem",
+  paddingTop: "0.75rem",
+};
+
+const PRIORITY_CARD_STYLE: CSSProperties = {
+  boxShadow: CARD_SHADOW,
+  borderRadius: CARD_BORDER_RADIUS,
+  overflow: "hidden",
+};
+
+const TIME_WINDOW_SELECTOR_STYLE: CSSProperties = {
+  display: "flex",
+  flexWrap: "wrap",
+  gap: "0.5rem",
 };
 
 function PriorityMetric({ label, value }: { label: string; value: number }) {
@@ -153,6 +138,38 @@ function PriorityMetricsStrip({ card }: { card: PriorityCard }) {
         <PriorityMetric label="Orders" value={card.orders} />
       </InlineGrid>
     </div>
+  );
+}
+
+export function TimeWindowSelector({
+  host,
+  selectedWindow,
+  shopId,
+}: {
+  host?: string;
+  selectedWindow: TimeWindow;
+  shopId: string;
+}) {
+  return (
+    <nav aria-label="Analytics window" style={TIME_WINDOW_SELECTOR_STYLE}>
+      {TIME_WINDOWS.map((option) => {
+        const isSelected = option.value === selectedWindow;
+        return (
+          <a
+            aria-current={isSelected ? "page" : undefined}
+            aria-label={`Show data for ${option.label}`}
+            className={isSelected
+              ? `${interactiveStyles.timeWindowOption} ${interactiveStyles.timeWindowOptionActive}`
+              : interactiveStyles.timeWindowOption}
+            data-selected={isSelected ? "true" : undefined}
+            href={dashboardPath(shopId, option.value, host)}
+            key={option.value}
+          >
+            {option.label}
+          </a>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -207,8 +224,8 @@ function PriorityProductSummary({
       <Text as="h3" variant="headingMd">
         <a
           aria-label={`View product details for ${card.product_id}`}
+          className={interactiveStyles.productLink}
           href={productPath(card.product_id, shopId, window, host)}
-          style={PRIORITY_PRODUCT_LINK_STYLE}
         >
           {card.product_id}
         </a>
@@ -249,7 +266,7 @@ export function PriorityRecommendation({ card }: { card: PriorityCard }) {
 
 export function PriorityWhyNow({ card }: { card: PriorityCard }) {
   return (
-    <div style={PRIORITY_WHY_NOW_STYLE}>
+    <div style={PRIORITY_DIVIDER_STYLE}>
       <BlockStack gap="150">
         <Text as="p" variant="bodySm" tone="subdued">
           {messages.dashboard.priorityWhyNow}
@@ -277,7 +294,7 @@ function PriorityFeedback({
   window: TimeWindow;
 }) {
   return (
-    <div style={PRIORITY_FEEDBACK_STYLE}>
+    <div style={PRIORITY_DIVIDER_STYLE}>
       <RecommendationFeedbackButtons
         board={card.board}
         productId={card.product_id}
@@ -429,30 +446,6 @@ function PriorityCards({
 
 export default function DashboardRoute() {
   const data = useLoaderData<typeof loader>();
-  const navigate = useNavigate();
-
-  const tabs = useMemo(
-    () =>
-      TIME_WINDOWS.map((option) => ({
-        id: option.value,
-        content: option.label,
-        accessibilityLabel: `Show data for ${option.label}`,
-      })),
-    [],
-  );
-
-  const selectedTabIndex = tabs.findIndex((tab) => tab.id === data.window);
-
-  const handleTabChange = useCallback(
-    (index: number) => {
-      const tab = tabs[index];
-      if (tab) {
-        void navigate(dashboardPath(data.shopId, tab.id, data.host));
-      }
-    },
-    [data.host, data.shopId, navigate, tabs],
-  );
-
   const totalTracked = data.blackboard.length + data.redboard.length;
   const primaryProductId = data.priorities[0]?.product_id ?? data.blackboard[0]?.product_id;
   const integrationHealth = readinessBannerContent(data.health);
@@ -483,59 +476,57 @@ export default function DashboardRoute() {
               </Text>
             </Banner>
 
-            <Tabs tabs={tabs} selected={selectedTabIndex} onSelect={handleTabChange}>
-              <Box paddingBlockStart="400">
-                <BlockStack gap="500">
-                  <div style={PRIORITY_SECTION_STYLE}>
-                    <Box padding="400">
-                      <BlockStack gap="400">
-                        <InlineStack align="space-between" blockAlign="start" gap="300">
-                          <BlockStack gap="200">
-                            <InlineStack gap="200" blockAlign="center">
-                              <Badge tone="info">{messages.dashboard.prioritiesKicker}</Badge>
-                            </InlineStack>
-                            <Text as="h2" variant="headingLg">{messages.dashboard.prioritiesTitle}</Text>
-                            <Text as="p" variant="bodyMd" tone="subdued">
-                              {messages.dashboard.prioritiesSubtitle}
-                            </Text>
-                          </BlockStack>
-                          <Badge>{messages.dashboard.prioritiesActionCount(data.priorities.length)}</Badge>
+            <TimeWindowSelector host={data.host} selectedWindow={data.window} shopId={data.shopId} />
+
+            <BlockStack gap="500">
+              <div style={PRIORITY_SECTION_STYLE}>
+                <Box padding="400">
+                  <BlockStack gap="400">
+                    <InlineStack align="space-between" blockAlign="start" gap="300">
+                      <BlockStack gap="200">
+                        <InlineStack gap="200" blockAlign="center">
+                          <Badge tone="info">{messages.dashboard.prioritiesKicker}</Badge>
                         </InlineStack>
-                        <PriorityCards
-                          cards={data.priorities}
-                          host={data.host}
-                          shopId={data.shopId}
-                          window={data.window}
-                        />
+                        <Text as="h2" variant="headingLg">{messages.dashboard.prioritiesTitle}</Text>
+                        <Text as="p" variant="bodyMd" tone="subdued">
+                          {messages.dashboard.prioritiesSubtitle}
+                        </Text>
                       </BlockStack>
-                    </Box>
-                  </div>
-                  <BlockStack gap="300">
-                    <Text as="h2" variant="headingMd">{messages.dashboard.viewMoreProducts}</Text>
-                    <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
-                      <LeaderboardTable
-                        host={data.host}
-                        rows={data.redboard}
-                        shopId={data.shopId}
-                        title={messages.dashboard.redboardTitle}
-                        subtitle={messages.dashboard.redboardSubtitle}
-                        tone="success"
-                        window={data.window}
-                      />
-                      <LeaderboardTable
-                        host={data.host}
-                        rows={data.blackboard}
-                        shopId={data.shopId}
-                        title={messages.dashboard.blackboardTitle}
-                        subtitle={messages.dashboard.blackboardSubtitle}
-                        tone="critical"
-                        window={data.window}
-                      />
-                    </InlineGrid>
+                      <Badge>{messages.dashboard.prioritiesActionCount(data.priorities.length)}</Badge>
+                    </InlineStack>
+                    <PriorityCards
+                      cards={data.priorities}
+                      host={data.host}
+                      shopId={data.shopId}
+                      window={data.window}
+                    />
                   </BlockStack>
-                </BlockStack>
-              </Box>
-            </Tabs>
+                </Box>
+              </div>
+              <BlockStack gap="300">
+                <Text as="h2" variant="headingMd">{messages.dashboard.viewMoreProducts}</Text>
+                <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
+                  <LeaderboardTable
+                    host={data.host}
+                    rows={data.redboard}
+                    shopId={data.shopId}
+                    title={messages.dashboard.redboardTitle}
+                    subtitle={messages.dashboard.redboardSubtitle}
+                    tone="success"
+                    window={data.window}
+                  />
+                  <LeaderboardTable
+                    host={data.host}
+                    rows={data.blackboard}
+                    shopId={data.shopId}
+                    title={messages.dashboard.blackboardTitle}
+                    subtitle={messages.dashboard.blackboardSubtitle}
+                    tone="critical"
+                    window={data.window}
+                  />
+                </InlineGrid>
+              </BlockStack>
+            </BlockStack>
           </BlockStack>
         </Layout.Section>
       </Layout>

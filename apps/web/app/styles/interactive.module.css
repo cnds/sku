@@ -1,0 +1,75 @@
+/* Interaction states that inline CSSProperties cannot express. */
+
+/* ---------- Product link (priority cards, product summaries) ---------- */
+
+.productLink {
+  color: var(--p-color-text-link);
+  cursor: pointer;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+.productLink:hover {
+  color: var(--p-color-text-link-hover, var(--p-color-text-link));
+  text-decoration-thickness: 2px;
+}
+
+.productLink:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--p-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Table link (leaderboard rows) ---------- */
+
+.tableLink {
+  color: var(--p-color-text-link);
+  text-decoration: none;
+  transition: text-decoration 0.15s ease;
+}
+
+.tableLink:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tableLink:focus-visible {
+  border-radius: 2px;
+  outline: 2px solid var(--p-color-border-focus);
+  outline-offset: 2px;
+}
+
+/* ---------- Time window selector ---------- */
+
+.timeWindowOption {
+  border: 1px solid transparent;
+  border-radius: var(--p-border-radius-200, 8px);
+  color: var(--p-color-text-subdued);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.25;
+  padding: 0.5rem 0.75rem;
+  text-decoration: none;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.timeWindowOption:hover {
+  background: var(--p-color-bg-surface-hover);
+  color: var(--p-color-text);
+}
+
+.timeWindowOptionActive {
+  background: var(--p-color-bg-fill-inverse, #303030);
+  border-color: var(--p-color-border-inverse, #303030);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+  color: var(--p-color-text-inverse, #ffffff);
+}
+
+.timeWindowOptionActive:hover {
+  /* Keep active styling on hover — don't blend with the inactive hover. */
+  background: var(--p-color-bg-fill-inverse, #303030);
+  color: var(--p-color-text-inverse, #ffffff);
+}

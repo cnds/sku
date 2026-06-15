@@ -1,5 +1,7 @@
+import type { CSSProperties } from "react";
 import type { PriorityCard, PrioritySignalState, PriorityTrendState } from "@/lib/contracts";
 import { messages } from "@/lib/messages";
+import { INNER_BORDER_RADIUS } from "@/lib/tokens";
 
 export type PriorityBadgeTone = "attention" | "critical" | "info" | "success";
 
@@ -59,4 +61,13 @@ export function priorityActionBackground(card: Pick<PriorityCard, "board">): str
   return card.board === "hidden_winner"
     ? "rgba(0, 128, 96, 0.05)"
     : "rgba(216, 44, 13, 0.05)";
+}
+
+export function priorityActionStyle(card: Pick<PriorityCard, "board">): CSSProperties {
+  return {
+    background: priorityActionBackground(card),
+    borderLeft: `6px solid ${priorityAccentColor(card)}`,
+    borderRadius: INNER_BORDER_RADIUS,
+    padding: "1rem",
+  };
 }

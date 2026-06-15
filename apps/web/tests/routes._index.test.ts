@@ -29,6 +29,7 @@ import {
   ErrorBoundary,
   PriorityRecommendation,
   PriorityWhyNow,
+  TimeWindowSelector,
   loader,
   readinessBannerContent,
 } from "../app/routes/_index";
@@ -103,6 +104,26 @@ describe("dashboard route loader", () => {
     );
 
     expect(markup).toContain(messages.dashboard.errorMessage);
+  });
+
+  it("always renders all time window links for an empty selected window", () => {
+    const markup = renderToStaticMarkup(
+      createElement(TimeWindowSelector, {
+        host: "admin.shopify.com/store/test",
+        selectedWindow: "7d",
+        shopId: "test-shop.myshopify.com",
+      }),
+    );
+
+    expect(markup).toContain("24 Hours");
+    expect(markup).toContain("7 Days");
+    expect(markup).toContain("30 Days");
+    expect(markup).toContain("window=24h");
+    expect(markup).toContain("window=7d");
+    expect(markup).toContain("window=30d");
+    expect(markup).toContain('aria-current="page"');
+    expect(markup).toContain('data-selected="true"');
+    expect(markup).toContain("timeWindowOptionActive");
   });
 
   it("renders markdown emphasis in dashboard priority card copy", () => {
