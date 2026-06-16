@@ -16,6 +16,7 @@ import {
 
 import { LeaderboardTable } from "@/components/LeaderboardTable";
 import { MarkdownText } from "@/components/MarkdownText";
+import { PageBottomSpacer } from "@/components/PageBottomSpacer";
 import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { TIME_WINDOWS, formatTimeWindowLabel } from "@/lib/analytics";
 import { fetchIntegrationHealth, fetchLeaderboard, fetchPriorities, parseTimeWindow } from "@/lib/api.server";
@@ -526,6 +527,7 @@ export default function DashboardRoute() {
                   />
                 </InlineGrid>
               </BlockStack>
+              <PageBottomSpacer />
             </BlockStack>
           </BlockStack>
         </Layout.Section>

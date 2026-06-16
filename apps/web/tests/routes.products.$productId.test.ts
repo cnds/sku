@@ -4,6 +4,8 @@ import { AppProvider } from "@shopify/polaris";
 import polarisTranslations from "@shopify/polaris/locales/en.json";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { PageBottomSpacer } from "../app/components/PageBottomSpacer";
+
 const {
   fetchPrioritiesMock,
   fetchProductAnalysisMock,
@@ -147,5 +149,12 @@ describe("product analysis route loader", () => {
     );
 
     expect(markup).toContain(messages.product.errorMessage);
+  });
+
+  it("uses the shared bottom spacer so product detail content does not touch the viewport edge", () => {
+    const markup = renderToStaticMarkup(createElement(PageBottomSpacer));
+
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain("height:3rem");
   });
 });

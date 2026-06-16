@@ -3,6 +3,7 @@ import { useLoaderData } from "@remix-run/react";
 import { Badge, Banner, BlockStack, Card, InlineStack, Layout, Page, Text } from "@shopify/polaris";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
+import { PageBottomSpacer } from "@/components/PageBottomSpacer";
 import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { formatTimeWindowLabel } from "@/lib/analytics";
 import { fetchPriorities, fetchProductAnalysis, parseTimeWindow } from "@/lib/api.server";
@@ -110,6 +111,7 @@ export default function ProductAnalysisRoute() {
                 windowStartDate={data.priorityCard?.window_start_date}
               />
             </Card>
+            <PageBottomSpacer />
           </BlockStack>
         </Layout.Section>
       </Layout>

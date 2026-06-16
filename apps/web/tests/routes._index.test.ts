@@ -25,6 +25,7 @@ vi.mock("../app/lib/api.server", () => ({
 }));
 
 import { messages } from "../app/lib/messages";
+import { PageBottomSpacer } from "../app/components/PageBottomSpacer";
 import {
   ErrorBoundary,
   PriorityRecommendation,
@@ -144,6 +145,13 @@ describe("dashboard route loader", () => {
     expect(markup).toContain("<strong>50 PDP views</strong>");
     expect(markup).toContain("<strong>2 add-to-carts</strong>");
     expect(markup).not.toContain("**");
+  });
+
+  it("renders a bottom spacer so the dashboard content does not touch the viewport edge", () => {
+    const markup = renderToStaticMarkup(createElement(PageBottomSpacer));
+
+    expect(markup).toContain('aria-hidden="true"');
+    expect(markup).toContain("height:3rem");
   });
 
   it("separates missing install, missing raw events, low PDP traffic, and partial coverage states", () => {
