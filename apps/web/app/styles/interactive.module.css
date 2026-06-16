@@ -47,7 +47,7 @@
 .timeWindowOption {
   border: 1px solid transparent;
   border-radius: var(--p-border-radius-200, 8px);
-  color: var(--p-color-text-subdued);
+  color: var(--p-color-text-secondary);
   font-size: 0.875rem;
   font-weight: 600;
   line-height: 1.25;
