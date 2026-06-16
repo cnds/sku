@@ -12,8 +12,15 @@ OpenAI-compatible credentials are configured.
 
 ## Apps
 
+Self-hosted services, built and deployed by us.
+
 - `apps/server`: FastAPI + SQLModel APIs, browser Shopify install/OAuth callback, onboarding status, ingest pipeline, integration health, recommendation feedback, internal card review, diagnosis, and Celery worker runtime.
 - `apps/web`: Embedded Shopify admin app built with Remix + Vite + Polaris. The shell publishes Shopify App Bridge metadata, defaults missing or invalid `window` params to `24h`, loads onboarding and integration health, shows readiness-aware board states, and loads product diagnosis asynchronously after first paint with freshness, manual re-run controls, and lightweight recommendation feedback.
+
+## Extensions
+
+Shopify platform extensions, built by Shopify CLI and deployed to Shopify infrastructure via `shopify app deploy`.
+
 - `extensions/theme`: Theme App Extension assets for storefront DOM-experience tracking. The shipped tracker batches `product_impression`, `product_click`, `component_impression`, `component_click`, `media_interaction`, `variant_intent`, and `engage` events, maps common PDP sections to stable component labels, then posts them to `/ingest/events` with per-visitor and per-session identifiers.
 - `extensions/web-pixel`: Shopify Web Pixel extension for standard Shopify customer events. It subscribes to product, cart, checkout, collection, search, and page events, then posts normalized batches to `/ingest/pixel-events`.
 
