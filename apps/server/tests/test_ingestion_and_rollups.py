@@ -5,13 +5,15 @@ from datetime import UTC, date, datetime
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy.exc import IntegrityError
 from sqlmodel import select
 
 import services.job_dispatch as job_dispatch_module
+import services.product_identity as product_identity_module
 from config import Settings
 from db import create_session_factory, db_session_context, init_db
 from main import create_app
-from models import DailyProductStat, EventType, RawEvent, ShopInstallation
+from models import DailyProductStat, EventType, RawEvent, ShopInstallation, ShopProductIdentity
 from schemas import IngestEvent
 from security.shopify import build_shopify_hmac
 from services.ingestion import EventIngestionService
@@ -93,6 +95,277 @@ async def test_ingestion_service_persists_raw_events_and_rolls_up_daily_stats(
     assert daily_stat.add_to_carts == 1
     assert daily_stat.orders == 1
     assert daily_stat.component_clicks_distribution == {}
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_normalizes_product_gid_before_persisting(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+    occurred_at = datetime(2026, 4, 23, 9, 0, tzinfo=UTC)
+
+    async with db_session_context(session_factory) as session:
+        await EventIngestionService().persist_batch(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="shopify_pixel",
+            session_id="session-1",
+            visitor_id="visitor-1",
+            events=[
+                IngestEvent(
+                    event_type=EventType.PRODUCT_VIEW,
+                    occurred_at=occurred_at,
+                    product_id="gid://shopify/Product/12345",
+                ),
+            ],
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        raw_event = (await session.exec(select(RawEvent))).one()
+
+    assert raw_event.product_id == "12345"
+    assert raw_event.context_json["original_product_id"] == "gid://shopify/Product/12345"
+    assert raw_event.context_json["product_id_resolution"] == "canonical"
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_resolves_handle_product_id_from_cached_identity(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+    occurred_at = datetime(2026, 4, 23, 9, 0, tzinfo=UTC)
+
+    async with db_session_context(session_factory) as session:
+        session.add(
+            ShopProductIdentity(
+                shop_id="shop-1",
+                product_id="12345",
+                handle="blue-shirt",
+                source="product_json",
+            )
+        )
+        await session.commit()
+
+    async with db_session_context(session_factory) as session:
+        await EventIngestionService().persist_batch(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="sdk_dom",
+            session_id="session-1",
+            visitor_id="visitor-1",
+            events=[
+                IngestEvent(
+                    context={"product_handle": "blue-shirt", "product_id_source": "handle_fallback"},
+                    event_type=EventType.PRODUCT_CLICK,
+                    occurred_at=occurred_at,
+                    product_id="handle:blue-shirt",
+                ),
+            ],
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        raw_event = (await session.exec(select(RawEvent))).one()
+
+    assert raw_event.product_id == "12345"
+    assert raw_event.context_json["original_product_id"] == "handle:blue-shirt"
+    assert raw_event.context_json["product_handle"] == "blue-shirt"
+    assert raw_event.context_json["product_id_resolution"] == "resolved_from_cache"
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_learns_product_handle_mapping_within_batch(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+    occurred_at = datetime(2026, 4, 23, 9, 0, tzinfo=UTC)
+
+    async with db_session_context(session_factory) as session:
+        await EventIngestionService().persist_batch(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="sdk_dom",
+            session_id="session-1",
+            visitor_id="visitor-1",
+            events=[
+                IngestEvent(
+                    context={"product_handle": "blue-shirt", "product_id_source": "product_json"},
+                    event_type=EventType.PRODUCT_IMPRESSION,
+                    occurred_at=occurred_at,
+                    product_id="12345",
+                ),
+                IngestEvent(
+                    context={"product_handle": "blue-shirt", "product_id_source": "handle_fallback"},
+                    event_type=EventType.PRODUCT_CLICK,
+                    occurred_at=occurred_at,
+                    product_id="handle:blue-shirt",
+                ),
+            ],
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        raw_events = (await session.exec(select(RawEvent).order_by(RawEvent.id))).all()
+        identity = (
+            await session.exec(select(ShopProductIdentity).where(ShopProductIdentity.handle == "blue-shirt"))
+        ).one()
+
+    assert [event.product_id for event in raw_events] == ["12345", "12345"]
+    assert raw_events[1].context_json["original_product_id"] == "handle:blue-shirt"
+    assert raw_events[1].context_json["product_id_resolution"] == "learned"
+    assert identity.shop_id == "shop-1"
+    assert identity.product_id == "12345"
+
+
+@pytest.mark.asyncio
+async def test_product_identity_learning_uses_atomic_write_for_new_handle(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class EmptyResult:
+        def first(self) -> None:
+            return None
+
+    class FakeDialect:
+        name = "sqlite"
+
+    class FakeBind:
+        dialect = FakeDialect()
+
+    class RacingIdentitySession:
+        executed_statements: list[object]
+
+        def __init__(self) -> None:
+            self.executed_statements = []
+
+        def get_bind(self) -> FakeBind:
+            return FakeBind()
+
+        async def exec(self, statement: object) -> EmptyResult:
+            self.executed_statements.append(statement)
+            return EmptyResult()
+
+        async def execute(self, statement: object) -> None:
+            self.executed_statements.append(statement)
+
+        def add(self, _identity: ShopProductIdentity) -> None:
+            raise IntegrityError("duplicate shop/handle", {}, None)
+
+    session = RacingIdentitySession()
+    monkeypatch.setattr(product_identity_module, "get_db_session", lambda: session)
+
+    resolved_event = await product_identity_module.ProductIdentityService().resolve_event(
+        event=IngestEvent(
+            context={"product_handle": "blue-shirt", "product_id_source": "product_json"},
+            event_type=EventType.PRODUCT_IMPRESSION,
+            occurred_at=datetime(2026, 4, 23, 9, 0, tzinfo=UTC),
+            product_id="12345",
+        ),
+        shop_id="shop-1",
+    )
+
+    assert resolved_event.product_id == "12345"
+    assert session.executed_statements
+
+
+@pytest.mark.asyncio
+async def test_ingestion_service_keeps_unresolved_handle_and_marks_context(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+    occurred_at = datetime(2026, 4, 23, 9, 0, tzinfo=UTC)
+
+    async with db_session_context(session_factory) as session:
+        await EventIngestionService().persist_batch(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="sdk_dom",
+            session_id="session-1",
+            visitor_id="visitor-1",
+            events=[
+                IngestEvent(
+                    context={"product_handle": "blue-shirt", "product_id_source": "handle_fallback"},
+                    event_type=EventType.PRODUCT_CLICK,
+                    occurred_at=occurred_at,
+                    product_id="handle:blue-shirt",
+                ),
+            ],
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        raw_event = (await session.exec(select(RawEvent))).one()
+
+    assert raw_event.product_id == "handle:blue-shirt"
+    assert raw_event.context_json["original_product_id"] == "handle:blue-shirt"
+    assert raw_event.context_json["product_handle"] == "blue-shirt"
+    assert raw_event.context_json["product_id_resolution"] == "unresolved"
+
+
+@pytest.mark.asyncio
+async def test_rollup_combines_numeric_pixel_event_with_resolved_theme_event(
+    sqlite_database_url: str,
+) -> None:
+    session_factory = create_session_factory(sqlite_database_url)
+    await init_db(session_factory.engine)
+    occurred_at = datetime(2026, 4, 23, 9, 0, tzinfo=UTC)
+
+    async with db_session_context(session_factory) as session:
+        session.add(
+            ShopProductIdentity(
+                shop_id="shop-1",
+                product_id="12345",
+                handle="blue-shirt",
+                source="product_json",
+            )
+        )
+        await session.commit()
+
+    async with db_session_context(session_factory) as session:
+        await EventIngestionService().persist_batch_and_rollup(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="shopify_pixel",
+            session_id="session-1",
+            stat_date=date(2026, 4, 23),
+            visitor_id="visitor-1",
+            events=[
+                IngestEvent(
+                    event_type=EventType.PRODUCT_VIEW,
+                    occurred_at=occurred_at,
+                    product_id="12345",
+                ),
+            ],
+        )
+        await EventIngestionService().persist_batch_and_rollup(
+            shop_id="shop-1",
+            shop_domain="demo.myshopify.com",
+            channel="sdk_dom",
+            session_id="session-1",
+            stat_date=date(2026, 4, 23),
+            visitor_id="visitor-1",
+            events=[
+                IngestEvent(
+                    context={"product_handle": "blue-shirt", "product_id_source": "handle_fallback"},
+                    event_type=EventType.PRODUCT_CLICK,
+                    occurred_at=occurred_at,
+                    product_id="handle:blue-shirt",
+                ),
+            ],
+        )
+        await session.commit()
+
+    async with session_factory() as session:
+        daily_stats = (await session.exec(select(DailyProductStat))).all()
+
+    assert len(daily_stats) == 1
+    assert daily_stats[0].product_id == "12345"
+    assert daily_stats[0].views == 1
+    assert daily_stats[0].clicks == 1
 
 
 @pytest.mark.asyncio

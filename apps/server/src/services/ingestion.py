@@ -8,6 +8,7 @@ from db import get_db_session
 from models import EventType, RawEvent
 from schemas import IngestEvent, ShopifyPixelEvent
 from services.job_dispatch import AfterCommitCallbacks, JobDispatchService
+from services.product_identity import ProductIdentityService
 from services.rollups import DailyRollupService
 
 SDK_DOM_EVENT_TYPES = frozenset(
@@ -78,6 +79,7 @@ class EventIngestionService:
                 component_id=event.component_id,
                 context={
                     **event.context,
+                    **({"product_id_source": "pixel"} if event.product_id is not None else {}),
                     "source_event_name": event.source_event_name,
                 },
                 dedupe_key=EventIngestionService._pixel_dedupe_key(event),
@@ -129,6 +131,14 @@ class EventIngestionService:
             ]
         )
 
+    @staticmethod
+    def _default_product_id_source(*, channel: str, event: IngestEvent) -> str | None:
+        if channel == "shopify_pixel" and event.product_id is not None:
+            return "pixel"
+        if channel == "shopify_webhook" and event.product_id is not None:
+            return "order_webhook"
+        return None
+
     async def persist_batch(
         self,
         *,
@@ -158,27 +168,33 @@ class EventIngestionService:
 
         seen_dedupe_keys: set[str] = set()
         raw_events: list[RawEvent] = []
+        identity_service = ProductIdentityService()
         for event in events:
             if event.dedupe_key is not None:
                 if event.dedupe_key in existing_dedupe_keys or event.dedupe_key in seen_dedupe_keys:
                     continue
                 seen_dedupe_keys.add(event.dedupe_key)
 
+            resolved_event = await identity_service.resolve_event(
+                default_source=self._default_product_id_source(channel=channel, event=event),
+                event=event,
+                shop_id=shop_id,
+            )
             raw_events.append(
                 RawEvent(
                     channel=channel,
-                    component_id=event.component_id,
-                    context_json=event.context,
-                    dedupe_key=event.dedupe_key,
-                    event_id=event.event_id,
-                    event_type=event.event_type,
-                    occurred_at=event.occurred_at,
-                    product_id=event.product_id,
+                    component_id=resolved_event.component_id,
+                    context_json=resolved_event.context,
+                    dedupe_key=resolved_event.dedupe_key,
+                    event_id=resolved_event.event_id,
+                    event_type=resolved_event.event_type,
+                    occurred_at=resolved_event.occurred_at,
+                    product_id=resolved_event.product_id,
                     session_id=session_id,
                     shop_domain=shop_domain,
                     shop_id=shop_id,
-                    source_event_name=event.source_event_name,
-                    variant_id=event.variant_id,
+                    source_event_name=resolved_event.source_event_name,
+                    variant_id=resolved_event.variant_id,
                     visitor_id=visitor_id,
                 )
             )

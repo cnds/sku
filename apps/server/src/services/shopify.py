@@ -166,6 +166,7 @@ class ShopifyOrderWebhookService:
                     "line_item_index": index,
                     "order_id": order_id,
                     "order_name": payload.get("name"),
+                    "product_id_source": "order_webhook",
                     "quantity": item.get("quantity", 1),
                     "source_event_name": "orders/create",
                 },

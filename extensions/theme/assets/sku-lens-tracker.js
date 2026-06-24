@@ -187,28 +187,202 @@
   // Product ID resolution
   // ---------------------------------------------------------------------------
 
-  function resolveProductId(element) {
-    if (element) {
-      var card = element.closest("[data-product-id]");
-      if (card) return card.getAttribute("data-product-id");
+  var productHandleCache = {};
 
-      var link = element.closest('a[href*="/products/"]');
-      if (link) {
-        var m = link.getAttribute("href").match(/\/products\/([^?#/]+)/);
-        if (m) return "handle:" + m[1];
-      }
+  function resolveProductIdentity(element) {
+    var dataIdentity = resolveDataProductIdentity(element);
+    if (dataIdentity) return Promise.resolve(dataIdentity);
+
+    var handle = element ? resolveProductHandle(element) : null;
+    if (handle) return resolveHandleProductIdentity(handle);
+
+    var analyticsIdentity = resolveShopifyAnalyticsProductIdentity();
+    if (analyticsIdentity) return Promise.resolve(analyticsIdentity);
+
+    if (element) {
+      var pageIdentity = resolveDataProductIdentity(null);
+      if (pageIdentity) return Promise.resolve(pageIdentity);
     }
 
-    if (
-      window.ShopifyAnalytics &&
-      window.ShopifyAnalytics.meta &&
-      window.ShopifyAnalytics.meta.product
-    ) {
-      return String(window.ShopifyAnalytics.meta.product.id);
+    var pageHandle = resolveProductHandle(null);
+    if (pageHandle) return resolveHandleProductIdentity(pageHandle);
+
+    return Promise.resolve(productIdentity(null, {}));
+  }
+
+  function resolveProductIdentitySync(element) {
+    var dataIdentity = resolveDataProductIdentity(element);
+    if (dataIdentity) return dataIdentity;
+
+    var handle = element ? resolveProductHandle(element) : null;
+    if (handle) return resolveCachedHandleProductIdentity(handle);
+
+    var analyticsIdentity = resolveShopifyAnalyticsProductIdentity();
+    if (analyticsIdentity) return analyticsIdentity;
+
+    if (element) {
+      var pageIdentity = resolveDataProductIdentity(null);
+      if (pageIdentity) return pageIdentity;
+    }
+
+    var pageHandle = resolveProductHandle(null);
+    if (pageHandle) return resolveCachedHandleProductIdentity(pageHandle);
+
+    return productIdentity(null, {});
+  }
+
+  function resolveDataProductIdentity(element) {
+    if (element) {
+      var card = element.closest("[data-product-id]");
+      if (card) {
+        var value = normalizeProductId(card.getAttribute("data-product-id"));
+        if (value) return canonicalProductIdentity(value, "data_product_id", null, card.getAttribute("data-product-id"));
+      }
+      return null;
     }
 
     var node = document.querySelector("[data-product-id]");
-    return node ? node.getAttribute("data-product-id") : null;
+    if (!node) return null;
+    var productId = normalizeProductId(node.getAttribute("data-product-id"));
+    if (!productId) return null;
+    return canonicalProductIdentity(productId, "data_product_id", null, node.getAttribute("data-product-id"));
+  }
+
+  function resolveShopifyAnalyticsProductIdentity() {
+    if (
+      window.ShopifyAnalytics &&
+      window.ShopifyAnalytics.meta &&
+      window.ShopifyAnalytics.meta.product &&
+      window.ShopifyAnalytics.meta.product.id !== undefined &&
+      window.ShopifyAnalytics.meta.product.id !== null
+    ) {
+      return canonicalProductIdentity(
+        normalizeProductId(window.ShopifyAnalytics.meta.product.id),
+        "shopify_analytics",
+        resolveHandleFromPath(window.location.pathname),
+        window.ShopifyAnalytics.meta.product.id
+      );
+    }
+    return null;
+  }
+
+  function resolveProductHandle(element) {
+    var href = null;
+    if (element) {
+      var link = element.closest('a[href*="/products/"]') ||
+        (element.querySelector ? element.querySelector('a[href*="/products/"]') : null);
+      if (link) href = link.getAttribute("href");
+      return resolveHandleFromPath(href);
+    }
+    return resolveHandleFromPath(window.location.pathname);
+  }
+
+  function resolveHandleFromPath(path) {
+    if (!path) return null;
+    var match = String(path).match(/\/products\/([^?#/]+)/);
+    if (!match) return null;
+    try {
+      return decodeURIComponent(match[1]);
+    } catch (_error) {
+      return match[1];
+    }
+  }
+
+  function resolveHandleProductIdentity(handle) {
+    var originalProductId = "handle:" + handle;
+    if (productHandleCache[handle]) {
+      return Promise.resolve(
+        canonicalProductIdentity(productHandleCache[handle], "product_json", handle, originalProductId)
+      );
+    }
+    if (productHandleCache[handle] === null) {
+      return Promise.resolve(unresolvedHandleProductIdentity(handle));
+    }
+
+    return fetch("/products/" + encodeURIComponent(handle) + ".js", {
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+    }).then(function (response) {
+      if (!response.ok) throw new Error("Product JSON failed with status " + response.status + ".");
+      return response.json();
+    }).then(function (product) {
+      var productId = product && normalizeProductId(product.id);
+      if (!productId) throw new Error("Product JSON did not include a product id.");
+      productHandleCache[handle] = productId;
+      return canonicalProductIdentity(productId, "product_json", handle, originalProductId);
+    }).catch(function () {
+      productHandleCache[handle] = null;
+      return unresolvedHandleProductIdentity(handle);
+    });
+  }
+
+  function resolveCachedHandleProductIdentity(handle) {
+    var originalProductId = "handle:" + handle;
+    if (productHandleCache[handle]) {
+      return canonicalProductIdentity(productHandleCache[handle], "product_json", handle, originalProductId);
+    }
+    return unresolvedHandleProductIdentity(handle);
+  }
+
+  function normalizeProductId(value) {
+    if (value === undefined || value === null || value === "") return null;
+    var text = String(value).trim();
+    var gidMatch = text.match(/^gid:\/\/shopify\/Product\/(\d+)$/);
+    return gidMatch ? gidMatch[1] : text;
+  }
+
+  function canonicalProductIdentity(productId, source, handle, originalProductId) {
+    var context = {
+      product_id_resolution: "canonical",
+      product_id_source: source,
+    };
+    if (handle) context.product_handle = handle;
+    if (originalProductId !== undefined && originalProductId !== null && String(originalProductId) !== String(productId)) {
+      context.original_product_id = String(originalProductId);
+    }
+    return productIdentity(productId, context);
+  }
+
+  function unresolvedHandleProductIdentity(handle) {
+    var originalProductId = "handle:" + handle;
+    return productIdentity(originalProductId, {
+      original_product_id: originalProductId,
+      product_handle: handle,
+      product_id_resolution: "unresolved",
+      product_id_source: "handle_fallback",
+    });
+  }
+
+  function productIdentity(productId, context) {
+    return {
+      context: context || {},
+      productId: productId === undefined || productId === null ? null : String(productId),
+    };
+  }
+
+  function mergeContexts(first, second) {
+    var merged = {};
+    var key;
+    first = first || {};
+    second = second || {};
+    for (key in first) {
+      if (Object.prototype.hasOwnProperty.call(first, key)) merged[key] = first[key];
+    }
+    for (key in second) {
+      if (Object.prototype.hasOwnProperty.call(second, key)) merged[key] = second[key];
+    }
+    return merged;
+  }
+
+  function trackResolvedProduct(eventType, identity, options, requireProductId) {
+    if (requireProductId && !identity.productId) return;
+    options = options || {};
+    track(eventType, {
+      componentId: options.componentId,
+      context: mergeContexts(identity.context, options.context),
+      productId: identity.productId,
+      variantId: options.variantId,
+    });
   }
 
   function resolvePageType() {
@@ -433,24 +607,24 @@
               var t = setTimeout(function () {
                 if (fired.has(target)) return;
                 fired.add(target);
-                var productId = resolveProductId(target);
-                if (!productId) return;
-                var cards = document.querySelectorAll(PRODUCT_CARD_SELECTORS);
-                var pos = -1;
-                for (var j = 0; j < cards.length; j++) {
-                  if (cards[j] === target) { pos = j; break; }
-                }
-                track("product_impression", {
-                  productId: productId,
-                  componentId: findSectionName(target),
-                  context: {
-                    component_signature: componentSignature(target),
-                    mapping_confidence: target.hasAttribute && target.hasAttribute("data-product-id") ? "high" : "medium",
-                    mapping_source: "product_card_selector",
-                    page_type: resolvePageType(),
-                    position: pos >= 0 ? pos : null,
-                    section_hint: findSectionName(target),
-                  },
+                resolveProductIdentity(target).then(function (identity) {
+                  if (!identity.productId) return;
+                  var cards = document.querySelectorAll(PRODUCT_CARD_SELECTORS);
+                  var pos = -1;
+                  for (var j = 0; j < cards.length; j++) {
+                    if (cards[j] === target) { pos = j; break; }
+                  }
+                  trackResolvedProduct("product_impression", identity, {
+                    componentId: findSectionName(target),
+                    context: {
+                      component_signature: componentSignature(target),
+                      mapping_confidence: target.hasAttribute && target.hasAttribute("data-product-id") ? "high" : "medium",
+                      mapping_source: "product_card_selector",
+                      page_type: resolvePageType(),
+                      position: pos >= 0 ? pos : null,
+                      section_hint: findSectionName(target),
+                    },
+                  }, true);
                 });
               }, IMPRESSION_DWELL_MS);
               timers.set(target, t);
@@ -493,8 +667,8 @@
         var card = target.closest(PRODUCT_CARD_SELECTORS);
         if (!card) return;
 
-        var productId = resolveProductId(card);
-        if (!productId) return;
+        var identity = resolveProductIdentitySync(card);
+        if (!identity.productId) return;
 
         var cards = document.querySelectorAll(PRODUCT_CARD_SELECTORS);
         var pos = -1;
@@ -506,8 +680,7 @@
           card.querySelector('a[href*="/products/"]') || target.closest("a");
         var targetUrl = link ? link.getAttribute("href") : null;
 
-        track("product_click", {
-          productId: productId,
+        trackResolvedProduct("product_click", identity, {
           componentId: findSectionName(card),
           context: {
             component_signature: componentSignature(card),
@@ -518,7 +691,7 @@
             section_hint: findSectionName(card),
             target_url: targetUrl,
           },
-        });
+        }, true);
       },
       true
     );
@@ -540,14 +713,13 @@
         var component = target.closest(PDP_COMPONENT_SELECTORS);
         if (!component) return;
 
-        var productId = resolveProductId(null);
-        if (!productId) return;
         var mapping = resolvePdpComponent(component);
 
-        track("component_click", {
-          productId: productId,
-          componentId: mapping.id,
-          context: componentDebugContext(component, "click", mapping),
+        resolveProductIdentity(null).then(function (identity) {
+          trackResolvedProduct("component_click", identity, {
+            componentId: mapping.id,
+            context: componentDebugContext(component, "click", mapping),
+          }, true);
         });
       },
       true
@@ -566,14 +738,13 @@
           if (!entry.isIntersecting || fired.has(entry.target)) continue;
           fired.add(entry.target);
 
-          var productId = resolveProductId(null);
-          if (!productId) return;
           var mapping = resolvePdpComponent(entry.target);
 
-          track("component_impression", {
-            productId: productId,
-            componentId: mapping.id,
-            context: componentDebugContext(entry.target, "impression", mapping),
+          resolveProductIdentity(null).then(function (identity) {
+            trackResolvedProduct("component_impression", identity, {
+              componentId: mapping.id,
+              context: componentDebugContext(entry.target, "impression", mapping),
+            }, true);
           });
         }
       },
@@ -604,21 +775,19 @@
         var target = event.target instanceof HTMLElement ? event.target : null;
         if (!target || !target.closest || !target.closest('form[action*="/cart/add"]')) return;
 
-        var productId = resolveProductId(null);
-        if (!productId) return;
-
-        track("component_click", {
-          productId: productId,
-          componentId: "buy_box",
-          variantId: resolveSelectedVariantId(),
-          context: {
-            action: "intent",
-            component_signature: componentSignature(target.closest('form[action*="/cart/add"]')),
-            mapping_confidence: "high",
-            mapping_source: "shopify_structured",
-            page_type: "pdp",
-            section_hint: findSectionName(target),
-          },
+        resolveProductIdentity(null).then(function (identity) {
+          trackResolvedProduct("component_click", identity, {
+            componentId: "buy_box",
+            variantId: resolveSelectedVariantId(),
+            context: {
+              action: "intent",
+              component_signature: componentSignature(target.closest('form[action*="/cart/add"]')),
+              mapping_confidence: "high",
+              mapping_source: "shopify_structured",
+              page_type: "pdp",
+              section_hint: findSectionName(target),
+            },
+          }, true);
         });
       },
       true
@@ -642,16 +811,14 @@
         var trigger = target.closest(MEDIA_TRIGGER_SELECTORS);
         if (!trigger) return;
 
-        var productId = resolveProductId(null);
-        if (!productId) return;
-
-        track("media_interaction", {
-          productId: productId,
-          componentId: "product_media",
-          context: {
-            action: classifyMediaAction(trigger),
-            media_index: resolveMediaIndex(trigger),
-          },
+        resolveProductIdentity(null).then(function (identity) {
+          trackResolvedProduct("media_interaction", identity, {
+            componentId: "product_media",
+            context: {
+              action: classifyMediaAction(trigger),
+              media_index: resolveMediaIndex(trigger),
+            },
+          }, true);
         });
       },
       true
@@ -699,13 +866,11 @@
         if (!(target instanceof HTMLElement)) return;
         if (!target.matches(VARIANT_SELECTORS)) return;
 
-        var productId = resolveProductId(null);
-        if (!productId) return;
-
-        track("variant_intent", {
-          productId: productId,
-          variantId: resolveSelectedVariantId(),
-          context: { options: collectSelectedOptions() },
+        resolveProductIdentity(null).then(function (identity) {
+          trackResolvedProduct("variant_intent", identity, {
+            context: { options: collectSelectedOptions() },
+            variantId: resolveSelectedVariantId(),
+          }, true);
         });
       },
       true
@@ -795,14 +960,14 @@
       var dwellMs = Date.now() - startTime;
       if (dwellMs < 500) return;
       updateScroll();
-      track("engage", {
-        productId: resolveProductId(null),
+      var identity = resolveProductIdentitySync(null);
+      trackResolvedProduct("engage", identity, {
         context: {
           dwell_ms: dwellMs,
           max_scroll_pct: maxScrollPct,
           page_type: pageType,
         },
-      });
+      }, false);
       flush();
     }
 

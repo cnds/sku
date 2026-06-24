@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 const source = readFileSync(
   new URL("../../../extensions/theme/assets/sku-lens-tracker.js", import.meta.url),
@@ -11,12 +11,12 @@ describe("storefront tracker event surface", () => {
   it("emits SDK DOM events without PDP view or add-to-cart funnel events", () => {
     expect(source).not.toContain('track("view"');
     expect(source).not.toContain('track("add_to_cart"');
-    expect(source).toContain('track("product_impression"');
-    expect(source).toContain('track("product_click"');
-    expect(source).toContain('track("component_impression"');
-    expect(source).toContain('track("component_click"');
-    expect(source).toContain('track("media_interaction"');
-    expect(source).toContain('track("variant_intent"');
+    expect(source).toContain('"product_impression"');
+    expect(source).toContain('"product_click"');
+    expect(source).toContain('"component_impression"');
+    expect(source).toContain('"component_click"');
+    expect(source).toContain('"media_interaction"');
+    expect(source).toContain('"variant_intent"');
     expect(source).toContain('componentId: "buy_box"');
     expect(source).toContain('componentId: "product_media"');
   });
@@ -71,16 +71,109 @@ describe("storefront tracker event surface", () => {
         expect.arrayContaining(["buy_box", "product_media", expectedDetailComponent]),
       );
       expect(events.some((event) => event.context.mapping_source === "theme_selector")).toBe(true);
+      expect(events.every((event) => event.product_id === "12345")).toBe(true);
+      expect(events.every((event) => event.context.product_id_source === "shopify_analytics")).toBe(true);
       expect(capturedBatches[0]).toMatchObject({
         shop_domain: "fixture.myshopify.com",
       });
     },
   );
+
+  it("records handle-only product clicks before product JSON resolves", async () => {
+    const capturedBatches = await runTrackerFixture({
+      descriptionClass: "collection-description",
+      deferProductJson: true,
+      flushImmediatelyAfterEvents: true,
+      mediaClass: "collection-media",
+      pageType: "collection",
+      productCardHandle: "widget",
+      variantClass: "collection-variants",
+    });
+    const productClick = capturedBatches.flatMap((batch) => batch.events).find(
+      (event) => event.event_type === "product_click",
+    );
+
+    expect(productClick).toMatchObject({
+      product_id: "handle:widget",
+      context: {
+        original_product_id: "handle:widget",
+        product_handle: "widget",
+        product_id_resolution: "unresolved",
+        product_id_source: "handle_fallback",
+      },
+    });
+  });
+
+  it("flushes engage synchronously on pagehide when PDP identity only has a URL handle", async () => {
+    const capturedBatches = await runTrackerFixture({
+      deferProductJson: true,
+      descriptionClass: "product-description",
+      flushImmediatelyAfterEvents: true,
+      mediaClass: "product-media",
+      omitShopifyAnalyticsProduct: true,
+      pagePath: "/products/widget",
+      pageType: "product",
+      triggerDomEvents: false,
+      triggerPagehide: true,
+      variantClass: "product-variants",
+    });
+    const engage = capturedBatches.flatMap((batch) => batch.events).find(
+      (event) => event.event_type === "engage",
+    );
+
+    expect(engage).toMatchObject({
+      event_type: "engage",
+      product_id: "handle:widget",
+      context: {
+        dwell_ms: 1000,
+        original_product_id: "handle:widget",
+        product_handle: "widget",
+        product_id_resolution: "unresolved",
+        product_id_source: "handle_fallback",
+      },
+    });
+  });
+
+  it("falls back to unresolved handle context when product JSON lookup fails", async () => {
+    const capturedBatches = await runTrackerFixture({
+      descriptionClass: "collection-description",
+      mediaClass: "collection-media",
+      pageType: "collection",
+      productCardHandle: "widget",
+      productJson: { body: {}, status: 404 },
+      variantClass: "collection-variants",
+    });
+    const productClick = capturedBatches.flatMap((batch) => batch.events).find(
+      (event) => event.event_type === "product_click",
+    );
+
+    expect(productClick).toMatchObject({
+      product_id: "handle:widget",
+      context: {
+        original_product_id: "handle:widget",
+        product_handle: "widget",
+        product_id_resolution: "unresolved",
+        product_id_source: "handle_fallback",
+      },
+    });
+  });
 });
 
 interface TrackerFixtureArgs {
+  deferProductJson?: boolean;
   descriptionClass: string;
+  flushImmediatelyAfterEvents?: boolean;
   mediaClass: string;
+  omitShopifyAnalyticsProduct?: boolean;
+  pagePath?: string;
+  pageType?: "collection" | "product";
+  productCardHandle?: string;
+  productJson?: {
+    body: Record<string, unknown>;
+    status: number;
+  };
+  triggerDomEvents?: boolean;
+  triggerPagehide?: boolean;
   variantClass: string;
 }
 
@@ -89,6 +182,7 @@ interface CapturedBatch {
     component_id: string | null;
     context: Record<string, unknown>;
     event_type: string;
+    product_id: string | null;
   }>;
   shop_domain: string;
 }
@@ -106,6 +200,8 @@ async function runTrackerFixture(args: TrackerFixtureArgs): Promise<CapturedBatc
   const previousGlobals = new Map(
     globalNames.map((name) => [name, Object.getOwnPropertyDescriptor(globalThis, name)]),
   );
+  let currentNow = 1000;
+  const dateNow = vi.spyOn(Date, "now").mockImplementation(() => currentNow);
 
   class FixtureElement {
     attributes: Record<string, string>;
@@ -197,8 +293,14 @@ async function runTrackerFixture(args: TrackerFixtureArgs): Promise<CapturedBatc
       if (selector === "button[name=\"add\"]") {
         return this.tagName === "BUTTON" && this.attributes.name === "add";
       }
+      if (selector === "a[href*=\"/products/\"]") {
+        return this.tagName === "A" && this.attributes.href?.includes("/products/") === true;
+      }
       if (selector === "[data-add-to-cart]") {
         return this.attributes["data-add-to-cart"] !== undefined;
+      }
+      if (selector === "[data-product-id]") {
+        return this.attributes["data-product-id"] !== undefined;
       }
       if (selector === "[data-sku-lens-component]") {
         return this.attributes["data-sku-lens-component"] !== undefined;
@@ -227,6 +329,12 @@ async function runTrackerFixture(args: TrackerFixtureArgs): Promise<CapturedBatc
 
     private hasClass(className: string): boolean {
       return this.className.split(/\s+/).includes(className);
+    }
+
+    hasAttribute(name: string): boolean {
+      if (name === "class") return this.className !== "";
+      if (name === "id") return this.id !== "";
+      return this.attributes[name] !== undefined;
     }
   }
 
@@ -271,6 +379,19 @@ async function runTrackerFixture(args: TrackerFixtureArgs): Promise<CapturedBatc
     attributes: { name: "id" },
     value: "variant-1",
   });
+  let productLink: FixtureElement | null = null;
+  if (args.productCardHandle) {
+    const productCard = new FixtureElement("div", {
+      className: "product-card",
+      textContent: "Widget card",
+    });
+    productLink = new FixtureElement("a", {
+      attributes: { href: `/products/${args.productCardHandle}` },
+      textContent: "Widget",
+    });
+    productCard.append(productLink);
+    body.append(productCard);
+  }
 
   form.append(hiddenVariant);
   form.append(button);
@@ -299,18 +420,29 @@ async function runTrackerFixture(args: TrackerFixtureArgs): Promise<CapturedBatc
       windowListeners[event].push(handler);
     },
     innerHeight: 600,
-    location: { pathname: "/products/demo-product", search: "" },
+    location: {
+      pathname: args.pagePath ?? (args.pageType === "collection" ? "/collections/frontpage" : "/products/demo-product"),
+      search: "",
+    },
     pageYOffset: 0,
     ShopifyAnalytics: {
       meta: {
-        page: { pageType: "product" },
-        product: { id: 12345 },
+        page: { pageType: args.pageType ?? "product" },
+        ...(args.pageType === "collection" || args.omitShopifyAnalyticsProduct ? {} : { product: { id: 12345 } }),
       },
     },
   };
 
   setGlobal("document", fixtureDocument);
   setGlobal("fetch", (url: string, init?: RequestInit) => {
+      if (args.productCardHandle && url === `/products/${args.productCardHandle}.js`) {
+        if (args.deferProductJson) {
+          return new Promise<Response>(() => {});
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify(args.productJson?.body ?? {}), { status: args.productJson?.status ?? 404 }),
+        );
+      }
       expect(url).toBe("https://api.example.test/ingest/events");
       capturedBatches.push(JSON.parse(String(init?.body)) as CapturedBatch);
       return Promise.resolve(new Response("{}", { status: 202 }));
@@ -325,16 +457,35 @@ async function runTrackerFixture(args: TrackerFixtureArgs): Promise<CapturedBatc
 
   try {
     Function(source)();
-    for (const target of [description, media, select, button]) {
-      const type = target === select ? "change" : "click";
-      for (const listener of documentListeners[type] ?? []) {
-        listener({ target });
+    currentNow = 2000;
+    if (args.triggerDomEvents !== false) {
+      for (const target of [description, media, select, button, productLink].filter(
+        (value): value is FixtureElement => value !== null,
+      )) {
+        const type = target === select ? "change" : "click";
+        for (const listener of documentListeners[type] ?? []) {
+          listener({ target });
+        }
       }
     }
-    globalThis.window.SkuLens.flush();
-    await Promise.resolve();
+    if (args.triggerPagehide) {
+      for (const listener of windowListeners.pagehide ?? []) {
+        listener();
+      }
+    }
+    if (args.flushImmediatelyAfterEvents) {
+      globalThis.window.SkuLens.flush();
+      await Promise.resolve();
+      return capturedBatches;
+    }
+    for (let i = 0; i < 5; i += 1) {
+      await Promise.resolve();
+      globalThis.window.SkuLens.flush();
+      await Promise.resolve();
+    }
     return capturedBatches;
   } finally {
+    dateNow.mockRestore();
     for (const [name, descriptor] of previousGlobals) {
       if (descriptor) {
         Object.defineProperty(globalThis, name, descriptor);

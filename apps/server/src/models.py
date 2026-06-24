@@ -66,6 +66,19 @@ class RawEvent(SQLModel, table=True):
     )
 
 
+class ShopProductIdentity(SQLModel, table=True):
+    __tablename__ = "shop_product_identities"
+    __table_args__ = (UniqueConstraint("shop_id", "handle", name="uq_shop_product_identity_handle"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    shop_id: str = Field(index=True)
+    product_id: str = Field(index=True)
+    handle: str | None = Field(default=None, index=True)
+    title: str | None = Field(default=None)
+    source: str = Field(default="unknown", index=True)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
+
+
 class DailyProductStat(SQLModel, table=True):
     __tablename__ = "daily_stats"
     __table_args__ = (UniqueConstraint("shop_id", "product_id", "stat_date", name="uq_daily_stats"),)
