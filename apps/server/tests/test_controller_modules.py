@@ -126,6 +126,7 @@ def test_all_business_routes_are_owned_by_controller_modules(
 ) -> None:
     app = create_app(_settings(sqlite_database_url, redis_url))
     expected = {
+        ("/api/healthz", ("GET",), "controllers.health"),
         ("/api/integration/health", ("GET",), "controllers.analytics"),
         ("/api/internal/card-review", ("GET",), "controllers.merchant_readiness"),
         ("/api/leaderboard", ("GET",), "controllers.analytics"),

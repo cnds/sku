@@ -10,6 +10,7 @@
 .turbo
 .venv
 .vscode
+var/
 .claude
 .pnpm-store
 __pycache__/

@@ -7,10 +7,14 @@
 .mypy_cache
 .pytest_cache
 .ruff_cache
+.pnpm-store
+.superpowers
 .turbo
 .venv
 .vscode
+var/
 __pycache__/
+celerybeat-schedule*
 *.db
 *.log
 *.pyc
@@ -20,4 +24,5 @@ coverage/
 dist/
 node_modules/
 apps/server/.venv/
-
+apps/web/build/
+apps/web/node_modules/

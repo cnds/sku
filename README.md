@@ -54,41 +54,67 @@ Shopify platform extensions, built by Shopify CLI and deployed to Shopify infras
 - Priority cards are selected from score-ranked product statistics: up to two Leakers and one Hidden Winner. When a real `AI_API_KEY` is configured, the selected cards reuse the AI diagnosis prompt to produce the card-level `suspected_friction` and `first_fix`; if AI is unavailable, rule-based copy remains the fallback.
 - Browser-side logs stay silent by default. To inspect `apps/web` browser polling or `extensions/theme` tracker behavior locally, set `localStorage['sku-lens:debug'] = '1'` before reproducing the flow.
 
-## Containerized Development
+## Runtime Compose
 
-1. Copy `.env.example` to `.env` and fill in Shopify credentials plus OpenAI-compatible AI credentials when needed.
-2. Sanity-check the stack definition with `docker compose --env-file .env.example config`.
-3. Build and start the full development stack with `docker compose up --build`.
-4. On the first boot, allow the `web` container time to finish `pnpm install` inside its Docker volumes before checking `localhost:3000`.
-5. Open `http://localhost:3000` for the embedded admin app.
-6. Use `http://localhost:8000` for direct API and ingest testing.
+The root `docker-compose.yml` is the shared runtime stack for production and local production-like testing. It builds immutable images from the root `Dockerfile`: the `server`, `worker`, and `worker-beat` services share the Python image, while `web` uses the Node/Remix image.
 
-Keep the `.env` host-facing values such as `DATABASE_URL`, `REDIS_URL`, and optional `CELERY_BROKER_URL` on `localhost` for bare-metal workflows. Docker Compose uses container-facing overrides for services inside the stack, including `DOCKER_REDIS_URL` and `DOCKER_CELERY_BROKER_URL`, which default to `redis://redis:6379/0`.
+1. Copy `.env.example` to `.env`.
+2. For local production-like testing, keep `SKU_LENS_ENV=local`, `SHOPIFY_APP_URL=http://localhost:3000`, and `SHOPIFY_WEBHOOK_BASE_URL=http://localhost:8000`.
+3. For production, set `SKU_LENS_ENV=production`, use strong URL-safe MySQL passwords, set real Shopify credentials, and use public HTTPS values for `SHOPIFY_APP_URL` and `SHOPIFY_WEBHOOK_BASE_URL`.
+4. Validate the stack with `docker compose --env-file .env config`.
+5. Build and start it with `docker compose up --build -d`.
+
+Runtime state is bind-mounted by default:
+
+- MySQL data: `${SKU_LENS_DATA_DIR:-./var/data}/mysql`
+- Redis data: `${SKU_LENS_DATA_DIR:-./var/data}/redis`
+- Celery Beat schedule: `${SKU_LENS_DATA_DIR:-./var/data}/celerybeat`
+
+Those paths are ignored by git. Rebuilding images does not remove them, and `docker compose down -v` does not delete bind-mounted files under `var/`; remove those directories explicitly only when you want a full data reset.
 
 Services started by Compose:
 
-- `mysql`: MySQL 8.4 on `localhost:3306`
-- `redis`: Redis 7.4 on `localhost:6379`
-- `server`: FastAPI app with reload on `localhost:8000`
+- `mysql`: MySQL 8.4, private to the Compose network
+- `redis`: Redis 7.4 with append-only persistence, private to the Compose network
+- `server`: FastAPI app on `${SERVER_BIND_HOST:-127.0.0.1}:${SERVER_PORT:-8000}`
 - `worker`: Celery worker for rollup and diagnosis tasks
 - `worker-beat`: single Celery Beat scheduler for due-shop rollup scans
-- `web`: Remix + Vite dev server on `localhost:3000`
+- `web`: Remix production server on `${WEB_BIND_HOST:-127.0.0.1}:${WEB_PORT:-3000}`
 
 Useful commands:
 
-- `docker compose --env-file .env.example config`: validate the Compose configuration
-- `docker compose up --build -d`: start everything in the background
+- `docker compose --env-file .env.example config`: validate the template values
+- `docker compose --env-file .env config`: validate the active environment
+- `docker compose up --build -d`: build and start everything in the background
 - `docker compose ps --all`: inspect service status and health
 - `docker compose logs -f web server worker worker-beat`: follow app logs
 - `docker compose restart worker worker-beat`: restart Celery processes after Python task or schedule changes
 - `docker compose down`: stop the stack
-- `docker compose down -v`: stop the stack and remove Docker volumes for a full reset
+- `docker compose down -v`: stop the stack and remove Docker-managed volumes; bind-mounted data under `${SKU_LENS_DATA_DIR:-./var/data}` remains in place
 
-The `server` and `web` services use source mounts for live development. The Celery worker and Beat scheduler share the same mounted code, but restart them after Python task or schedule changes. Compose intentionally keeps separate `.venv` volumes for `server`, `worker`, and `worker-beat`.
+When running behind an existing reverse proxy or platform router, keep the Compose port bindings on `127.0.0.1` and route:
+
+- `/api/*`, `/ingest/*`, and `/shopify/*` to `http://127.0.0.1:${SERVER_PORT:-8000}`
+- all other paths to `http://127.0.0.1:${WEB_PORT:-3000}`
+
+The proxy must preserve the original request path. Do not strip `/api`, `/ingest`, or `/shopify`.
+
+Health endpoints:
+
+- Backend: `GET /api/healthz`
+- Web: `GET /healthz`
+
+For a minimal MySQL backup, run this from the host after setting the same `.env` values used by Compose:
+
+```bash
+docker compose exec mysql sh -c 'mysqldump -uroot -p"$MYSQL_ROOT_PASSWORD" "$MYSQL_DATABASE"' > sku_lens_backup.sql
+```
+
+Application services write logs to stdout and stderr only. Docker keeps short local history with the `json-file` driver and log rotation from `docker-compose.yml`; production log retention and alerts should be handled by a host-level agent such as Vector, Fluent Bit, Promtail, or Filebeat collecting Docker container logs and forwarding them to your logging backend.
 
 ## Bare-Metal Development
 
-1. Start infrastructure with `docker compose up -d mysql redis`.
+1. Start MySQL and Redis outside the runtime Compose stack, or add a temporary local-only Compose override that publishes `3306` and `6379`.
 2. Install Python deps with `uv sync --directory apps/server --extra dev`.
 3. Install frontend deps with `pnpm install`.
 4. Copy `.env.example` to `.env` and fill in Shopify credentials plus OpenAI-compatible AI credentials when needed.
@@ -98,7 +124,7 @@ The `server` and `web` services use source mounts for live development. The Cele
 8. Seed repeatable demo data with `uv run --directory apps/server sku-lens-seed-demo`.
 9. Run the admin app with `pnpm dev`.
 
-`SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag and build the App Embed activation link. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook HMAC verification. `SHOPIFY_SCOPES` must include `read_orders` for order webhooks plus `write_pixels` and `read_customer_events` so OAuth can activate the app pixel. `SHOPIFY_WEBHOOK_BASE_URL` is the public backend base used for OAuth callback, webhook, and ingest URLs, while `SHOPIFY_APP_URL` is the embedded web app base used after install. `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for priority-card advice and product diagnosis reports; without a real `AI_API_KEY`, SKU Lens keeps the same score-based card selection and uses local fallback copy for merchant-facing advice. `REDIS_URL` is also the default Celery broker URL; set `CELERY_BROKER_URL` only if you need Celery to use a different Redis broker. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs. Set `SKU_LENS_INTERNAL_REVIEW=1` only when the gated card-review endpoint should be available.
+`SHOPIFY_API_KEY` must be set so the embedded admin shell can publish the App Bridge meta tag and build the App Embed activation link. `SHOPIFY_API_SECRET` is used for Shopify OAuth callback and webhook HMAC verification. `SHOPIFY_SCOPES` must include `read_orders` for order webhooks plus `write_pixels` and `read_customer_events` so OAuth can activate the app pixel. `SHOPIFY_WEBHOOK_BASE_URL` is the public backend base used for OAuth callback, webhook, and ingest URLs, while `SHOPIFY_APP_URL` is the embedded web app base used after install. `INGEST_SHARED_SECRET` plus `INGEST_TOKEN_TTL_SECONDS` control storefront ingest authentication. `AI_API_KEY`, `AI_MODEL`, and `AI_BASE_URL` configure the OpenAI-compatible Chat Completions provider for priority-card advice and product diagnosis reports; without a real `AI_API_KEY`, SKU Lens keeps the same score-based card selection and uses local fallback copy for merchant-facing advice. `DATABASE_URL`, `REDIS_URL`, and optional `CELERY_BROKER_URL` are used by bare-metal processes; the runtime Compose stack overrides them with container-internal service addresses. `SKU_LENS_LOG_LEVEL` defaults to `INFO` and controls both API and worker application logs. Set `SKU_LENS_INTERNAL_REVIEW=1` only when the gated card-review endpoint should be available.
 
 The demo seed command targets the most recent OAuth-installed Shopify shop by default, so data appears in the embedded admin app for that development store. If no OAuth-installed shop exists, it uses the latest installation record; if no installation exists, it falls back to `sku-dev-uaop8pff.myshopify.com`. Pass `--shop-domain <store>.myshopify.com` to seed a specific store. The command replaces only the repo's `demo-*` products for that shop, preserves existing OAuth tokens unless you explicitly override them, includes stable PDP component labels such as `product_description`, `shipping_returns`, and `recommendations`, and pre-generates diagnosis cards so `http://localhost:3000/?shop=<store>.myshopify.com&window=24h` renders real board and product data immediately.
 
@@ -115,7 +141,7 @@ Merchant-test copy, demo flow, App Store draft, competitor narrative, and theme 
 - `npm run typecheck`
 - `npm run build`
 
-The repository is expected to stay warning-clean under those commands. Backend tests should not emit Python warnings, and the web app is already opted into the current Remix v3 future flags used by this repo. For stack checks, wait for the `web` logs to print the Vite ready message before probing `http://localhost:3000`, and use `http://localhost:8000/openapi.json` as the backend health endpoint.
+The repository is expected to stay warning-clean under those commands. Backend tests should not emit Python warnings, and the web app is already opted into the current Remix v3 future flags used by this repo. For stack checks, use `http://localhost:8000/api/healthz` as the backend health endpoint and `http://localhost:3000/healthz` as the web health endpoint.
 
 ## Storefront Performance Check
 

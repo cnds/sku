@@ -7,12 +7,14 @@
     "build": "vite build",
     "dev": "vite dev",
     "lint": "tsc --noEmit",
+    "start": "remix-serve ./build/server/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@remix-run/node": "2.17.4",
     "@remix-run/react": "2.17.4",
+    "@remix-run/serve": "2.17.4",
     "@shopify/app-bridge-react": "4.2.10",
     "@shopify/polaris": "13.9.5",
     "@shopify/polaris-icons": "9.3.1",
