@@ -7,11 +7,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PageBottomSpacer } from "../app/components/PageBottomSpacer";
 
 const {
+  fetchBillingStatusMock,
   fetchPrioritiesMock,
   fetchProductAnalysisMock,
   fetchOrCreateDiagnosisMock,
   parseTimeWindowMock,
 } = vi.hoisted(() => ({
+  fetchBillingStatusMock: vi.fn(),
   fetchOrCreateDiagnosisMock: vi.fn(),
   fetchPrioritiesMock: vi.fn(),
   fetchProductAnalysisMock: vi.fn(),
@@ -19,6 +21,7 @@ const {
 }));
 
 vi.mock("../app/lib/api.server", () => ({
+  fetchBillingStatus: fetchBillingStatusMock,
   fetchPriorities: fetchPrioritiesMock,
   fetchOrCreateDiagnosis: fetchOrCreateDiagnosisMock,
   fetchProductAnalysis: fetchProductAnalysisMock,
@@ -30,11 +33,13 @@ import { ErrorBoundary, loader } from "../app/routes/products.$productId";
 
 describe("product analysis route loader", () => {
   beforeEach(() => {
+    fetchBillingStatusMock.mockReset();
     fetchPrioritiesMock.mockReset();
     fetchProductAnalysisMock.mockReset();
     fetchOrCreateDiagnosisMock.mockReset();
     parseTimeWindowMock.mockReset();
     parseTimeWindowMock.mockReturnValue("7d");
+    fetchBillingStatusMock.mockResolvedValue(billingStatusFixture());
     fetchPrioritiesMock.mockResolvedValue([]);
   });
 
@@ -70,6 +75,10 @@ describe("product analysis route loader", () => {
       shopId: "test-shop.myshopify.com",
       window: "7d",
     });
+    expect(fetchBillingStatusMock).toHaveBeenCalledWith({
+      requestId: expect.any(String),
+      shopId: "test-shop.myshopify.com",
+    });
     expect(fetchPrioritiesMock).toHaveBeenCalledWith({
       requestId: expect.any(String),
       shopId: "test-shop.myshopify.com",
@@ -80,6 +89,10 @@ describe("product analysis route loader", () => {
       analysis: {
         benchmark_product_id: "benchmark-1",
         product_id: "product-1",
+      },
+      billing: {
+        current_plan: "growth",
+        is_entitled: true,
       },
       diagnosisPath:
         "/resources/products/product-1/diagnosis?"
@@ -143,6 +156,28 @@ describe("product analysis route loader", () => {
     });
   });
 
+  it("does not load product analysis when billing is not entitled", async () => {
+    fetchBillingStatusMock.mockResolvedValue({
+      ...billingStatusFixture(),
+      current_plan: null,
+      is_entitled: false,
+      subscription_status: "unsubscribed",
+    });
+
+    const payload = await loader({
+      params: { productId: "product-1" },
+      request: new Request("https://example.test/products/product-1?shop=test-shop.myshopify.com&window=7d"),
+    } as never);
+
+    expect(fetchProductAnalysisMock).not.toHaveBeenCalled();
+    expect(fetchPrioritiesMock).not.toHaveBeenCalled();
+    expect(payload).toMatchObject({
+      analysis: null,
+      diagnosisPath: null,
+      productId: "product-1",
+    });
+  });
+
   it("renders the route error fallback without Remix route hooks", () => {
     const markup = renderToStaticMarkup(
       createElement(AppProvider, { i18n: polarisTranslations }, createElement(ErrorBoundary)),
@@ -158,3 +193,30 @@ describe("product analysis route loader", () => {
     expect(markup).toContain("height:3rem");
   });
 });
+
+function billingStatusFixture() {
+  return {
+    ai_refresh: {
+      limit: 150,
+      period_key: "2026-07",
+      remaining: 144,
+      used: 6,
+    },
+    billing_interval: "monthly",
+    current_period_ends_at: "2026-08-02T00:00:00Z",
+    current_plan: "growth",
+    installed: true,
+    is_entitled: true,
+    pdp_views: {
+      limit: 100000,
+      over_limit: false,
+      used: 2400,
+    },
+    pending_effective_at: null,
+    pending_plan: null,
+    plans: [],
+    shop_id: "test-shop.myshopify.com",
+    subscription_status: "active",
+    trial_ends_at: null,
+  };
+}

@@ -20,6 +20,12 @@ from db import (
 )
 from logging_utils import configure_logging
 from services.analysis import ProductAnalysisNotFoundError
+from services.billing import (
+    AiRefreshQuotaExceededError,
+    BillingShopNotInstalledError,
+    BillingSubscriptionRequiredError,
+    ShopifyBillingError,
+)
 from services.diagnosis import DiagnosisNotFoundError
 from services.ingest_auth import (
     IngestAuthError,
@@ -144,6 +150,38 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     ) -> JSONResponse:
         del request
         return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+    @app.exception_handler(BillingShopNotInstalledError)
+    async def billing_shop_not_installed_handler(
+        request: Request,
+        exc: BillingShopNotInstalledError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(status_code=404, content={"detail": str(exc)})
+
+    @app.exception_handler(BillingSubscriptionRequiredError)
+    async def billing_subscription_required_handler(
+        request: Request,
+        exc: BillingSubscriptionRequiredError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(status_code=402, content={"detail": str(exc)})
+
+    @app.exception_handler(AiRefreshQuotaExceededError)
+    async def ai_refresh_quota_exceeded_handler(
+        request: Request,
+        exc: AiRefreshQuotaExceededError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(status_code=402, content={"detail": str(exc)})
+
+    @app.exception_handler(ShopifyBillingError)
+    async def shopify_billing_error_handler(
+        request: Request,
+        exc: ShopifyBillingError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(status_code=502, content={"detail": str(exc)})
 
     @app.middleware("http")
     async def db_session_middleware(

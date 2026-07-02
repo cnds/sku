@@ -16,6 +16,11 @@ export function dashboardPath(shopId: string, window: string, host?: string): st
   return `/?${params}`;
 }
 
+export function onboardingPath(shopId: string, window: string, host?: string): string {
+  const params = routeParams(shopId, window, host);
+  return `/onboarding?${params}`;
+}
+
 export function diagnosisResourcePath(productId: string, shopId: string, window: string, host?: string): string {
   const params = routeParams(shopId, window, host);
   return `/resources/products/${encodeURIComponent(productId)}/diagnosis?${params}`;

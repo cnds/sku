@@ -127,6 +127,10 @@ def test_all_business_routes_are_owned_by_controller_modules(
     app = create_app(_settings(sqlite_database_url, redis_url))
     expected = {
         ("/api/healthz", ("GET",), "controllers.health"),
+        ("/api/billing/cancel", ("POST",), "controllers.billing"),
+        ("/api/billing/change-plan", ("POST",), "controllers.billing"),
+        ("/api/billing/status", ("GET",), "controllers.billing"),
+        ("/api/billing/subscribe", ("POST",), "controllers.billing"),
         ("/api/integration/health", ("GET",), "controllers.analytics"),
         ("/api/internal/card-review", ("GET",), "controllers.merchant_readiness"),
         ("/api/leaderboard", ("GET",), "controllers.analytics"),
@@ -141,6 +145,7 @@ def test_all_business_routes_are_owned_by_controller_modules(
         ("/shopify/oauth/callback", ("GET",), "controllers.shopify"),
         ("/shopify/oauth/callback", ("POST",), "controllers.shopify"),
         ("/shopify/oauth/start", ("GET",), "controllers.shopify"),
+        ("/shopify/billing/callback", ("GET",), "controllers.billing"),
         ("/shopify/webhooks/orders/create", ("POST",), "controllers.shopify"),
     }
     actual = {

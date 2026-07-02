@@ -6,11 +6,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PriorityCard } from "../app/lib/contracts";
 
 const {
+  fetchBillingStatusMock,
   fetchIntegrationHealthMock,
   fetchLeaderboardMock,
   fetchPrioritiesMock,
   parseTimeWindowMock,
 } = vi.hoisted(() => ({
+  fetchBillingStatusMock: vi.fn(),
   fetchIntegrationHealthMock: vi.fn(),
   fetchLeaderboardMock: vi.fn(),
   fetchPrioritiesMock: vi.fn(),
@@ -18,6 +20,7 @@ const {
 }));
 
 vi.mock("../app/lib/api.server", () => ({
+  fetchBillingStatus: fetchBillingStatusMock,
   fetchIntegrationHealth: fetchIntegrationHealthMock,
   fetchLeaderboard: fetchLeaderboardMock,
   fetchPriorities: fetchPrioritiesMock,
@@ -37,10 +40,13 @@ import {
 
 describe("dashboard route loader", () => {
   beforeEach(() => {
+    fetchBillingStatusMock.mockReset();
+    fetchIntegrationHealthMock.mockReset();
     fetchLeaderboardMock.mockReset();
     fetchPrioritiesMock.mockReset();
     parseTimeWindowMock.mockReset();
     parseTimeWindowMock.mockReturnValue("24h");
+    fetchBillingStatusMock.mockResolvedValue(billingStatusFixture());
     fetchIntegrationHealthMock.mockResolvedValue({
       checks: [],
       coverage: {
@@ -70,6 +76,10 @@ describe("dashboard route loader", () => {
       shopId: "test-shop.myshopify.com",
       window: "24h",
     });
+    expect(fetchBillingStatusMock).toHaveBeenCalledWith({
+      requestId: expect.any(String),
+      shopId: "test-shop.myshopify.com",
+    });
     expect(fetchIntegrationHealthMock).toHaveBeenCalledWith({
       requestId: expect.any(String),
       shopId: "test-shop.myshopify.com",
@@ -92,10 +102,37 @@ describe("dashboard route loader", () => {
       request: new Request("https://example.test/?window=24h"),
     } as never);
 
+    expect(fetchBillingStatusMock).toHaveBeenCalledWith({
+      requestId: expect.any(String),
+      shopId: "sku-dev-uaop8pff.myshopify.com",
+    });
     expect(fetchPrioritiesMock).toHaveBeenCalledWith({
       requestId: expect.any(String),
       shopId: "sku-dev-uaop8pff.myshopify.com",
       window: "24h",
+    });
+  });
+
+  it("does not fetch board data when the shop is not subscribed", async () => {
+    fetchBillingStatusMock.mockResolvedValue({
+      ...billingStatusFixture(),
+      current_plan: null,
+      is_entitled: false,
+      subscription_status: "unsubscribed",
+    });
+
+    const payload = await loader({
+      request: new Request("https://example.test/?shop=test-shop.myshopify.com&window=24h"),
+    } as never);
+
+    expect(fetchIntegrationHealthMock).not.toHaveBeenCalled();
+    expect(fetchPrioritiesMock).not.toHaveBeenCalled();
+    expect(fetchLeaderboardMock).not.toHaveBeenCalled();
+    expect(payload).toMatchObject({
+      blackboard: [],
+      health: null,
+      priorities: [],
+      redboard: [],
     });
   });
 
@@ -243,5 +280,53 @@ function priorityCardFixture(): PriorityCard {
     views: 50,
     window_end_date: "2026-05-27",
     window_start_date: "2026-05-20",
+  };
+}
+
+function billingStatusFixture() {
+  return {
+    ai_refresh: {
+      limit: 150,
+      period_key: "2026-07",
+      remaining: 144,
+      used: 6,
+    },
+    billing_interval: "monthly",
+    current_period_ends_at: "2026-08-02T00:00:00Z",
+    current_plan: "growth",
+    installed: true,
+    is_entitled: true,
+    pdp_views: {
+      limit: 100000,
+      over_limit: false,
+      used: 2400,
+    },
+    pending_effective_at: null,
+    pending_plan: null,
+    plans: [
+      {
+        ai_refresh_limit: 50,
+        annual_price_monthly_equivalent: 15,
+        history_days: 30,
+        monthly_price: 19,
+        name: "SKU Lens Starter",
+        pdp_view_soft_limit: 25000,
+        plan: "starter",
+        recommended: false,
+      },
+      {
+        ai_refresh_limit: 150,
+        annual_price_monthly_equivalent: 29,
+        history_days: 90,
+        monthly_price: 39,
+        name: "SKU Lens Growth",
+        pdp_view_soft_limit: 100000,
+        plan: "growth",
+        recommended: true,
+      },
+    ],
+    shop_id: "test-shop.myshopify.com",
+    subscription_status: "active",
+    trial_ends_at: null,
   };
 }

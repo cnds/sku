@@ -15,7 +15,7 @@ import {
 } from "@shopify/polaris";
 import { RefreshIcon } from "@shopify/polaris-icons";
 import { MarkdownText } from "@/components/MarkdownText";
-import type { DiagnosisResult, PriorityCard, ProductAnalysisResult } from "@/lib/contracts";
+import type { BillingQuotaResponse, DiagnosisResult, PriorityCard, ProductAnalysisResult } from "@/lib/contracts";
 import { BORDER_SECONDARY, INNER_BORDER_RADIUS } from "@/lib/tokens";
 
 import {
@@ -40,6 +40,7 @@ import {
 } from "@/lib/priorities";
 
 interface AnalysisPanelProps {
+  aiRefresh?: BillingQuotaResponse;
   analysis: ProductAnalysisResult;
   diagnosisPath: string;
   priorityCard?: PriorityCard | null;
@@ -422,11 +423,15 @@ function ShopperJourneyCard({
 }
 
 function DiagnosisHeader({
+  aiRefresh,
   diagnosis,
+  rerunDisabled,
   onRerun,
   showRerun,
 }: {
+  aiRefresh?: BillingQuotaResponse;
   diagnosis: DiagnosisResult;
+  rerunDisabled: boolean;
   onRerun: () => void;
   showRerun: boolean;
 }) {
@@ -442,26 +447,43 @@ function DiagnosisHeader({
         {diagnosis.status === "failed" ? <Badge tone="critical">{messages.analysis.diagnosisFailed}</Badge> : null}
       </InlineStack>
       {showRerun ? (
-        <Button icon={RefreshIcon} onClick={onRerun} size="slim">
-          Re-run
-        </Button>
+        <InlineStack gap="200" blockAlign="center">
+          {aiRefresh ? (
+            <Text as="p" variant="bodySm" tone="subdued">
+              AI refreshes left this month: {aiRefresh.remaining} / {aiRefresh.limit}
+            </Text>
+          ) : null}
+          <Button disabled={rerunDisabled} icon={RefreshIcon} onClick={onRerun} size="slim">
+            Re-run
+          </Button>
+        </InlineStack>
       ) : null}
     </InlineStack>
   );
 }
 
 function DiagnosisCards({
+  aiRefresh,
   diagnosis,
   onRerun,
 }: {
+  aiRefresh?: BillingQuotaResponse;
   diagnosis: DiagnosisResult;
   onRerun: () => void;
 }) {
+  const rerunDisabled = Boolean(aiRefresh && aiRefresh.remaining <= 0);
+
   if (diagnosis.status === "pending") {
     return (
       <Card>
         <BlockStack gap="400">
-          <DiagnosisHeader diagnosis={diagnosis} onRerun={onRerun} showRerun={false} />
+          <DiagnosisHeader
+            aiRefresh={aiRefresh}
+            diagnosis={diagnosis}
+            onRerun={onRerun}
+            rerunDisabled={rerunDisabled}
+            showRerun={false}
+          />
           <Text as="p" variant="bodySm" tone="subdued">{diagnosisFreshnessText(diagnosis)}</Text>
           <Banner tone="info">
             {messages.analysis.diagnosisPendingBanner}
@@ -476,8 +498,19 @@ function DiagnosisCards({
     return (
       <Card>
         <BlockStack gap="300">
-          <DiagnosisHeader diagnosis={diagnosis} onRerun={onRerun} showRerun />
+          <DiagnosisHeader
+            aiRefresh={aiRefresh}
+            diagnosis={diagnosis}
+            onRerun={onRerun}
+            rerunDisabled={rerunDisabled}
+            showRerun
+          />
           <Text as="p" variant="bodySm" tone="subdued">{diagnosisFreshnessText(diagnosis)}</Text>
+          {rerunDisabled ? (
+            <Banner tone="warning">
+              Existing diagnosis remains available. Upgrade or wait for the next billing period to refresh it again.
+            </Banner>
+          ) : null}
           <Banner tone="critical">
             {diagnosis.report_markdown ?? messages.analysis.diagnosisFailedFallback}
           </Banner>
@@ -523,8 +556,19 @@ function DiagnosisCards({
     <Box>
       <Box paddingBlockEnd="300">
         <BlockStack gap="100">
-          <DiagnosisHeader diagnosis={diagnosis} onRerun={onRerun} showRerun />
+          <DiagnosisHeader
+            aiRefresh={aiRefresh}
+            diagnosis={diagnosis}
+            onRerun={onRerun}
+            rerunDisabled={rerunDisabled}
+            showRerun
+          />
           <Text as="p" variant="bodySm" tone="subdued">{diagnosisFreshnessText(diagnosis)}</Text>
+          {rerunDisabled ? (
+            <Banner tone="warning">
+              Existing diagnosis remains available. Upgrade or wait for the next billing period to refresh it again.
+            </Banner>
+          ) : null}
         </BlockStack>
       </Box>
       <InlineGrid columns={{ xs: 1, md: 2 }} gap="400">
@@ -558,7 +602,7 @@ function DiagnosisCards({
   );
 }
 
-export function AnalysisPanel({ analysis, diagnosisPath, priorityCard }: AnalysisPanelProps) {
+export function AnalysisPanel({ aiRefresh, analysis, diagnosisPath, priorityCard }: AnalysisPanelProps) {
   const [diagnosis, setDiagnosis] = useState<DiagnosisResult>(createPendingDiagnosis);
   const [rerunToken, setRerunToken] = useState(0);
 
@@ -660,8 +704,12 @@ export function AnalysisPanel({ analysis, diagnosisPath, priorityCard }: Analysi
       {priorityCard ? <PriorityDetailCard card={priorityCard} /> : null}
       <ShopperJourneyCard analysis={analysis} priorityCard={priorityCard} />
       <DiagnosisCards
+        aiRefresh={aiRefresh}
         diagnosis={diagnosis}
         onRerun={() => {
+          if (aiRefresh && aiRefresh.remaining <= 0) {
+            return;
+          }
           setDiagnosis(createPendingDiagnosis());
           setRerunToken((current) => current + 1);
         }}

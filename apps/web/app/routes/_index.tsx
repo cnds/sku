@@ -6,6 +6,7 @@ import {
   Banner,
   BlockStack,
   Box,
+  Button,
   Card,
   InlineGrid,
   InlineStack,
@@ -19,8 +20,14 @@ import { MarkdownText } from "@/components/MarkdownText";
 import { PageBottomSpacer } from "@/components/PageBottomSpacer";
 import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { TIME_WINDOWS, formatTimeWindowLabel } from "@/lib/analytics";
-import { fetchIntegrationHealth, fetchLeaderboard, fetchPriorities, parseTimeWindow } from "@/lib/api.server";
-import type { IntegrationHealthResponse, PriorityCard, TimeWindow } from "@/lib/contracts";
+import {
+  fetchBillingStatus,
+  fetchIntegrationHealth,
+  fetchLeaderboard,
+  fetchPriorities,
+  parseTimeWindow,
+} from "@/lib/api.server";
+import type { BillingStatusResponse, IntegrationHealthResponse, PriorityCard, TimeWindow } from "@/lib/contracts";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
 import {
@@ -35,7 +42,7 @@ import {
 } from "@/lib/priorities";
 import { hostFromUrl, shopIdFromUrl } from "@/lib/shop";
 import { BORDER_SECONDARY, CARD_BORDER_RADIUS, CARD_SHADOW, INNER_BORDER_RADIUS } from "@/lib/tokens";
-import { dashboardPath, productPath } from "@/lib/url";
+import { dashboardPath, onboardingPath, productPath } from "@/lib/url";
 import interactiveStyles from "@/styles/interactive.module.css";
 
 export {
@@ -52,6 +59,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const shopId = shopIdFromUrl(url);
   const host = hostFromUrl(url);
   const window = parseTimeWindow(url.searchParams.get("window"));
+  const billing = await fetchBillingStatus({ requestId, shopId });
+  if (!billing.is_entitled) {
+    return {
+      billing,
+      blackboard: [],
+      health: null,
+      host,
+      priorities: [],
+      redboard: [],
+      shopId,
+      window,
+    };
+  }
+
   const [health, priorities, blackboard, redboard] = await Promise.all([
     fetchIntegrationHealth({ requestId, shopId, window }),
     fetchPriorities({ requestId, shopId, window }),
@@ -59,7 +80,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     fetchLeaderboard({ board: "red", requestId, shopId, window }),
   ]);
 
-  return { blackboard, health, host, priorities, redboard, shopId, window };
+  return { billing, blackboard, health, host, priorities, redboard, shopId, window };
 }
 
 const PRIORITY_SECTION_STYLE: CSSProperties = {
@@ -447,6 +468,17 @@ function PriorityCards({
 
 export default function DashboardRoute() {
   const data = useLoaderData<typeof loader>();
+  if (!data.billing.is_entitled || !data.health) {
+    return (
+      <DashboardBillingGate
+        billing={data.billing}
+        host={data.host}
+        shopId={data.shopId}
+        window={data.window}
+      />
+    );
+  }
+
   const totalTracked = data.blackboard.length + data.redboard.length;
   const primaryProductId = data.priorities[0]?.product_id ?? data.blackboard[0]?.product_id;
   const integrationHealth = readinessBannerContent(data.health);
@@ -529,6 +561,53 @@ export default function DashboardRoute() {
               </BlockStack>
               <PageBottomSpacer />
             </BlockStack>
+          </BlockStack>
+        </Layout.Section>
+      </Layout>
+    </Page>
+  );
+}
+
+function DashboardBillingGate({
+  billing,
+  host,
+  shopId,
+  window,
+}: {
+  billing: BillingStatusResponse;
+  host?: string;
+  shopId: string;
+  window: TimeWindow;
+}) {
+  const recommended = billing.plans.find((plan) => plan.recommended) ?? billing.plans[1] ?? billing.plans[0];
+
+  return (
+    <Page title={messages.app.name} subtitle={messages.dashboard.subtitle}>
+      <Layout>
+        <Layout.Section>
+          <BlockStack gap="400">
+            <Banner tone="warning">
+              <Text as="p" variant="bodyMd">
+                Choose a plan to unlock the Daily SKU Decision Board and product diagnostics for {shopId}.
+              </Text>
+            </Banner>
+            <Card>
+              <BlockStack gap="300">
+                <InlineStack align="space-between" blockAlign="center" gap="300">
+                  <BlockStack gap="100">
+                    <Text as="h2" variant="headingLg">Start with Growth</Text>
+                    <Text as="p" variant="bodyMd" tone="subdued">
+                      {recommended
+                        ? `$${recommended.monthly_price}/month, ${recommended.ai_refresh_limit} manual AI refreshes, and ${recommended.history_days} days of history.`
+                        : "Start a 14-day trial, then choose the plan that fits your store."}
+                    </Text>
+                  </BlockStack>
+                  <Button url={onboardingPath(shopId, window, host)} variant="primary">
+                    View plans
+                  </Button>
+                </InlineStack>
+              </BlockStack>
+            </Card>
           </BlockStack>
         </Layout.Section>
       </Layout>

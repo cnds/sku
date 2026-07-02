@@ -42,6 +42,26 @@ class RecommendationFeedbackAction(StrEnum):
     REMIND_LATER = "remind_later"
 
 
+class BillingPlan(StrEnum):
+    STARTER = "starter"
+    GROWTH = "growth"
+    PRO = "pro"
+
+
+class BillingStatus(StrEnum):
+    UNSUBSCRIBED = "unsubscribed"
+    TRIALING = "trialing"
+    ACTIVE = "active"
+    FROZEN = "frozen"
+    CANCELLED = "cancelled"
+    EXPIRED = "expired"
+
+
+class BillingInterval(StrEnum):
+    MONTHLY = "monthly"
+    ANNUAL = "annual"
+
+
 class RawEvent(SQLModel, table=True):
     __tablename__ = "raw_events"
     __table_args__ = (UniqueConstraint("shop_id", "channel", "dedupe_key", name="uq_raw_event_dedupe"),)
@@ -157,3 +177,34 @@ class RecommendationFeedback(SQLModel, table=True):
         sa_column=Column(JSON, nullable=False),
     )
     created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
+
+
+class ShopSubscription(SQLModel, table=True):
+    __tablename__ = "shop_subscriptions"
+    __table_args__ = (UniqueConstraint("shop_id", name="uq_shop_subscription_shop"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    shop_id: str = Field(index=True)
+    current_plan: BillingPlan | None = Field(default=None, index=True)
+    pending_plan: BillingPlan | None = Field(default=None, index=True)
+    status: BillingStatus = Field(default=BillingStatus.UNSUBSCRIBED, index=True)
+    billing_interval: BillingInterval | None = Field(default=None, index=True)
+    shopify_subscription_id: str | None = Field(default=None, index=True)
+    trial_started_at: datetime | None = Field(default=None)
+    trial_ends_at: datetime | None = Field(default=None)
+    current_period_started_at: datetime | None = Field(default=None)
+    current_period_ends_at: datetime | None = Field(default=None)
+    pending_effective_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
+
+
+class AiRefreshUsage(SQLModel, table=True):
+    __tablename__ = "ai_refresh_usage"
+    __table_args__ = (UniqueConstraint("shop_id", "period_key", name="uq_ai_refresh_usage_period"),)
+
+    id: int | None = Field(default=None, primary_key=True)
+    shop_id: str = Field(index=True)
+    period_key: str = Field(index=True)
+    manual_refresh_count: int = Field(default=0)
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(UTC), index=True)
