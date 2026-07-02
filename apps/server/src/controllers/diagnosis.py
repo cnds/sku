@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Query, Request
 
 from schemas import DiagnosisResult, ProductSnapshot, TimeWindow
+from services.billing import BillingService
 from services.diagnosis import ProductDiagnosisService
 from services.job_dispatch import JobDispatchService
 
@@ -24,6 +25,8 @@ async def trigger_product_diagnosis(
     window: Annotated[TimeWindow, WINDOW_QUERY] = TimeWindow.HOURS_24,
     force: bool = False,
 ) -> DiagnosisResult:
+    if force:
+        await BillingService(request.app.state.settings).consume_manual_ai_refresh(shop_id=shop_id)
     prepared = await ProductDiagnosisService().prepare_report(
         force=force,
         product_id=product_id,

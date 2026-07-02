@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     shopify_app_url: str
     shopify_scopes: str
     shopify_webhook_base_url: str
+    shopify_billing_test: bool = False
     ai_api_key: str = ""
     ai_model: str = "gpt-4o-mini"
     ai_base_url: str = "https://api.openai.com/v1"

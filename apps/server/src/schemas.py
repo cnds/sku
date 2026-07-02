@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from models import DiagnosisStatus, EventType, RecommendationFeedbackAction
+from models import BillingInterval, BillingPlan, BillingStatus, DiagnosisStatus, EventType, RecommendationFeedbackAction
 
 
 class TimeWindow(StrEnum):
@@ -159,6 +159,64 @@ class RecommendationFeedbackResponse(BaseModel):
     product_id: str
     shop_id: str
     window: TimeWindow
+
+
+class BillingPlanConfigResponse(BaseModel):
+    plan: BillingPlan
+    name: str
+    monthly_price: int
+    annual_price_monthly_equivalent: int
+    ai_refresh_limit: int
+    pdp_view_soft_limit: int
+    history_days: int
+    recommended: bool = False
+
+
+class BillingQuotaResponse(BaseModel):
+    used: int
+    limit: int
+    remaining: int
+    period_key: str
+
+
+class PdpViewsQuotaResponse(BaseModel):
+    used: int
+    limit: int
+    over_limit: bool
+
+
+class BillingStatusResponse(BaseModel):
+    shop_id: str
+    installed: bool
+    is_entitled: bool
+    subscription_status: BillingStatus
+    current_plan: BillingPlan | None
+    pending_plan: BillingPlan | None = None
+    billing_interval: BillingInterval | None = None
+    trial_ends_at: datetime | None = None
+    current_period_ends_at: datetime | None = None
+    pending_effective_at: datetime | None = None
+    ai_refresh: BillingQuotaResponse
+    pdp_views: PdpViewsQuotaResponse
+    plans: list[BillingPlanConfigResponse]
+
+
+class BillingSubscribeRequest(BaseModel):
+    shop_id: str
+    plan: BillingPlan
+    billing_interval: BillingInterval = BillingInterval.MONTHLY
+
+
+class BillingSubscribeResponse(BaseModel):
+    confirmation_url: str
+    plan: BillingPlan
+    billing_interval: BillingInterval
+    replacement_behavior: str
+
+
+class BillingCancelRequest(BaseModel):
+    shop_id: str
+    prorate: bool = False
 
 
 class LeaderboardEntry(BaseModel):

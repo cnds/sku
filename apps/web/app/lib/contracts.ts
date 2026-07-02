@@ -8,6 +8,9 @@ export type IntegrationHealthStatus = "healthy" | "partial" | "not_connected";
 export type IntegrationCheckStatus = "ok" | "missing";
 export type OnboardingChecklistStatus = "done" | "action" | "pending";
 export type RecommendationFeedbackAction = "will_try" | "not_useful" | "already_fixed" | "remind_later";
+export type BillingPlan = "starter" | "growth" | "pro";
+export type BillingInterval = "monthly" | "annual";
+export type BillingStatus = "unsubscribed" | "trialing" | "active" | "frozen" | "cancelled" | "expired";
 
 export interface LeaderboardEntry {
   product_id: string;
@@ -147,6 +150,53 @@ export interface RecommendationFeedbackResponse {
   product_id: string;
   shop_id: string;
   window: TimeWindow;
+}
+
+export interface BillingPlanConfigResponse {
+  plan: BillingPlan;
+  name: string;
+  monthly_price: number;
+  annual_price_monthly_equivalent: number;
+  ai_refresh_limit: number;
+  pdp_view_soft_limit: number;
+  history_days: number;
+  recommended: boolean;
+}
+
+export interface BillingQuotaResponse {
+  used: number;
+  limit: number;
+  remaining: number;
+  period_key: string;
+}
+
+export interface PdpViewsQuotaResponse {
+  used: number;
+  limit: number;
+  over_limit: boolean;
+}
+
+export interface BillingStatusResponse {
+  shop_id: string;
+  installed: boolean;
+  is_entitled: boolean;
+  subscription_status: BillingStatus;
+  current_plan: BillingPlan | null;
+  pending_plan: BillingPlan | null;
+  billing_interval: BillingInterval | null;
+  trial_ends_at: string | null;
+  current_period_ends_at: string | null;
+  pending_effective_at: string | null;
+  ai_refresh: BillingQuotaResponse;
+  pdp_views: PdpViewsQuotaResponse;
+  plans: BillingPlanConfigResponse[];
+}
+
+export interface BillingSubscribeResponse {
+  confirmation_url: string;
+  plan: BillingPlan;
+  billing_interval: BillingInterval;
+  replacement_behavior: string;
 }
 
 export interface InternalCardReviewItem {

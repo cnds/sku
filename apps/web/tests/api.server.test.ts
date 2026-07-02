@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   createDiagnosis,
+  fetchBillingStatus,
   fetchDiagnosis,
   fetchInternalCardReview,
   fetchIntegrationHealth,
@@ -10,6 +11,7 @@ import {
   fetchPriorities,
   fetchProductAnalysis,
   postRecommendationFeedback,
+  subscribeToPlan,
 } from "../app/lib/api.server";
 
 describe("api.server logging", () => {
@@ -215,6 +217,80 @@ describe("api.server logging", () => {
       "http://localhost:8000/api/onboarding/status?shop_id=demo.myshopify.com&window=24h",
     );
     expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-onboarding");
+  });
+
+  it("fetches billing status from the backend billing endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          ai_refresh: { limit: 150, period_key: "2026-07", remaining: 144, used: 6 },
+          billing_interval: "monthly",
+          current_period_ends_at: "2026-08-02T00:00:00Z",
+          current_plan: "growth",
+          installed: true,
+          is_entitled: true,
+          pdp_views: { limit: 100000, over_limit: false, used: 2400 },
+          pending_effective_at: null,
+          pending_plan: null,
+          plans: [],
+          shop_id: "demo.myshopify.com",
+          subscription_status: "active",
+          trial_ends_at: null,
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        },
+      ),
+    ) as typeof fetch;
+
+    await fetchBillingStatus({
+      requestId: "req-billing",
+      shopId: "demo.myshopify.com",
+    });
+
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] ?? [];
+    const headers = new Headers(init?.headers);
+
+    expect(String(url)).toBe("http://localhost:8000/api/billing/status?shop_id=demo.myshopify.com");
+    expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-billing");
+  });
+
+  it("posts subscription selections to the backend billing endpoint", async () => {
+    global.fetch = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          billing_interval: "annual",
+          confirmation_url: "https://demo.myshopify.com/admin/charges/confirm",
+          plan: "growth",
+          replacement_behavior: "STANDARD",
+        }),
+        {
+          headers: { "Content-Type": "application/json" },
+          status: 200,
+        },
+      ),
+    ) as typeof fetch;
+
+    await subscribeToPlan({
+      billingInterval: "annual",
+      plan: "growth",
+      requestId: "req-subscribe",
+      shopId: "demo.myshopify.com",
+    });
+
+    const [url, init] = vi.mocked(global.fetch).mock.calls[0] ?? [];
+    const headers = new Headers(init?.headers);
+
+    expect(String(url)).toBe("http://localhost:8000/api/billing/subscribe");
+    expect(init?.method).toBe("POST");
+    expect(headers.get("Content-Type")).toBe("application/json");
+    expect(headers.get("X-SKU-Lens-Request-Id")).toBe("req-subscribe");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      billing_interval: "annual",
+      plan: "growth",
+      shop_id: "demo.myshopify.com",
+    });
   });
 
   it("posts lightweight recommendation feedback to the backend", async () => {

@@ -1,4 +1,8 @@
 import type {
+  BillingInterval,
+  BillingPlan,
+  BillingStatusResponse,
+  BillingSubscribeResponse,
   DiagnosisResult,
   InternalCardReviewResponse,
   IntegrationHealthResponse,
@@ -89,6 +93,87 @@ export async function fetchOnboardingStatus(args: {
     {
       requestId: args.requestId,
       route: "onboarding_status",
+    },
+  );
+}
+
+export async function fetchBillingStatus(args: {
+  requestId: string;
+  shopId: string;
+}): Promise<BillingStatusResponse> {
+  return fetchJson<BillingStatusResponse>(
+    apiPath("/api/billing/status", { shop_id: args.shopId }),
+    {
+      requestId: args.requestId,
+      route: "billing_status",
+    },
+  );
+}
+
+export async function subscribeToPlan(args: {
+  billingInterval: BillingInterval;
+  plan: BillingPlan;
+  requestId: string;
+  shopId: string;
+}): Promise<BillingSubscribeResponse> {
+  return fetchJson<BillingSubscribeResponse>(
+    "/api/billing/subscribe",
+    {
+      requestId: args.requestId,
+      route: "billing_subscribe",
+    },
+    {
+      body: JSON.stringify({
+        billing_interval: args.billingInterval,
+        plan: args.plan,
+        shop_id: args.shopId,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
+  );
+}
+
+export async function changeBillingPlan(args: {
+  billingInterval: BillingInterval;
+  plan: BillingPlan;
+  requestId: string;
+  shopId: string;
+}): Promise<BillingSubscribeResponse> {
+  return fetchJson<BillingSubscribeResponse>(
+    "/api/billing/change-plan",
+    {
+      requestId: args.requestId,
+      route: "billing_change_plan",
+    },
+    {
+      body: JSON.stringify({
+        billing_interval: args.billingInterval,
+        plan: args.plan,
+        shop_id: args.shopId,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    },
+  );
+}
+
+export async function cancelBillingPlan(args: {
+  requestId: string;
+  shopId: string;
+}): Promise<BillingStatusResponse> {
+  return fetchJson<BillingStatusResponse>(
+    "/api/billing/cancel",
+    {
+      requestId: args.requestId,
+      route: "billing_cancel",
+    },
+    {
+      body: JSON.stringify({
+        shop_id: args.shopId,
+      }),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
     },
   );
 }

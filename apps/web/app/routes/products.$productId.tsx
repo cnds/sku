@@ -1,17 +1,17 @@
 import type { LoaderFunctionArgs } from "@remix-run/node";
 import { useLoaderData } from "@remix-run/react";
-import { Badge, Banner, BlockStack, Card, InlineStack, Layout, Page, Text } from "@shopify/polaris";
+import { Badge, Banner, BlockStack, Button, Card, InlineStack, Layout, Page, Text } from "@shopify/polaris";
 
 import { AnalysisPanel } from "@/components/AnalysisPanel";
 import { PageBottomSpacer } from "@/components/PageBottomSpacer";
 import { RecommendationFeedbackButtons } from "@/components/RecommendationFeedback";
 import { formatTimeWindowLabel } from "@/lib/analytics";
-import { fetchPriorities, fetchProductAnalysis, parseTimeWindow } from "@/lib/api.server";
+import { fetchBillingStatus, fetchPriorities, fetchProductAnalysis, parseTimeWindow } from "@/lib/api.server";
 import { requestIdFromHeaders } from "@/lib/logging";
 import { messages } from "@/lib/messages";
 import { priorityActionLabel, priorityBoardLabel, priorityTone } from "@/lib/priorities";
 import { hostFromUrl, shopIdFromUrl } from "@/lib/shop";
-import { dashboardPath, diagnosisResourcePath } from "@/lib/url";
+import { dashboardPath, diagnosisResourcePath, onboardingPath } from "@/lib/url";
 
 export function boardLabelForGap(gapValue: number): { label: string; tone: "critical" | "success" } {
   return gapValue > 0
@@ -40,6 +40,20 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
   const host = hostFromUrl(url);
   const window = parseTimeWindow(url.searchParams.get("window"));
   const productId = params.productId ?? "";
+  const billing = await fetchBillingStatus({ requestId, shopId });
+  if (!billing.is_entitled) {
+    return {
+      analysis: null,
+      billing,
+      diagnosisPath: null,
+      host,
+      productId,
+      priorityCard: null,
+      shopId,
+      window,
+    };
+  }
+
   const [analysis, priorities] = await Promise.all([
     fetchProductAnalysis({ productId, requestId, shopId, window }),
     fetchPriorities({ requestId, shopId, window }),
@@ -48,6 +62,7 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
   return {
     analysis,
+    billing,
     diagnosisPath: diagnosisResourcePath(productId, shopId, window, host),
     host,
     productId,
@@ -59,6 +74,30 @@ export async function loader({ params, request }: LoaderFunctionArgs) {
 
 export default function ProductAnalysisRoute() {
   const data = useLoaderData<typeof loader>();
+  if (!data.billing.is_entitled || !data.analysis || !data.diagnosisPath) {
+    return (
+      <Page
+        title={data.productId}
+        backAction={{ content: messages.product.backAction, url: dashboardPath(data.shopId, data.window, data.host) }}
+      >
+        <Layout>
+          <Layout.Section>
+            <BlockStack gap="400">
+              <Banner tone="warning">
+                <Text as="p" variant="bodyMd">
+                  Choose a plan to unlock product diagnostics and manual AI refreshes for {data.shopId}.
+                </Text>
+              </Banner>
+              <Button url={onboardingPath(data.shopId, data.window, data.host)} variant="primary">
+                View plans
+              </Button>
+            </BlockStack>
+          </Layout.Section>
+        </Layout>
+      </Page>
+    );
+  }
+
   const board = data.priorityCard
     ? { label: priorityBoardLabel(data.priorityCard.board), tone: priorityTone(data.priorityCard) }
     : boardLabelForGap(data.analysis.gap);
@@ -94,6 +133,7 @@ export default function ProductAnalysisRoute() {
         <Layout.Section>
           <BlockStack gap="400">
             <AnalysisPanel
+              aiRefresh={data.billing.ai_refresh}
               analysis={data.analysis}
               diagnosisPath={data.diagnosisPath}
               priorityCard={data.priorityCard}
